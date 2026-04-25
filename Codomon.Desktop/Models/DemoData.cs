@@ -1,54 +1,36 @@
-using Avalonia;
-
 namespace Codomon.Desktop.Models;
 
 public static class DemoData
 {
-    public static List<SystemBoxModel> Systems { get; } = new();
-    public static List<ConnectionModel> Connections { get; } = new();
+    public static WorkspaceModel Workspace { get; } = CreateWorkspace();
 
-    static DemoData()
+    private static WorkspaceModel CreateWorkspace()
     {
-        var sysA = new SystemBoxModel
+        var sysA = new SystemBoxModel { Id = "sysA", Name = "System A", X = 40, Y = 40, Width = 220, Height = 200 };
+        sysA.Modules.Add(new ModuleBoxModel { Id = "modA1", SystemId = "sysA", Name = "Module A1", RelativeX = 20, RelativeY = 40, Width = 80, Height = 40 });
+        sysA.Modules.Add(new ModuleBoxModel { Id = "modA2", SystemId = "sysA", Name = "Module A2", RelativeX = 20, RelativeY = 100, Width = 80, Height = 40 });
+
+        var sysB = new SystemBoxModel { Id = "sysB", Name = "System B", X = 320, Y = 40, Width = 220, Height = 200 };
+        sysB.Modules.Add(new ModuleBoxModel { Id = "modB1", SystemId = "sysB", Name = "Module B1", RelativeX = 20, RelativeY = 40, Width = 80, Height = 40 });
+        sysB.Modules.Add(new ModuleBoxModel { Id = "modB2", SystemId = "sysB", Name = "Module B2", RelativeX = 20, RelativeY = 100, Width = 80, Height = 40 });
+
+        var sysC = new SystemBoxModel { Id = "sysC", Name = "System C", X = 180, Y = 300, Width = 220, Height = 160 };
+        sysC.Modules.Add(new ModuleBoxModel { Id = "modC1", SystemId = "sysC", Name = "Module C1", RelativeX = 20, RelativeY = 40, Width = 80, Height = 40 });
+
+        var workspace = new WorkspaceModel
         {
-            Id = "sysA",
-            Name = "System A",
-            Bounds = new Rect(40, 40, 220, 200),
-            Modules = new List<ModuleBoxModel>
-            {
-                new() { Id = "modA1", Name = "Module A1", ParentSystemId = "sysA", Bounds = new Rect(60, 80, 80, 40) },
-                new() { Id = "modA2", Name = "Module A2", ParentSystemId = "sysA", Bounds = new Rect(60, 140, 80, 40) },
-            }
+            WorkspaceName = "Demo Workspace",
+            SourceProjectPath = string.Empty,
+            ActiveProfile = new ProfileModel { ProfileName = "Default" }
         };
 
-        var sysB = new SystemBoxModel
-        {
-            Id = "sysB",
-            Name = "System B",
-            Bounds = new Rect(320, 40, 220, 200),
-            Modules = new List<ModuleBoxModel>
-            {
-                new() { Id = "modB1", Name = "Module B1", ParentSystemId = "sysB", Bounds = new Rect(340, 80, 80, 40) },
-                new() { Id = "modB2", Name = "Module B2", ParentSystemId = "sysB", Bounds = new Rect(340, 140, 80, 40) },
-            }
-        };
+        workspace.Systems.Add(sysA);
+        workspace.Systems.Add(sysB);
+        workspace.Systems.Add(sysC);
 
-        var sysC = new SystemBoxModel
-        {
-            Id = "sysC",
-            Name = "System C",
-            Bounds = new Rect(180, 300, 220, 160),
-            Modules = new List<ModuleBoxModel>
-            {
-                new() { Id = "modC1", Name = "Module C1", ParentSystemId = "sysC", Bounds = new Rect(200, 340, 80, 40) },
-            }
-        };
+        workspace.Connections.Add(new ConnectionModel { Id = "conn1", Name = "calls", FromId = "sysA", ToId = "sysB", Origin = ConnectionOrigin.Manual });
+        workspace.Connections.Add(new ConnectionModel { Id = "conn2", Name = "feeds", FromId = "sysB", ToId = "sysC", Origin = ConnectionOrigin.Manual });
 
-        Systems.Add(sysA);
-        Systems.Add(sysB);
-        Systems.Add(sysC);
-
-        Connections.Add(new ConnectionModel { FromId = "sysA", ToId = "sysB", Label = "calls" });
-        Connections.Add(new ConnectionModel { FromId = "sysB", ToId = "sysC", Label = "feeds" });
+        return workspace;
     }
 }
