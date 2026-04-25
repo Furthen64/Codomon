@@ -4,21 +4,17 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Codomon.Desktop.Models;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace Codomon.Desktop.Controls;
 
 public class MainCanvasControl : Control
 {
-    private readonly List<SystemBoxModel> _systems;
-    private readonly List<ConnectionModel> _connections;
+    private readonly WorkspaceModel _workspace;
+    private readonly SelectionStateModel _selectionState;
 
-    private object? _selectedItem;
     private SystemBoxModel? _draggingSystem;
     private Point _dragOffset;
-
-    public event Action<object?>? SelectionChanged;
 
     private static readonly IBrush SystemFill = new SolidColorBrush(Color.FromRgb(30, 58, 95));
     private static readonly IBrush SystemFillSelected = new SolidColorBrush(Color.FromRgb(0, 120, 215));
@@ -36,44 +32,52 @@ public class MainCanvasControl : Control
     private static readonly Pen ModulePenSelected = new Pen(ModuleFillSelected, 2);
     private static readonly Pen ConnectionPen = new Pen(ConnectionBrush, 1.5) { DashStyle = DashStyle.Dash };
 
-    public MainCanvasControl(List<SystemBoxModel> systems, List<ConnectionModel> connections)
+    public MainCanvasControl(WorkspaceModel workspace, SelectionStateModel selectionState)
     {
-        _systems = systems;
-        _connections = connections;
+        _workspace = workspace;
+        _selectionState = selectionState;
 
         Focusable = true;
         ClipToBounds = true;
+
+        _selectionState.PropertyChanged += (_, _) => InvalidateVisual();
 
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
     }
 
-    public object? SelectedItem => _selectedItem;
+    private static Rect GetModuleAbsoluteBounds(ModuleBoxModel mod, SystemBoxModel sys)
+        => new Rect(sys.X + mod.RelativeX, sys.Y + mod.RelativeY, mod.Width, mod.Height);
+
+    private static Rect GetSystemBounds(SystemBoxModel sys)
+        => new Rect(sys.X, sys.Y, sys.Width, sys.Height);
 
     public override void Render(DrawingContext context)
     {
         context.FillRectangle(BackgroundBrush, new Rect(Bounds.Size));
 
-        foreach (var conn in _connections)
+        foreach (var conn in _workspace.Connections)
         {
             DrawConnection(context, conn);
         }
 
-        foreach (var sys in _systems)
+        foreach (var sys in _workspace.Systems)
         {
-            DrawSystem(context, sys);
+            if (sys.IsVisible)
+                DrawSystem(context, sys);
         }
     }
 
     private void DrawSystem(DrawingContext context, SystemBoxModel sys)
     {
-        bool isSelected = _selectedItem == sys;
+        bool isSelected = _selectionState.SelectedId == sys.Id;
         var fill = isSelected ? SystemFillSelected : SystemFill;
         var pen = isSelected ? SystemPenSelected : SystemPen;
+        var bounds = GetSystemBounds(sys);
 
-        context.FillRectangle(fill, sys.Bounds);
-        context.DrawRectangle(pen, sys.Bounds);
+        context.FillRectangle(fill, bounds);
+        context.DrawRectangle(pen, bounds);
 
         var tf = new FormattedText(
             sys.Name,
@@ -82,16 +86,19 @@ public class MainCanvasControl : Control
             Typeface.Default,
             14,
             LabelBrush);
-        context.DrawText(tf, new Point(sys.Bounds.X + 8, sys.Bounds.Y + 8));
+        context.DrawText(tf, new Point(bounds.X + 8, bounds.Y + 8));
 
         foreach (var mod in sys.Modules)
         {
-            bool modSelected = _selectedItem == mod;
+            if (!mod.IsVisible) continue;
+
+            bool modSelected = _selectionState.SelectedId == mod.Id;
             var mFill = modSelected ? ModuleFillSelected : ModuleFill;
             var mPen = modSelected ? ModulePenSelected : ModulePen;
+            var mBounds = GetModuleAbsoluteBounds(mod, sys);
 
-            context.FillRectangle(mFill, mod.Bounds);
-            context.DrawRectangle(mPen, mod.Bounds);
+            context.FillRectangle(mFill, mBounds);
+            context.DrawRectangle(mPen, mBounds);
 
             var mtf = new FormattedText(
                 mod.Name,
@@ -100,27 +107,22 @@ public class MainCanvasControl : Control
                 Typeface.Default,
                 11,
                 LabelBrush);
-            context.DrawText(mtf, new Point(mod.Bounds.X + 4, mod.Bounds.Y + 4));
+            context.DrawText(mtf, new Point(mBounds.X + 4, mBounds.Y + 4));
         }
     }
 
     private void DrawConnection(DrawingContext context, ConnectionModel conn)
     {
-        var fromSys = _systems.FirstOrDefault(s => s.Id == conn.FromId);
-        var toSys = _systems.FirstOrDefault(s => s.Id == conn.ToId);
-        if (fromSys == null || toSys == null) return;
+        var fromPt = ResolveConnectionPoint(conn.FromId);
+        var toPt = ResolveConnectionPoint(conn.ToId);
+        if (fromPt == null || toPt == null) return;
 
-        var fromCenter = new Point(fromSys.Bounds.X + fromSys.Bounds.Width / 2,
-                                   fromSys.Bounds.Y + fromSys.Bounds.Height / 2);
-        var toCenter = new Point(toSys.Bounds.X + toSys.Bounds.Width / 2,
-                                 toSys.Bounds.Y + toSys.Bounds.Height / 2);
+        context.DrawLine(ConnectionPen, fromPt.Value, toPt.Value);
 
-        context.DrawLine(ConnectionPen, fromCenter, toCenter);
-
-        var midX = (fromCenter.X + toCenter.X) / 2;
-        var midY = (fromCenter.Y + toCenter.Y) / 2;
+        var midX = (fromPt.Value.X + toPt.Value.X) / 2;
+        var midY = (fromPt.Value.Y + toPt.Value.Y) / 2;
         var ltf = new FormattedText(
-            conn.Label,
+            conn.Name,
             System.Globalization.CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             Typeface.Default,
@@ -129,48 +131,91 @@ public class MainCanvasControl : Control
         context.DrawText(ltf, new Point(midX, midY));
     }
 
+    private Point? ResolveConnectionPoint(string id)
+    {
+        var sys = _workspace.Systems.FirstOrDefault(s => s.Id == id);
+        if (sys != null)
+            return new Point(sys.X + sys.Width / 2, sys.Y + sys.Height / 2);
+
+        foreach (var s in _workspace.Systems)
+        {
+            var mod = s.Modules.FirstOrDefault(m => m.Id == id);
+            if (mod != null)
+                return new Point(s.X + mod.RelativeX + mod.Width / 2, s.Y + mod.RelativeY + mod.Height / 2);
+        }
+
+        return null;
+    }
+
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var pos = e.GetPosition(this);
         Focus();
 
-        object? hit = null;
-        foreach (var sys in _systems)
+        // Check modules first (they are on top of systems)
+        ModuleBoxModel? hitMod = null;
+        SystemBoxModel? hitModParent = null;
+        foreach (var sys in _workspace.Systems)
         {
+            if (!sys.IsVisible) continue;
             foreach (var mod in sys.Modules)
             {
-                if (mod.Bounds.Contains(pos))
+                if (!mod.IsVisible) continue;
+                if (GetModuleAbsoluteBounds(mod, sys).Contains(pos))
                 {
-                    hit = mod;
+                    hitMod = mod;
+                    hitModParent = sys;
                     break;
                 }
             }
-            if (hit != null) break;
+            if (hitMod != null) break;
         }
 
-        if (hit == null)
+        SystemBoxModel? hitSys = null;
+        if (hitMod == null)
         {
-            foreach (var sys in _systems)
+            foreach (var sys in _workspace.Systems)
             {
-                if (sys.Bounds.Contains(pos))
+                if (!sys.IsVisible) continue;
+                if (GetSystemBounds(sys).Contains(pos))
                 {
-                    hit = sys;
+                    hitSys = sys;
                     break;
                 }
             }
         }
 
-        if (hit is SystemBoxModel sysHit)
+        if (hitSys != null)
         {
-            _draggingSystem = sysHit;
-            _dragOffset = new Point(pos.X - sysHit.Bounds.X, pos.Y - sysHit.Bounds.Y);
+            _draggingSystem = hitSys;
+            _dragOffset = new Point(pos.X - hitSys.X, pos.Y - hitSys.Y);
             e.Pointer.Capture(this);
         }
 
-        if (_selectedItem != hit)
+        string newId = hitMod?.Id ?? hitSys?.Id ?? string.Empty;
+        if (_selectionState.SelectedId != newId)
         {
-            _selectedItem = hit;
-            SelectionChanged?.Invoke(_selectedItem);
+            _workspace.ClearSelection();
+            if (hitMod != null)
+            {
+                hitMod.IsSelected = true;
+                _selectionState.SelectedId = hitMod.Id;
+                _selectionState.SelectedType = "Module";
+                _selectionState.SelectedName = hitMod.Name;
+            }
+            else if (hitSys != null)
+            {
+                hitSys.IsSelected = true;
+                _selectionState.SelectedId = hitSys.Id;
+                _selectionState.SelectedType = "System";
+                _selectionState.SelectedName = hitSys.Name;
+            }
+            else
+            {
+                _selectionState.SelectedId = string.Empty;
+                _selectionState.SelectedType = string.Empty;
+                _selectionState.SelectedName = string.Empty;
+            }
         }
 
         InvalidateVisual();
@@ -181,17 +226,8 @@ public class MainCanvasControl : Control
         if (_draggingSystem == null) return;
         var pos = e.GetPosition(this);
 
-        var newX = pos.X - _dragOffset.X;
-        var newY = pos.Y - _dragOffset.Y;
-        var dx = newX - _draggingSystem.Bounds.X;
-        var dy = newY - _draggingSystem.Bounds.Y;
-
-        _draggingSystem.Bounds = new Rect(newX, newY, _draggingSystem.Bounds.Width, _draggingSystem.Bounds.Height);
-
-        foreach (var mod in _draggingSystem.Modules)
-        {
-            mod.Bounds = new Rect(mod.Bounds.X + dx, mod.Bounds.Y + dy, mod.Bounds.Width, mod.Bounds.Height);
-        }
+        _draggingSystem.X = pos.X - _dragOffset.X;
+        _draggingSystem.Y = pos.Y - _dragOffset.Y;
 
         InvalidateVisual();
     }

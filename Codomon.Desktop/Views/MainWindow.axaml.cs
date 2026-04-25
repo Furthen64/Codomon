@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Codomon.Desktop.Controls;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.ViewModels;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace Codomon.Desktop.Views;
@@ -21,27 +20,29 @@ public partial class MainWindow : Window
 
         SetupCanvas();
         SetupTreeView();
+
+        _vm.Selection.PropertyChanged += (_, _) => UpdatePropertiesPanel();
     }
 
     private void SetupCanvas()
     {
-        _canvas = new MainCanvasControl(DemoData.Systems, DemoData.Connections);
-        _canvas.SelectionChanged += OnCanvasSelectionChanged;
+        _canvas = new MainCanvasControl(_vm.Workspace, _vm.Selection);
 
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
             host.Content = _canvas;
     }
 
-    private void OnCanvasSelectionChanged(object? item)
+    private void UpdatePropertiesPanel()
     {
-        _vm.OnSelectionChanged(item);
-
         var nameText = this.FindControl<TextBlock>("PropNameText");
         var typeText = this.FindControl<TextBlock>("PropTypeText");
 
-        if (nameText != null) nameText.Text = _vm.SelectedName;
-        if (typeText != null) typeText.Text = _vm.SelectedType;
+        var sel = _vm.Selection;
+        if (nameText != null)
+            nameText.Text = string.IsNullOrEmpty(sel.SelectedName) ? "None" : sel.SelectedName;
+        if (typeText != null)
+            typeText.Text = string.IsNullOrEmpty(sel.SelectedType) ? "-" : sel.SelectedType;
     }
 
     private void SetupTreeView()
@@ -49,24 +50,48 @@ public partial class MainWindow : Window
         var tree = this.FindControl<TreeView>("ArchTreeView");
         if (tree == null) return;
 
-        var items = new List<TreeViewItem>();
-
-        foreach (var sys in DemoData.Systems)
+        var items = _vm.Workspace.Systems.Select(sys =>
         {
             var sysNode = new TreeViewItem
             {
                 Header = CreateNodeHeader(sys.Name, "☐"),
                 IsExpanded = true,
+                Tag = sys,
                 ItemsSource = sys.Modules.Select(mod => new TreeViewItem
                 {
-                    Header = CreateNodeHeader(mod.Name, "  ☐")
+                    Header = CreateNodeHeader(mod.Name, "  ☐"),
+                    Tag = mod
                 }).ToList()
             };
-
-            items.Add(sysNode);
-        }
+            return sysNode;
+        }).ToList();
 
         tree.ItemsSource = items;
+
+        tree.SelectionChanged += OnTreeSelectionChanged;
+    }
+
+    private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0 || e.AddedItems[0] is not TreeViewItem item)
+            return;
+
+        _vm.Workspace.ClearSelection();
+
+        if (item.Tag is SystemBoxModel sys)
+        {
+            sys.IsSelected = true;
+            _vm.Selection.SelectedId = sys.Id;
+            _vm.Selection.SelectedType = "System";
+            _vm.Selection.SelectedName = sys.Name;
+        }
+        else if (item.Tag is ModuleBoxModel mod)
+        {
+            mod.IsSelected = true;
+            _vm.Selection.SelectedId = mod.Id;
+            _vm.Selection.SelectedType = "Module";
+            _vm.Selection.SelectedName = mod.Name;
+        }
     }
 
     private static Avalonia.Controls.StackPanel CreateNodeHeader(string name, string icon)
