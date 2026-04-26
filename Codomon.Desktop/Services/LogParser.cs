@@ -107,7 +107,7 @@ public static class LogParser
         if (string.IsNullOrWhiteSpace(line))
             return new LogEntryModel { RawLine = line, IsParsed = false };
 
-        var parts = line.Split(options.Delimiter);
+        var parts = line.Split(new[] { options.Delimiter }, StringSplitOptions.None);
 
         DateTimeOffset? ts     = null;
         string          level  = string.Empty;
@@ -148,7 +148,7 @@ public static class LogParser
             Timestamp = ts,
             Level     = level,
             Source    = string.Empty,
-            Message   = string.Join(" | ", msgBuf),
+            Message   = string.Join("  ", msgBuf),
             RawLine   = line,
             IsParsed  = true
         };

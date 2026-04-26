@@ -171,7 +171,7 @@ public partial class ImportWizardDialog : Window
                 .ReadLines(_vm.FilePath)
                 .FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
             if (line == null) return 0;
-            return line.Split(_vm.EffectiveDelimiter).Length;
+            return line.Split(new[] { _vm.EffectiveDelimiter }, StringSplitOptions.None).Length;
         }
         catch { return 0; }
     }
@@ -230,9 +230,18 @@ public partial class ImportWizardDialog : Window
 
         try
         {
-            int count = System.IO.File.ReadLines(path).Count();
+            // Stream the file line-by-line to avoid loading large files into memory.
+            // Cap the count at 1,000,000 so the UI never freezes on huge files.
+            const int maxCount = 1_000_000;
+            int count = 0;
+            bool capped = false;
+            foreach (var _ in System.IO.File.ReadLines(path))
+            {
+                count++;
+                if (count >= maxCount) { capped = true; break; }
+            }
             _vm.PreviewLineCount = count;
-            tb.Text = _vm.FileInfoText;
+            tb.Text = capped ? $">{count:N0} lines  —  {System.IO.Path.GetFileName(path)}" : _vm.FileInfoText;
         }
         catch
         {
@@ -292,7 +301,7 @@ public partial class ImportWizardDialog : Window
         if (string.IsNullOrEmpty(delimiter)) return;
 
         // Determine max column count across sample rows.
-        var rows = previewLines.Select(l => l.Split(delimiter)).ToArray();
+        var rows = previewLines.Select(l => l.Split(new[] { delimiter }, StringSplitOptions.None)).ToArray();
         int maxCols = rows.Max(r => r.Length);
         if (maxCols == 0) return;
 
@@ -414,7 +423,7 @@ public partial class ImportWizardDialog : Window
         var delimiter = _vm.EffectiveDelimiter;
         if (string.IsNullOrEmpty(delimiter)) { tb.Text = "—"; return; }
 
-        var parts  = sampleLine.Split(delimiter);
+        var parts  = sampleLine.Split(new[] { delimiter }, StringSplitOptions.None);
         int colIdx = _vm.TimestampColumnIndex;
 
         string? candidateValue = null;
