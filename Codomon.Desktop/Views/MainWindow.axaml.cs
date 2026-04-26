@@ -3,6 +3,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Codomon.Desktop.Controls;
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Persistence;
 using Codomon.Desktop.ViewModels;
 using System;
 using System.ComponentModel;
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
         SetupCanvas();
         SetupTreeView();
         RefreshProfileComboBox();
+        PopulateRecentWorkspaces();
 
         _vm.Selection.PropertyChanged += (_, _) => UpdatePropertiesPanel();
         _vm.PropertyChanged += OnViewModelPropertyChanged;
@@ -48,7 +50,16 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.Workspace))
+        if (e.PropertyName == nameof(MainViewModel.HasWorkspace))
+        {
+            var workspaceGrid = this.FindControl<Grid>("WorkspaceGrid");
+            var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
+            bool has = _vm.HasWorkspace;
+            if (workspaceGrid != null) workspaceGrid.IsVisible = has;
+            if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has;
+            UpdateWindowTitle();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.Workspace))
         {
             SetupCanvas();
             SetupTreeView();
@@ -221,6 +232,31 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void OnDeleteProfileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace) return;
+
+        var activeProfile = _vm.Workspace.ActiveProfile;
+        if (activeProfile == null) return;
+
+        if (_vm.Workspace.Profiles.Count <= 1)
+        {
+            await ShowErrorAsync("Cannot delete the last profile. At least one profile must remain.");
+            return;
+        }
+
+        bool confirmed = await ShowConfirmDeleteProfileAsync(activeProfile.ProfileName);
+        if (!confirmed) return;
+
+        await ExecuteSafeAsync(() =>
+        {
+            _vm.DeleteProfile(activeProfile.Id);
+            UpdateWindowTitle();
+            AppLogger.Info($"Profile deleted: {activeProfile.ProfileName}");
+            return Task.CompletedTask;
+        });
+    }
+
     // ── Profile ComboBox helpers ─────────────────────────────────────────────
 
     private void RefreshProfileComboBox()
@@ -339,6 +375,198 @@ public partial class MainWindow : Window
 
         await dialog.ShowDialog(this);
         return result;
+    }
+
+    // ── Confirm-delete profile dialog ─────────────────────────────────────────
+
+    private async Task<bool> ShowConfirmDeleteProfileAsync(string profileName)
+    {
+        bool confirmed = false;
+
+        var dialog = new Window
+        {
+            Title = "Delete Profile",
+            Width = 420,
+            Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var deleteBtn = new Button { Content = "Delete", Padding = new Avalonia.Thickness(20, 4) };
+        var cancelBtn = new Button { Content = "Cancel", Padding = new Avalonia.Thickness(20, 4) };
+
+        deleteBtn.Click += (_, _) => { confirmed = true; dialog.Close(); };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Delete profile \"{profileName}\"? This cannot be undone.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Foreground = Avalonia.Media.Brushes.White
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Children = { deleteBtn, cancelBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return confirmed;
+    }
+
+    // ── Welcome / Recent Workspaces ──────────────────────────────────────────
+
+    private void PopulateRecentWorkspaces()
+    {
+        var listBox = this.FindControl<ListBox>("RecentWorkspacesListBox");
+        if (listBox == null) return;
+
+        listBox.Items.Clear();
+
+        var entries = RecentWorkspacesService.Load();
+
+        if (entries.Count == 0)
+        {
+            listBox.Items.Add(new ListBoxItem
+            {
+                Content = new TextBlock
+                {
+                    Text = "No recent workspaces. Create or open one to get started.",
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677")),
+                    FontSize = 13,
+                    Margin = new Avalonia.Thickness(8, 12)
+                },
+                IsEnabled = false
+            });
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            var lastMod = entry.LastModified;
+            var lastModText = lastMod == default
+                ? "—"
+                : lastMod.ToString("yyyy-MM-dd  HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+            var item = new ListBoxItem
+            {
+                Tag = entry,
+                Padding = new Avalonia.Thickness(12, 8),
+                Content = new StackPanel
+                {
+                    Spacing = 2,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = entry.WorkspaceName,
+                            FontSize = 15,
+                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                            Foreground = Avalonia.Media.Brushes.White
+                        },
+                        new TextBlock
+                        {
+                            Text = entry.FolderPath,
+                            FontSize = 11,
+                            Foreground = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.Parse("#778899"))
+                        },
+                        new TextBlock
+                        {
+                            Text = $"Last updated: {lastModText}",
+                            FontSize = 11,
+                            Foreground = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.Parse("#556677"))
+                        }
+                    }
+                }
+            };
+            listBox.Items.Add(item);
+        }
+    }
+
+    private async void OnRecentWorkspaceSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0 || e.AddedItems[0] is not ListBoxItem item) return;
+        if (item.Tag is not RecentWorkspaceEntry entry) return;
+
+        // Clear selection so the list doesn't stay highlighted.
+        if (sender is ListBox lb) lb.SelectedItem = null;
+
+        if (!System.IO.Directory.Exists(entry.FolderPath))
+        {
+            var remove = await ShowRemoveStaleRecentAsync(entry.WorkspaceName);
+            if (remove)
+            {
+                RecentWorkspacesService.Remove(entry.FolderPath);
+                PopulateRecentWorkspaces();
+            }
+            return;
+        }
+
+        await ExecuteSafeAsync(async () =>
+        {
+            await _vm.OpenWorkspaceAsync(entry.FolderPath);
+            UpdateWindowTitle();
+            AppLogger.Info($"Workspace opened from recent list: {entry.FolderPath}");
+        });
+    }
+
+    private async Task<bool> ShowRemoveStaleRecentAsync(string workspaceName)
+    {
+        bool remove = false;
+
+        var dialog = new Window
+        {
+            Title = "Workspace Not Found",
+            Width = 440,
+            Height = 180,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var removeBtn = new Button { Content = "Remove from List", Padding = new Avalonia.Thickness(20, 4) };
+        var cancelBtn = new Button { Content = "Keep",             Padding = new Avalonia.Thickness(20, 4) };
+
+        removeBtn.Click += (_, _) => { remove = true; dialog.Close(); };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"The workspace \"{workspaceName}\" could not be found on disk. Remove it from the recent list?",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Foreground = Avalonia.Media.Brushes.White
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Children = { removeBtn, cancelBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return remove;
     }
 
     // ── Autosave dialogs ─────────────────────────────────────────────────────
@@ -590,10 +818,16 @@ public partial class MainWindow : Window
 
     private void UpdateWindowTitle()
     {
-        var workspaceSuffix = _vm.IsDirty
-            ? $" — {_vm.Workspace.WorkspaceName} *"
-            : $" — {_vm.Workspace.WorkspaceName}";
-        Title = $"Codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate}){workspaceSuffix}";
+        var baseTitle = $"Codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
+        if (_vm.HasWorkspace)
+        {
+            var dirty = _vm.IsDirty ? " *" : string.Empty;
+            Title = $"{baseTitle}  —  {_vm.Workspace.WorkspaceName}{dirty}";
+        }
+        else
+        {
+            Title = baseTitle;
+        }
     }
 
     // ── Canvas / TreeView ────────────────────────────────────────────────────
