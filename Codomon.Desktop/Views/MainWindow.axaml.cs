@@ -231,7 +231,13 @@ public partial class MainWindow : Window
         _updatingProfileComboBox = true;
         try
         {
-            combo.ItemsSource = _vm.Profiles;
+            // Only re-bind ItemsSource when the workspace (and therefore the collection) has
+            // changed. For profile additions within the same workspace the ObservableCollection
+            // notifies Avalonia incrementally, avoiding a full reset that would fire spurious
+            // SelectionChanged events after the guard flag is cleared.
+            if (!ReferenceEquals(combo.ItemsSource, _vm.Profiles))
+                combo.ItemsSource = _vm.Profiles;
+
             combo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(ProfileModel.ProfileName));
             SyncProfileComboBoxSelectionCore(combo);
         }

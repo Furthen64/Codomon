@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Codomon.Desktop.Models;
 
 public class WorkspaceModel
@@ -6,7 +8,7 @@ public class WorkspaceModel
     public string SourceProjectPath { get; set; } = string.Empty;
     public List<SystemBoxModel> Systems { get; set; } = new();
     public List<ConnectionModel> Connections { get; set; } = new();
-    public List<ProfileModel> Profiles { get; set; } = new();
+    public ObservableCollection<ProfileModel> Profiles { get; set; } = new();
     public string ActiveProfileId { get; set; } = string.Empty;
 
     /// <summary>The currently active profile, or null if no profiles exist.</summary>
