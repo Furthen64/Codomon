@@ -202,7 +202,7 @@ public static class WorkspaceSerializer
             ActiveProfileId = activeProfileId
         };
 
-        workspace.Profiles.AddRange(profiles);
+        foreach (var p in profiles) workspace.Profiles.Add(p);
         workspace.Systems.AddRange(systems);
         workspace.Connections.AddRange(connections);
 
