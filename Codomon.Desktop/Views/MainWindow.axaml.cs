@@ -1056,12 +1056,15 @@ public partial class MainWindow : Window
 
     private void RebuildTimeline()
     {
+        if (!_vm.HasWorkspace) return;
         _vm.Timeline.Build(_vm.LogReplay.Entries, _vm.Workspace);
     }
 
     private void UpdateTimelineCursor()
     {
-        var entry = _vm.LogReplay.CurrentEntry;
+        var replay = _vm.LogReplay;
+        if (replay == null) return;
+        var entry = replay.CurrentEntry;
         _vm.Timeline.ReplayCursorTime = entry?.Timestamp?.TimeOfDay;
     }
 

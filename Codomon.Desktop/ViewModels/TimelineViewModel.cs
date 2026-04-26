@@ -15,7 +15,8 @@ public class TimelineViewModel : INotifyPropertyChanged
     /// <summary>Granularity: one bucket per 5 minutes → 288 buckets / day.</summary>
     public static readonly TimeSpan BucketSize = TimeSpan.FromMinutes(5);
 
-    private const int BucketsPerDay = (int)(24 * 60 / 5); // 288
+    private static readonly int BucketsPerDay =
+        (int)(TimeSpan.FromDays(1).TotalMinutes / BucketSize.TotalMinutes);
 
     // ── Public state ──────────────────────────────────────────────────────────
 

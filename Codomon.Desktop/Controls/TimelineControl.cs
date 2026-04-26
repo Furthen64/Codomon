@@ -236,7 +236,7 @@ public class TimelineControl : Control
             new Point(x, bounds.Height));
 
         // Small label above the axis.
-        var label = cursorTime.Value.ToString(@"hh\:mm");
+        var label = cursorTime.Value.ToString(@"HH\:mm");
         var ft = new FormattedText(
             label,
             System.Globalization.CultureInfo.InvariantCulture,
