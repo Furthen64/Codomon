@@ -743,25 +743,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
-        if (storageProvider == null) return;
-
-        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Import Log File",
-            AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("Log files") { Patterns = new[] { "*.log", "*.txt", "*.out" } },
-                new FilePickerFileType("All files") { Patterns = new[] { "*.*" } }
-            }
-        });
-
-        if (files.Count == 0) return;
+        var wizard = new ImportWizardDialog();
+        var result = await wizard.ShowDialog<ImportWizardViewModel?>(this);
+        if (result == null) return;   // user cancelled the wizard
 
         await ExecuteSafeAsync(async () =>
         {
-            await _vm.ImportLogsAsync(files[0].Path.LocalPath);
+            await _vm.ImportLogsWithOptionsAsync(result.FilePath, result.BuildImportOptions());
             RefreshLogReplayPanel();
         });
     }

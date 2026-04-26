@@ -45,4 +45,15 @@ public static class LogImportService
         var lines = await File.ReadAllLinesAsync(filePath);
         return lines.Select(LogParser.Parse).ToList();
     }
+
+    /// <summary>
+    /// Reads a delimiter-separated log file and parses each line using
+    /// <paramref name="options"/> (custom delimiter, timestamp column, format, and timezone).
+    /// </summary>
+    public static async Task<List<LogEntryModel>> LoadEntriesWithOptionsAsync(
+        string filePath, ImportOptions options)
+    {
+        var lines = await File.ReadAllLinesAsync(filePath);
+        return lines.Select(l => LogParser.ParseDelimited(l, options)).ToList();
+    }
 }

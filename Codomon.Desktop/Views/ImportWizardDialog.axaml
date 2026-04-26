@@ -1,0 +1,180 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.ImportWizardDialog"
+        Title="Import Log — Import Wizard"
+        Width="640" Height="540"
+        MinWidth="540" MinHeight="460"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Ellipse x:Name="Dot1" Width="10" Height="10" Fill="#3A8FBF"/>
+            <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot4" Width="10" Height="10" Fill="#2A3F5A"/>
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="Import Log" FontSize="16" FontWeight="Bold" Foreground="White"/>
+          <TextBlock x:Name="StepTitleText" Text="Step 1 of 4 — Select File"
+                     FontSize="12" Foreground="#88AABB"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button x:Name="CancelButton" Content="Cancel" Click="OnCancelClick"
+                Padding="16,6" DockPanel.Dock="Left"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button x:Name="BackButton"   Content="← Back"        Click="OnBackClick"
+                  Padding="16,6" IsEnabled="False"/>
+          <Button x:Name="NextButton"   Content="Next →"         Click="OnNextClick"
+                  Padding="16,6"/>
+          <Button x:Name="ImportButton" Content="✓ Import"       Click="OnImportClick"
+                  Padding="16,6" IsVisible="False"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Content area -->
+    <Border Padding="24,20">
+      <Grid>
+
+        <!-- Validation error banner (shared across steps) -->
+        <Border x:Name="ErrorBanner" IsVisible="False"
+                Background="#3A1A1A" BorderBrush="#CC4444" BorderThickness="1"
+                CornerRadius="4" Padding="10,7" VerticalAlignment="Top" ZIndex="10">
+          <TextBlock x:Name="ErrorText" Foreground="#FF8888" TextWrapping="Wrap" FontSize="12"/>
+        </Border>
+
+        <!-- ── Step 1: Select file ───────────────────────────────────────────── -->
+        <StackPanel x:Name="Step1Panel" Spacing="12" Margin="0,36,0,0">
+          <TextBlock Text="Select the raw text or log file you want to import."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+          <TextBlock Text="Accepted: .log, .txt, .csv, .tsv, or any plain-text file."
+                     Foreground="#667788" FontSize="11"/>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <TextBox x:Name="FilePathBox" Grid.Column="0"
+                     Watermark="Path to log file…"
+                     TextChanged="OnFilePathChanged"/>
+            <Button Grid.Column="1" Content="Browse…" Click="OnBrowseFileClick"
+                    Margin="8,0,0,0" Padding="12,4"/>
+          </Grid>
+          <TextBlock x:Name="FileInfoText" Foreground="#667788" FontSize="11"/>
+        </StackPanel>
+
+        <!-- ── Step 2: Delimiter ─────────────────────────────────────────────── -->
+        <StackPanel x:Name="Step2Panel" Spacing="10" Margin="0,36,0,0" IsVisible="False">
+          <TextBlock Text="Choose the character that separates columns in each log line."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+
+          <!-- Delimiter selector row -->
+          <Grid ColumnDefinitions="140,*" Margin="0,4,0,0">
+            <TextBlock Grid.Column="0" Text="Delimiter:" Foreground="#AABBCC"
+                       VerticalAlignment="Center" FontWeight="SemiBold"/>
+            <ComboBox x:Name="DelimiterComboBox" Grid.Column="1"
+                      HorizontalAlignment="Stretch" Padding="6,2"
+                      SelectionChanged="OnDelimiterSelectionChanged"/>
+          </Grid>
+
+          <!-- Custom delimiter entry (shown only when "Custom" is selected) -->
+          <Grid x:Name="CustomDelimiterRow" ColumnDefinitions="140,*" IsVisible="False">
+            <TextBlock Grid.Column="0" Text="Custom character:" Foreground="#AABBCC"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="CustomDelimiterBox" Grid.Column="1"
+                     Watermark="e.g.  |  or  ;  or  ::  …"
+                     MaxLength="8"
+                     TextChanged="OnCustomDelimiterChanged"/>
+          </Grid>
+
+          <!-- Preview -->
+          <TextBlock Text="Preview (first 5 lines):" Foreground="#667788" FontSize="11"
+                     Margin="0,4,0,2"/>
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                  CornerRadius="3" Height="160">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+              <StackPanel x:Name="PreviewStackPanel" Margin="6"/>
+            </ScrollViewer>
+          </Border>
+        </StackPanel>
+
+        <!-- ── Step 3: Timestamp & Timezone ─────────────────────────────────── -->
+        <StackPanel x:Name="Step3Panel" Spacing="10" Margin="0,36,0,0" IsVisible="False">
+          <TextBlock Text="Tell Codomon where to find the timestamp and how to interpret it."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+
+          <!-- Timestamp column -->
+          <Grid ColumnDefinitions="160,*" Margin="0,6,0,0">
+            <TextBlock Grid.Column="0" Text="Timestamp column:" Foreground="#AABBCC"
+                       VerticalAlignment="Center" FontWeight="SemiBold"/>
+            <ComboBox x:Name="TimestampColumnComboBox" Grid.Column="1"
+                      HorizontalAlignment="Stretch" Padding="6,2"
+                      SelectionChanged="OnTimestampColumnChanged"/>
+          </Grid>
+
+          <!-- Timestamp format -->
+          <Grid ColumnDefinitions="160,*">
+            <TextBlock Grid.Column="0" Text="Timestamp format:" Foreground="#AABBCC"
+                       VerticalAlignment="Center" FontWeight="SemiBold"/>
+            <ComboBox x:Name="TimestampFormatComboBox" Grid.Column="1"
+                      HorizontalAlignment="Stretch" Padding="6,2"
+                      SelectionChanged="OnTimestampFormatChanged"/>
+          </Grid>
+
+          <!-- Custom format entry -->
+          <Grid x:Name="CustomFormatRow" ColumnDefinitions="160,*" IsVisible="False">
+            <TextBlock Grid.Column="0" Text="Format string:" Foreground="#AABBCC"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="CustomFormatBox" Grid.Column="1"
+                     Watermark="e.g.  yyyy-MM-dd HH:mm:ss.fff"
+                     TextChanged="OnCustomFormatChanged"/>
+          </Grid>
+
+          <!-- Timezone -->
+          <Grid ColumnDefinitions="160,*">
+            <TextBlock Grid.Column="0" Text="Timezone:" Foreground="#AABBCC"
+                       VerticalAlignment="Center" FontWeight="SemiBold"/>
+            <ComboBox x:Name="TimeZoneComboBox" Grid.Column="1"
+                      HorizontalAlignment="Stretch" Padding="6,2"
+                      SelectionChanged="OnTimeZoneChanged"/>
+          </Grid>
+
+          <!-- Sample parse result -->
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                  CornerRadius="3" Padding="10,7" Margin="0,8,0,0">
+            <StackPanel Spacing="3">
+              <TextBlock Text="Sample parse:" Foreground="#667788" FontSize="11"/>
+              <TextBlock x:Name="SampleParseText" Foreground="#88CCAA" FontSize="11"
+                         FontFamily="Monospace" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- ── Step 4: Confirmation ──────────────────────────────────────────── -->
+        <StackPanel x:Name="Step4Panel" Spacing="12" Margin="0,36,0,0" IsVisible="False">
+          <TextBlock Text="Review your settings and click Import to load the file."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                  CornerRadius="3" Padding="14,10">
+            <TextBlock x:Name="SummaryText" Foreground="#AABBCC" FontSize="12"
+                       FontFamily="Monospace" TextWrapping="Wrap"/>
+          </Border>
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+  </DockPanel>
+</Window>
