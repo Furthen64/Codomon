@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -171,9 +172,33 @@ public partial class ImportWizardDialog : Window
                 .ReadLines(_vm.FilePath)
                 .FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
             if (line == null) return 0;
-            return line.Split(new[] { _vm.EffectiveDelimiter }, StringSplitOptions.None).Length;
+            return SplitLine(line).Length;
         }
         catch { return 0; }
+    }
+
+    /// <summary>
+    /// Splits a log line using the current delimiter (regex or literal).
+    /// Empty segments produced at the boundary of a regex match are filtered out
+    /// to avoid phantom columns in the preview.
+    /// </summary>
+    private string[] SplitLine(string line)
+    {
+        var delimiter = _vm.EffectiveDelimiter;
+        if (string.IsNullOrEmpty(delimiter)) return new[] { line };
+
+        if (_vm.DelimiterIsRegex)
+        {
+            try
+            {
+                return Regex.Split(line, delimiter)
+                            .Where(s => s.Length > 0)
+                            .ToArray();
+            }
+            catch { return new[] { line }; }
+        }
+
+        return line.Split(new[] { delimiter }, StringSplitOptions.None);
     }
 
     // ── Step 1: file picker ──────────────────────────────────────────────────
@@ -260,6 +285,24 @@ public partial class ImportWizardDialog : Window
         var customRow = this.FindControl<Grid>("CustomDelimiterRow");
         if (customRow != null) customRow.IsVisible = _vm.IsCustomDelimiter;
 
+        // Update the label and input hint to reflect regex vs literal mode.
+        if (_vm.IsCustomDelimiter)
+        {
+            var label = this.FindControl<TextBlock>("CustomDelimiterLabel");
+            var box   = this.FindControl<TextBox>("CustomDelimiterBox");
+            bool isRx = _vm.DelimiterIsRegex;
+            if (label != null) label.Text = isRx ? "Regex pattern:" : "Custom character:";
+            if (box   != null)
+            {
+                box.Watermark = isRx
+                    ? @"e.g.  \]\s*\[  or  \t|\s{2,}  …"
+                    : "e.g.  |  or  ;  or  ::  …";
+                // Limit literal delimiters to a short string; regex patterns are unrestricted.
+                const int maxLiteralDelimiterLength = 8;
+                box.MaxLength = isRx ? 0 : maxLiteralDelimiterLength;
+            }
+        }
+
         RefreshPreviewGrid();
     }
 
@@ -301,7 +344,7 @@ public partial class ImportWizardDialog : Window
         if (string.IsNullOrEmpty(delimiter)) return;
 
         // Determine max column count across sample rows.
-        var rows = previewLines.Select(l => l.Split(new[] { delimiter }, StringSplitOptions.None)).ToArray();
+        var rows = previewLines.Select(l => SplitLine(l)).ToArray();
         int maxCols = rows.Max(r => r.Length);
         if (maxCols == 0) return;
 
@@ -423,7 +466,7 @@ public partial class ImportWizardDialog : Window
         var delimiter = _vm.EffectiveDelimiter;
         if (string.IsNullOrEmpty(delimiter)) { tb.Text = "—"; return; }
 
-        var parts  = sampleLine.Split(new[] { delimiter }, StringSplitOptions.None);
+        var parts  = SplitLine(sampleLine);
         int colIdx = _vm.TimestampColumnIndex;
 
         string? candidateValue = null;

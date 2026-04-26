@@ -33,26 +33,31 @@ public class ImportWizardViewModel : INotifyPropertyChanged
     /// <summary>Preset delimiter choices shown in Step 2.</summary>
     public static readonly IReadOnlyList<DelimiterOption> DelimiterOptions = new[]
     {
-        new DelimiterOption("tab",       @"Tab (\t)",      "\t"),
-        new DelimiterOption("comma",     "Comma (,)",      ","),
-        new DelimiterOption("semicolon", "Semicolon (;)",  ";"),
-        new DelimiterOption("pipe",      "Pipe (|)",       "|"),
-        new DelimiterOption("space",     "Space",          " "),
-        new DelimiterOption("custom",    "Custom…",        ""),
+        new DelimiterOption("tab",        @"Tab (\t)",                          "\t"),
+        new DelimiterOption("comma",      "Comma (,)",                          ","),
+        new DelimiterOption("semicolon",  "Semicolon (;)",                      ";"),
+        new DelimiterOption("pipe",       "Pipe (|)",                           "|"),
+        new DelimiterOption("space",      "Space",                              " "),
+        // Regex preset: handles [timestamp] [level]  message  (e.g. plasticity.log)
+        new DelimiterOption("bracketrx", @"Regex — [ts] [level]  msg",         @"\]\s*\[|\]\s{2,}", IsRegex: true),
+        new DelimiterOption("custom",    "Custom…",                            ""),
+        new DelimiterOption("customrx",  "Custom Regex…",                      "", IsRegex: true),
     };
 
     /// <summary>Preset timestamp format choices shown in Step 3.</summary>
     public static readonly IReadOnlyList<TimestampFormatOption> TimestampFormatOptions = new[]
     {
-        new TimestampFormatOption("auto",     "Auto-detect",                        null),
-        new TimestampFormatOption("iso_ms",   "ISO 8601 ms  (yyyy-MM-ddTHH:mm:ss.fff)", "yyyy-MM-ddTHH:mm:ss.fff"),
-        new TimestampFormatOption("iso",      "ISO 8601     (yyyy-MM-ddTHH:mm:ss)",     "yyyy-MM-ddTHH:mm:ss"),
-        new TimestampFormatOption("space_ms", "Space ms     (yyyy-MM-dd HH:mm:ss.fff)", "yyyy-MM-dd HH:mm:ss.fff"),
-        new TimestampFormatOption("space",    "Space        (yyyy-MM-dd HH:mm:ss)",     "yyyy-MM-dd HH:mm:ss"),
-        new TimestampFormatOption("us",       "US date      (MM/dd/yyyy HH:mm:ss)",     "MM/dd/yyyy HH:mm:ss"),
-        new TimestampFormatOption("eu",       "EU date      (dd/MM/yyyy HH:mm:ss)",     "dd/MM/yyyy HH:mm:ss"),
-        new TimestampFormatOption("time",     "Time only    (HH:mm:ss)",                "HH:mm:ss"),
-        new TimestampFormatOption("custom",   "Custom…",                            null),
+        new TimestampFormatOption("auto",       "Auto-detect",                                null),
+        new TimestampFormatOption("iso_ms",     "ISO 8601 ms  (yyyy-MM-ddTHH:mm:ss.fff)",     "yyyy-MM-ddTHH:mm:ss.fff"),
+        new TimestampFormatOption("iso",        "ISO 8601     (yyyy-MM-ddTHH:mm:ss)",         "yyyy-MM-ddTHH:mm:ss"),
+        new TimestampFormatOption("space_ms",   "Space ms     (yyyy-MM-dd HH:mm:ss.fff)",     "yyyy-MM-dd HH:mm:ss.fff"),
+        new TimestampFormatOption("space",      "Space        (yyyy-MM-dd HH:mm:ss)",         "yyyy-MM-dd HH:mm:ss"),
+        new TimestampFormatOption("bracket_ms", "Bracketed ms ([yyyy-MM-dd HH:mm:ss.fff])",   "[yyyy-MM-dd HH:mm:ss.fff]"),
+        new TimestampFormatOption("bracket",    "Bracketed    ([yyyy-MM-dd HH:mm:ss])",       "[yyyy-MM-dd HH:mm:ss]"),
+        new TimestampFormatOption("us",         "US date      (MM/dd/yyyy HH:mm:ss)",         "MM/dd/yyyy HH:mm:ss"),
+        new TimestampFormatOption("eu",         "EU date      (dd/MM/yyyy HH:mm:ss)",         "dd/MM/yyyy HH:mm:ss"),
+        new TimestampFormatOption("time",       "Time only    (HH:mm:ss)",                    "HH:mm:ss"),
+        new TimestampFormatOption("custom",     "Custom…",                                    null),
     };
 
     /// <summary>Timezone choices shown in Step 3 (IANA IDs work on all platforms in .NET 8).</summary>
@@ -110,6 +115,7 @@ public class ImportWizardViewModel : INotifyPropertyChanged
             _delimiterKey = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsCustomDelimiter));
+            OnPropertyChanged(nameof(DelimiterIsRegex));
             OnPropertyChanged(nameof(EffectiveDelimiter));
             ClearValidation();
         }
@@ -127,14 +133,18 @@ public class ImportWizardViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsCustomDelimiter => DelimiterKey == "custom";
+    public bool IsCustomDelimiter => _delimiterKey is "custom" or "customrx";
+
+    /// <summary>True when the effective delimiter should be used as a regex pattern.</summary>
+    public bool DelimiterIsRegex =>
+        DelimiterOptions.FirstOrDefault(o => o.Key == _delimiterKey)?.IsRegex == true;
 
     public string EffectiveDelimiter
     {
         get
         {
-            if (DelimiterKey == "custom") return _customDelimiter;
-            return DelimiterOptions.FirstOrDefault(o => o.Key == DelimiterKey)?.Value ?? "\t";
+            if (_delimiterKey is "custom" or "customrx") return _customDelimiter;
+            return DelimiterOptions.FirstOrDefault(o => o.Key == _delimiterKey)?.Value ?? "\t";
         }
     }
 
@@ -228,7 +238,17 @@ public class ImportWizardViewModel : INotifyPropertyChanged
 
             case 2:
                 if (string.IsNullOrEmpty(EffectiveDelimiter))
-                { ValidationError = "Please enter a delimiter character."; return false; }
+                {
+                    ValidationError = DelimiterIsRegex
+                        ? "Please enter a regex pattern."
+                        : "Please enter a delimiter character.";
+                    return false;
+                }
+                if (DelimiterIsRegex)
+                {
+                    try { _ = new System.Text.RegularExpressions.Regex(EffectiveDelimiter); }
+                    catch { ValidationError = "The regex pattern is not valid."; return false; }
+                }
                 break;
 
             case 3:
@@ -245,6 +265,7 @@ public class ImportWizardViewModel : INotifyPropertyChanged
     public ImportOptions BuildImportOptions() => new ImportOptions
     {
         Delimiter            = EffectiveDelimiter,
+        DelimiterIsRegex     = DelimiterIsRegex,
         TimestampColumnIndex = TimestampColumnIndex,
         TimestampFormat      = EffectiveTimestampFormat,
         TimeZoneId           = TimeZoneId
@@ -254,7 +275,7 @@ public class ImportWizardViewModel : INotifyPropertyChanged
     public string BuildSummary()
     {
         var delim  = IsCustomDelimiter
-            ? $"Custom: \"{CustomDelimiter}\""
+            ? $"Custom{(DelimiterIsRegex ? " Regex" : "")}: \"{CustomDelimiter}\""
             : DelimiterOptions.FirstOrDefault(o => o.Key == DelimiterKey)?.Label ?? DelimiterKey;
 
         var tsCol  = TimestampColumnIndex < 0 ? "Auto-detect" : $"Column {TimestampColumnIndex}";
@@ -283,7 +304,7 @@ public class ImportWizardViewModel : INotifyPropertyChanged
 
 // ── Simple record types for option lists ──────────────────────────────────────
 
-public sealed record DelimiterOption(string Key, string Label, string Value);
+public sealed record DelimiterOption(string Key, string Label, string Value, bool IsRegex = false);
 
 public sealed record TimestampFormatOption(string Key, string Label, string? Format);
 

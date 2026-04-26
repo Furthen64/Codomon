@@ -3,8 +3,14 @@ namespace Codomon.Desktop.Services;
 /// <summary>Options that control how a delimited log file is parsed during import.</summary>
 public class ImportOptions
 {
-    /// <summary>The field delimiter string (e.g. "\t", ",", "|").</summary>
+    /// <summary>The field delimiter string (e.g. "\t", ",", "|") or a regex pattern.</summary>
     public string Delimiter { get; set; } = "\t";
+
+    /// <summary>
+    /// When <c>true</c>, <see cref="Delimiter"/> is treated as a regular expression
+    /// and <c>Regex.Split</c> is used instead of a literal string split.
+    /// </summary>
+    public bool DelimiterIsRegex { get; set; } = false;
 
     /// <summary>
     /// Zero-based column index of the timestamp field, or -1 to auto-detect

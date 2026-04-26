@@ -88,13 +88,12 @@
                       SelectionChanged="OnDelimiterSelectionChanged"/>
           </Grid>
 
-          <!-- Custom delimiter entry (shown only when "Custom" is selected) -->
+          <!-- Custom delimiter entry (shown only when "Custom" or "Custom Regex" is selected) -->
           <Grid x:Name="CustomDelimiterRow" ColumnDefinitions="140,*" IsVisible="False">
-            <TextBlock Grid.Column="0" Text="Custom character:" Foreground="#AABBCC"
-                       VerticalAlignment="Center"/>
+            <TextBlock x:Name="CustomDelimiterLabel" Grid.Column="0" Text="Custom character:"
+                       Foreground="#AABBCC" VerticalAlignment="Center"/>
             <TextBox x:Name="CustomDelimiterBox" Grid.Column="1"
                      Watermark="e.g.  |  or  ;  or  ::  …"
-                     MaxLength="8"
                      TextChanged="OnCustomDelimiterChanged"/>
           </Grid>
 
