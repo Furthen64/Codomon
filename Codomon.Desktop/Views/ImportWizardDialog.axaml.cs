@@ -24,6 +24,7 @@ public partial class ImportWizardDialog : Window
         DataContext = _vm;
 
         PopulateDelimiterComboBox();
+        PopulateKnownFormatComboBox();
         PopulateTimestampFormatComboBox();
         PopulateTimeZoneComboBox();
         SyncStepUi();
@@ -85,10 +86,16 @@ public partial class ImportWizardDialog : Window
         UpdateStepDots(step);
 
         if (step == 2)
+        {
+            SyncDelimiterComboBoxToVm();
             RefreshPreviewGrid();
+        }
 
         if (step == 3)
+        {
+            SyncTimestampComboBoxesToVm();
             RefreshTimestampColumnComboBox();
+        }
 
         if (step == 4)
             RefreshSummary();
@@ -138,6 +145,67 @@ public partial class ImportWizardDialog : Window
         foreach (var opt in ImportWizardViewModel.TimeZoneOptions)
             combo.Items.Add(new ComboBoxItem { Content = opt.Label, Tag = opt.Id });
         combo.SelectedIndex = 0; // UTC by default
+    }
+
+    private void PopulateKnownFormatComboBox()
+    {
+        var combo = this.FindControl<ComboBox>("KnownFormatComboBox")!;
+        combo.Items.Clear();
+        foreach (var fmt in ImportWizardViewModel.KnownAppLogFormats)
+            combo.Items.Add(new ComboBoxItem { Content = fmt.Label, Tag = fmt.Key });
+        combo.SelectedIndex = 0; // "None" by default
+    }
+
+    /// <summary>
+    /// Selects the ComboBoxItem matching <paramref name="key"/> in <paramref name="combo"/>.
+    /// Returns the matched index, or -1 if not found (selection is not changed).
+    /// </summary>
+    private static int SelectComboByTag(ComboBox combo, string key)
+    {
+        for (int i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is ComboBoxItem item && item.Tag?.ToString() == key)
+            {
+                combo.SelectedIndex = i;
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>Synchronises the Delimiter ComboBox (and custom row) to the current VM state.</summary>
+    private void SyncDelimiterComboBoxToVm()
+    {
+        var combo = this.FindControl<ComboBox>("DelimiterComboBox")!;
+        SelectComboByTag(combo, _vm.DelimiterKey);
+
+        var customRow = this.FindControl<Grid>("CustomDelimiterRow");
+        if (customRow != null) customRow.IsVisible = _vm.IsCustomDelimiter;
+
+        if (_vm.IsCustomDelimiter)
+        {
+            var box = this.FindControl<TextBox>("CustomDelimiterBox");
+            if (box != null) box.Text = _vm.CustomDelimiter;
+        }
+    }
+
+    /// <summary>Synchronises the Timestamp Format and Timezone ComboBoxes to the current VM state.</summary>
+    private void SyncTimestampComboBoxesToVm()
+    {
+        var fmtCombo = this.FindControl<ComboBox>("TimestampFormatComboBox")!;
+        SelectComboByTag(fmtCombo, _vm.TimestampFormatKey);
+
+        var customRow = this.FindControl<Grid>("CustomFormatRow");
+        if (customRow != null) customRow.IsVisible = _vm.IsCustomTimestampFormat;
+
+        if (_vm.IsCustomTimestampFormat)
+        {
+            var box = this.FindControl<TextBox>("CustomFormatBox");
+            if (box != null) box.Text = _vm.CustomTimestampFormat;
+        }
+
+        var tzCombo = this.FindControl<ComboBox>("TimeZoneComboBox")!;
+        SelectComboByTag(tzCombo, _vm.TimeZoneId);
     }
 
     /// <summary>
@@ -239,6 +307,13 @@ public partial class ImportWizardDialog : Window
             _vm.FilePath = tb.Text ?? string.Empty;
             UpdateFileInfo(_vm.FilePath);
         }
+    }
+
+    private void OnKnownFormatSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox combo || combo.SelectedItem is not ComboBoxItem item) return;
+        var key = item.Tag?.ToString() ?? "none";
+        _vm.ApplyKnownFormat(key);
     }
 
     private void UpdateFileInfo(string path)
