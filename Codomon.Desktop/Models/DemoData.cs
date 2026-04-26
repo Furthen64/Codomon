@@ -17,13 +17,16 @@ public static class DemoData
         var sysC = new SystemBoxModel { Id = "sysC", Name = "System C", X = 180, Y = 300, Width = 220, Height = 160 };
         sysC.Modules.Add(new ModuleBoxModel { Id = "modC1", SystemId = "sysC", Name = "Module C1", RelativeX = 20, RelativeY = 40, Width = 80, Height = 40 });
 
+        var defaultProfile = new ProfileModel { Id = "default", ProfileName = "Default" };
+
         var workspace = new WorkspaceModel
         {
             WorkspaceName = "Demo Workspace",
             SourceProjectPath = string.Empty,
-            ActiveProfile = new ProfileModel { ProfileName = "Default" }
+            ActiveProfileId = "default"
         };
 
+        workspace.Profiles.Add(defaultProfile);
         workspace.Systems.Add(sysA);
         workspace.Systems.Add(sysB);
         workspace.Systems.Add(sysC);

@@ -17,7 +17,6 @@ public static class WorkspaceSerializer
     private const string ModulesFile = "modules.json";
     private const string ConnectionsFile = "connections.json";
     private const string ProfilesFolder = "profiles";
-    private const string DefaultProfileFile = "default.json";
     private const string VersionFile = ".wsversion";
 
     private static readonly string[] RequiredFiles =
@@ -41,7 +40,8 @@ public static class WorkspaceSerializer
         var workspaceDto = new WorkspaceFileDto
         {
             Name = workspace.WorkspaceName,
-            SourceProjectPath = workspace.SourceProjectPath
+            SourceProjectPath = workspace.SourceProjectPath,
+            ActiveProfileId = workspace.ActiveProfileId
         };
         await WriteJsonAsync(Path.Combine(folderPath, WorkspaceFile), workspaceDto);
 
@@ -87,35 +87,28 @@ public static class WorkspaceSerializer
         };
         await WriteJsonAsync(Path.Combine(folderPath, ConnectionsFile), connectionsDto);
 
-        var layoutPositions = new Dictionary<string, LayoutPositionDto>();
-        foreach (var sys in workspace.Systems)
+        // Capture live layout into the active profile before saving.
+        var activeProfile = workspace.ActiveProfile;
+        if (activeProfile != null)
+            CaptureLayoutIntoProfile(workspace, activeProfile);
+
+        // Save all profiles to profiles/{id}.json
+        var profilesDir = Path.Combine(folderPath, ProfilesFolder);
+        var savedIds = new HashSet<string>();
+        foreach (var profile in workspace.Profiles)
         {
-            layoutPositions[sys.Id] = new LayoutPositionDto
-            {
-                X = sys.X,
-                Y = sys.Y,
-                Width = sys.Width,
-                Height = sys.Height
-            };
-            foreach (var mod in sys.Modules)
-            {
-                layoutPositions[mod.Id] = new LayoutPositionDto
-                {
-                    X = mod.RelativeX,
-                    Y = mod.RelativeY,
-                    Width = mod.Width,
-                    Height = mod.Height
-                };
-            }
+            var profileDto = ProfileToDto(profile);
+            await WriteJsonAsync(Path.Combine(profilesDir, $"{profile.Id}.json"), profileDto);
+            savedIds.Add(profile.Id);
         }
 
-        var profileDto = new ProfileFileDto
+        // Remove profile files that no longer exist in the workspace.
+        foreach (var file in Directory.GetFiles(profilesDir, "*.json"))
         {
-            ProfileName = workspace.ActiveProfile.ProfileName,
-            LayoutPositions = layoutPositions,
-            CheckboxFilterState = workspace.ActiveProfile.CheckboxFilterState
-        };
-        await WriteJsonAsync(Path.Combine(folderPath, ProfilesFolder, DefaultProfileFile), profileDto);
+            var id = Path.GetFileNameWithoutExtension(file);
+            if (!savedIds.Contains(id))
+                File.Delete(file);
+        }
     }
 
     public static async Task<WorkspaceModel> LoadAsync(string folderPath)
@@ -127,10 +120,30 @@ public static class WorkspaceSerializer
         var modulesDto = await ReadJsonAsync<ModulesFileDto>(Path.Combine(folderPath, ModulesFile));
         var connectionsDto = await ReadJsonAsync<ConnectionsFileDto>(Path.Combine(folderPath, ConnectionsFile));
 
-        ProfileFileDto? profileDto = null;
-        var profilePath = Path.Combine(folderPath, ProfilesFolder, DefaultProfileFile);
-        if (File.Exists(profilePath))
-            profileDto = await ReadJsonAsync<ProfileFileDto>(profilePath);
+        // Load all profiles from profiles/*.json
+        var profiles = new List<ProfileModel>();
+        var profilesDir = Path.Combine(folderPath, ProfilesFolder);
+        if (Directory.Exists(profilesDir))
+        {
+            foreach (var file in Directory.GetFiles(profilesDir, "*.json").OrderBy(f => f))
+            {
+                var dto = await ReadJsonAsync<ProfileFileDto>(file);
+                var id = Path.GetFileNameWithoutExtension(file);
+                profiles.Add(DtoToProfile(id, dto));
+            }
+        }
+
+        // Ensure at least one profile exists (migration / empty workspaces).
+        if (profiles.Count == 0)
+            profiles.Add(new ProfileModel { Id = "default", ProfileName = "Default" });
+
+        // Resolve active profile ID: prefer stored value, fall back to first profile.
+        var activeProfileId = !string.IsNullOrEmpty(workspaceDto.ActiveProfileId)
+            && profiles.Any(p => p.Id == workspaceDto.ActiveProfileId)
+                ? workspaceDto.ActiveProfileId
+                : profiles[0].Id;
+
+        var activeProfile = profiles.First(p => p.Id == activeProfileId);
 
         var modulesBySystem = modulesDto.Modules
             .GroupBy(m => m.SystemId)
@@ -166,29 +179,8 @@ public static class WorkspaceSerializer
             return sys;
         }).ToList();
 
-        if (profileDto != null)
-        {
-            foreach (var sys in systems)
-            {
-                if (profileDto.LayoutPositions.TryGetValue(sys.Id, out var pos))
-                {
-                    sys.X = pos.X;
-                    sys.Y = pos.Y;
-                    sys.Width = pos.Width;
-                    sys.Height = pos.Height;
-                }
-                foreach (var mod in sys.Modules)
-                {
-                    if (profileDto.LayoutPositions.TryGetValue(mod.Id, out var mPos))
-                    {
-                        mod.RelativeX = mPos.X;
-                        mod.RelativeY = mPos.Y;
-                        mod.Width = mPos.Width;
-                        mod.Height = mPos.Height;
-                    }
-                }
-            }
-        }
+        // Apply the active profile's layout positions to the live systems/modules.
+        ApplyProfileLayout(activeProfile, systems);
 
         var connections = connectionsDto.Connections.Select(c => new ConnectionModel
         {
@@ -203,19 +195,14 @@ public static class WorkspaceSerializer
                 : ConnectionOrigin.Manual
         }).ToList();
 
-        var profile = new ProfileModel
-        {
-            ProfileName = profileDto?.ProfileName ?? "Default",
-            CheckboxFilterState = profileDto?.CheckboxFilterState ?? new Dictionary<string, bool>()
-        };
-
         var workspace = new WorkspaceModel
         {
             WorkspaceName = workspaceDto.Name,
             SourceProjectPath = workspaceDto.SourceProjectPath,
-            ActiveProfile = profile
+            ActiveProfileId = activeProfileId
         };
 
+        workspace.Profiles.AddRange(profiles);
         workspace.Systems.AddRange(systems);
         workspace.Connections.AddRange(connections);
 
@@ -233,12 +220,14 @@ public static class WorkspaceSerializer
         const double InitialYOffset = 40;
         const double SystemHorizontalSpacing = 260;
 
+        var defaultProfileId = Guid.NewGuid().ToString();
         var workspace = new WorkspaceModel
         {
             WorkspaceName = workspaceName,
             SourceProjectPath = sourceProjectPath,
-            ActiveProfile = new ProfileModel { ProfileName = profileName }
+            ActiveProfileId = defaultProfileId
         };
+        workspace.Profiles.Add(new ProfileModel { Id = defaultProfileId, ProfileName = profileName });
 
         if (initialSystemNames != null)
         {
@@ -273,6 +262,104 @@ public static class WorkspaceSerializer
                 $"Missing required files: {string.Join(", ", missing)}");
         }
     }
+
+    // ── Layout helpers (shared with MainViewModel) ────────────────────────────
+
+    /// <summary>
+    /// Captures the live layout positions and visibility (checkbox) states from
+    /// <paramref name="workspace"/> systems and modules into <paramref name="profile"/>.
+    /// </summary>
+    public static void CaptureLayoutIntoProfile(WorkspaceModel workspace, ProfileModel profile)
+    {
+        var positions = new Dictionary<string, LayoutPosition>();
+        var checkboxState = new Dictionary<string, bool>();
+
+        foreach (var sys in workspace.Systems)
+        {
+            positions[sys.Id] = new LayoutPosition
+            {
+                X = sys.X, Y = sys.Y, Width = sys.Width, Height = sys.Height
+            };
+            checkboxState[sys.Id] = sys.IsVisible;
+
+            foreach (var mod in sys.Modules)
+            {
+                positions[mod.Id] = new LayoutPosition
+                {
+                    X = mod.RelativeX, Y = mod.RelativeY, Width = mod.Width, Height = mod.Height
+                };
+                checkboxState[mod.Id] = mod.IsVisible;
+            }
+        }
+
+        profile.LayoutPositions = positions;
+        profile.CheckboxFilterState = checkboxState;
+    }
+
+    /// <summary>Applies <paramref name="profile"/> layout positions to <paramref name="systems"/>.</summary>
+    public static void ApplyProfileLayout(ProfileModel profile, IEnumerable<SystemBoxModel> systems)
+    {
+        foreach (var sys in systems)
+        {
+            if (profile.LayoutPositions.TryGetValue(sys.Id, out var pos))
+            {
+                sys.X = pos.X;
+                sys.Y = pos.Y;
+                sys.Width = pos.Width;
+                sys.Height = pos.Height;
+            }
+            if (profile.CheckboxFilterState.TryGetValue(sys.Id, out var vis))
+                sys.IsVisible = vis;
+
+            foreach (var mod in sys.Modules)
+            {
+                if (profile.LayoutPositions.TryGetValue(mod.Id, out var mPos))
+                {
+                    mod.RelativeX = mPos.X;
+                    mod.RelativeY = mPos.Y;
+                    mod.Width = mPos.Width;
+                    mod.Height = mPos.Height;
+                }
+                if (profile.CheckboxFilterState.TryGetValue(mod.Id, out var mVis))
+                    mod.IsVisible = mVis;
+            }
+        }
+    }
+
+    // ── Dto conversion helpers ────────────────────────────────────────────────
+
+    private static ProfileFileDto ProfileToDto(ProfileModel profile) => new()
+    {
+        ProfileName = profile.ProfileName,
+        LayoutPositions = profile.LayoutPositions.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new LayoutPositionDto
+            {
+                X = kvp.Value.X, Y = kvp.Value.Y,
+                Width = kvp.Value.Width, Height = kvp.Value.Height
+            }),
+        CheckboxFilterState = profile.CheckboxFilterState,
+        VisualSettings = profile.VisualSettings,
+        Notes = profile.Notes
+    };
+
+    private static ProfileModel DtoToProfile(string id, ProfileFileDto dto) => new()
+    {
+        Id = id,
+        ProfileName = dto.ProfileName,
+        LayoutPositions = dto.LayoutPositions.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new LayoutPosition
+            {
+                X = kvp.Value.X, Y = kvp.Value.Y,
+                Width = kvp.Value.Width, Height = kvp.Value.Height
+            }),
+        CheckboxFilterState = dto.CheckboxFilterState,
+        VisualSettings = dto.VisualSettings,
+        Notes = dto.Notes
+    };
+
+    // ── JSON helpers ──────────────────────────────────────────────────────────
 
     private static async Task WriteJsonAsync<T>(string path, T value)
     {

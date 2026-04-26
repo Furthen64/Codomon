@@ -19,6 +19,9 @@ public partial class MainWindow : Window
     // Keep at most one Dev Console open at a time.
     private DevConsoleWindow? _devConsole;
 
+    // Guards against re-entrant profile ComboBox updates.
+    private bool _updatingProfileComboBox;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -31,6 +34,7 @@ public partial class MainWindow : Window
 
         SetupCanvas();
         SetupTreeView();
+        RefreshProfileComboBox();
 
         _vm.Selection.PropertyChanged += (_, _) => UpdatePropertiesPanel();
         _vm.PropertyChanged += OnViewModelPropertyChanged;
@@ -48,6 +52,7 @@ public partial class MainWindow : Window
         {
             SetupCanvas();
             SetupTreeView();
+            RefreshProfileComboBox();
         }
         else if (e.PropertyName == nameof(MainViewModel.StatusMessage))
         {
@@ -58,6 +63,15 @@ public partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.IsDirty))
         {
             UpdateWindowTitle();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.Profiles))
+        {
+            RefreshProfileComboBox();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.ActiveProfileId))
+        {
+            SyncProfileComboBoxSelection();
+            _canvas?.InvalidateVisual();
         }
     }
 
@@ -151,6 +165,177 @@ public partial class MainWindow : Window
             AppLogger.Info($"Autosave loaded: {selected.DisplayName}");
         });
     }
+
+    // ── Profile toolbar handlers ─────────────────────────────────────────────
+
+    private void OnProfileComboBoxSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingProfileComboBox) return;
+
+        var combo = this.FindControl<ComboBox>("ProfileComboBox");
+        if (combo?.SelectedItem is not ProfileModel profile) return;
+
+        _vm.SwitchProfile(profile.Id);
+    }
+
+    private async void OnNewProfileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var name = await ShowInputDialogAsync("New Profile", "Enter a name for the new profile:", "New Profile");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        _vm.CreateProfile(name.Trim());
+        UpdateWindowTitle();
+        AppLogger.Info($"Profile created: {name}");
+    }
+
+    private async void OnRenameProfileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var activeProfile = _vm.Workspace.ActiveProfile;
+        if (activeProfile == null) return;
+
+        var name = await ShowInputDialogAsync("Rename Profile", "Enter a new name for the profile:", activeProfile.ProfileName);
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        _vm.RenameProfile(activeProfile.Id, name.Trim());
+        UpdateWindowTitle();
+        AppLogger.Info($"Profile renamed to: {name}");
+    }
+
+    private async void OnDuplicateProfileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var activeProfile = _vm.Workspace.ActiveProfile;
+        if (activeProfile == null) return;
+
+        var name = await ShowInputDialogAsync(
+            "Duplicate Profile",
+            "Enter a name for the duplicate profile:",
+            $"Copy of {activeProfile.ProfileName}");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        await ExecuteSafeAsync(() =>
+        {
+            _vm.DuplicateProfile(activeProfile.Id, name.Trim());
+            UpdateWindowTitle();
+            AppLogger.Info($"Profile duplicated as: {name}");
+            return Task.CompletedTask;
+        });
+    }
+
+    // ── Profile ComboBox helpers ─────────────────────────────────────────────
+
+    private void RefreshProfileComboBox()
+    {
+        var combo = this.FindControl<ComboBox>("ProfileComboBox");
+        if (combo == null) return;
+
+        _updatingProfileComboBox = true;
+        try
+        {
+            combo.ItemsSource = _vm.Profiles;
+            combo.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(ProfileModel.ProfileName));
+            SyncProfileComboBoxSelectionCore(combo);
+        }
+        finally
+        {
+            _updatingProfileComboBox = false;
+        }
+    }
+
+    private void SyncProfileComboBoxSelection()
+    {
+        var combo = this.FindControl<ComboBox>("ProfileComboBox");
+        if (combo == null) return;
+
+        _updatingProfileComboBox = true;
+        try
+        {
+            SyncProfileComboBoxSelectionCore(combo);
+        }
+        finally
+        {
+            _updatingProfileComboBox = false;
+        }
+    }
+
+    private void SyncProfileComboBoxSelectionCore(ComboBox combo)
+    {
+        var activeId = _vm.ActiveProfileId;
+        var match = _vm.Profiles.FirstOrDefault(p => p.Id == activeId);
+        combo.SelectedItem = match;
+    }
+
+    // ── Input dialog ─────────────────────────────────────────────────────────
+
+    private async Task<string?> ShowInputDialogAsync(string title, string prompt, string defaultValue = "")
+    {
+        string? result = null;
+
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 420,
+            Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var inputBox = new TextBox
+        {
+            Text = defaultValue,
+            Foreground = Avalonia.Media.Brushes.White,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#1A2435")),
+            Padding = new Avalonia.Thickness(6, 4)
+        };
+
+        var okBtn = new Button
+        {
+            Content = "OK",
+            Padding = new Avalonia.Thickness(20, 4),
+            IsDefault = true
+        };
+        var cancelBtn = new Button
+        {
+            Content = "Cancel",
+            Padding = new Avalonia.Thickness(20, 4),
+            IsCancel = true
+        };
+
+        okBtn.Click += (_, _) => { result = inputBox.Text; dialog.Close(); };
+        cancelBtn.Click += (_, _) => dialog.Close();
+        inputBox.KeyDown += (_, ke) =>
+        {
+            if (ke.Key == Avalonia.Input.Key.Enter) { result = inputBox.Text; dialog.Close(); }
+        };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = prompt,
+                    Foreground = Avalonia.Media.Brushes.White,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                },
+                inputBox,
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Children = { okBtn, cancelBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return result;
+    }
+
+    // ── Autosave dialogs ─────────────────────────────────────────────────────
 
     private async Task<Codomon.Desktop.Persistence.AutosaveEntry?> ShowAutosavePickerAsync(
         List<Codomon.Desktop.Persistence.AutosaveEntry> entries)

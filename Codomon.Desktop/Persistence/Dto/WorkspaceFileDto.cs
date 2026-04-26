@@ -5,6 +5,7 @@ public class WorkspaceFileDto
     public string Schema { get; set; } = "codomon-workspace/1";
     public string Name { get; set; } = string.Empty;
     public string SourceProjectPath { get; set; } = string.Empty;
+    public string ActiveProfileId { get; set; } = string.Empty;
     public string ParserSettingsPlaceholder { get; set; } = string.Empty;
     public string LogSourceSettingsPlaceholder { get; set; } = string.Empty;
 }

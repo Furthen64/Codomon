@@ -18,7 +18,7 @@ public class MainViewModel : INotifyPropertyChanged
     public WorkspaceModel Workspace
     {
         get => _workspace;
-        private set { _workspace = value; OnPropertyChanged(); }
+        private set { _workspace = value; OnPropertyChanged(); OnPropertyChanged(nameof(Profiles)); OnPropertyChanged(nameof(ActiveProfileId)); }
     }
 
     public string WorkspaceFolderPath
@@ -41,6 +41,119 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public SelectionStateModel Selection { get; } = new SelectionStateModel();
+
+    // ── Profile management ───────────────────────────────────────────────────
+
+    /// <summary>All profiles in the current workspace.</summary>
+    public IReadOnlyList<ProfileModel> Profiles => Workspace.Profiles;
+
+    /// <summary>ID of the currently active profile.</summary>
+    public string ActiveProfileId => Workspace.ActiveProfileId;
+
+    /// <summary>
+    /// Saves the live layout into the current profile, then switches the active profile to
+    /// <paramref name="profileId"/> and fires property-change notifications. The view responds
+    /// to those notifications to apply the new profile layout and redraw the canvas.
+    /// </summary>
+    public void SwitchProfile(string profileId)
+    {
+        if (string.IsNullOrEmpty(profileId) || Workspace.ActiveProfileId == profileId) return;
+
+        CaptureLayoutToActiveProfile();
+
+        Workspace.ActiveProfileId = profileId;
+
+        var newProfile = Workspace.ActiveProfile;
+        if (newProfile != null)
+            WorkspaceSerializer.ApplyProfileLayout(newProfile, Workspace.Systems);
+
+        IsDirty = true;
+        OnPropertyChanged(nameof(ActiveProfileId));
+        StatusMessage = $"Profile: {newProfile?.ProfileName ?? profileId}";
+    }
+
+    /// <summary>
+    /// Creates a new profile initialized with the current live layout state, adds it to the
+    /// workspace, and switches to it as the active profile.
+    /// </summary>
+    public ProfileModel CreateProfile(string name)
+    {
+        CaptureLayoutToActiveProfile();
+
+        var profile = new ProfileModel
+        {
+            Id = Guid.NewGuid().ToString(),
+            ProfileName = name,
+        };
+        // Start the new profile with the current layout so the canvas looks the same initially.
+        WorkspaceSerializer.CaptureLayoutIntoProfile(Workspace, profile);
+
+        Workspace.Profiles.Add(profile);
+        Workspace.ActiveProfileId = profile.Id;
+
+        IsDirty = true;
+        OnPropertyChanged(nameof(Profiles));
+        OnPropertyChanged(nameof(ActiveProfileId));
+        StatusMessage = $"Profile created: {name}";
+        return profile;
+    }
+
+    /// <summary>Renames the profile with the given ID.</summary>
+    public void RenameProfile(string profileId, string newName)
+    {
+        var profile = Workspace.Profiles.FirstOrDefault(p => p.Id == profileId);
+        if (profile == null) return;
+
+        profile.ProfileName = newName;
+        IsDirty = true;
+        OnPropertyChanged(nameof(Profiles));
+        StatusMessage = $"Profile renamed to: {newName}";
+    }
+
+    /// <summary>Duplicates a profile, saves its copy with <paramref name="newName"/>, and switches to it.</summary>
+    public ProfileModel DuplicateProfile(string profileId, string newName)
+    {
+        CaptureLayoutToActiveProfile();
+
+        var source = Workspace.Profiles.FirstOrDefault(p => p.Id == profileId)
+            ?? throw new InvalidOperationException($"Profile '{profileId}' not found.");
+
+        var copy = new ProfileModel
+        {
+            Id = Guid.NewGuid().ToString(),
+            ProfileName = newName,
+            LayoutPositions = source.LayoutPositions.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new LayoutPosition
+                {
+                    X = kvp.Value.X, Y = kvp.Value.Y,
+                    Width = kvp.Value.Width, Height = kvp.Value.Height
+                }),
+            CheckboxFilterState = new Dictionary<string, bool>(source.CheckboxFilterState),
+            VisualSettings = new Dictionary<string, string>(source.VisualSettings),
+            Notes = source.Notes
+        };
+
+        Workspace.Profiles.Add(copy);
+        Workspace.ActiveProfileId = copy.Id;
+        WorkspaceSerializer.ApplyProfileLayout(copy, Workspace.Systems);
+
+        IsDirty = true;
+        OnPropertyChanged(nameof(Profiles));
+        OnPropertyChanged(nameof(ActiveProfileId));
+        StatusMessage = $"Profile duplicated: {newName}";
+        return copy;
+    }
+
+    /// <summary>Captures the live canvas layout into the currently active profile in memory.</summary>
+    public void CaptureLayoutToActiveProfile()
+    {
+        var profile = Workspace.ActiveProfile;
+        if (profile != null)
+            WorkspaceSerializer.CaptureLayoutIntoProfile(Workspace, profile);
+    }
+
+    // ── Workspace operations ─────────────────────────────────────────────────
 
     public async Task NewWorkspaceAsync(
         string folderPath,
