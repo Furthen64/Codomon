@@ -13,6 +13,9 @@ public class MainCanvasControl : Control
     private readonly WorkspaceModel _workspace;
     private readonly SelectionStateModel _selectionState;
 
+    /// <summary>Invoked when the user finishes dragging a system box, marking the workspace as dirty.</summary>
+    public Action? OnLayoutChanged;
+
     private SystemBoxModel? _draggingSystem;
     private Point _dragOffset;
 
@@ -237,6 +240,7 @@ public class MainCanvasControl : Control
         if (_draggingSystem != null)
         {
             e.Pointer.Capture(null);
+            OnLayoutChanged?.Invoke();
         }
         _draggingSystem = null;
     }

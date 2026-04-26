@@ -79,6 +79,46 @@ public partial class SetupWizardDialog : Window
         this.FindControl<TextBlock>("StepTitleText")!.Text = _vm.StepTitle;
 
         UpdateStepDots(step);
+
+        // When arriving at Step 3, auto-suggest the workspace name if the user
+        // hasn't typed one yet.
+        if (step == 3 && string.IsNullOrWhiteSpace(_vm.WorkspaceName))
+        {
+            var suggested = SuggestWorkspaceName(_vm.SourceProjectPath);
+            if (!string.IsNullOrEmpty(suggested))
+            {
+                _vm.WorkspaceName = suggested;
+                var nameBox = this.FindControl<TextBox>("WorkspaceNameBox");
+                if (nameBox != null) nameBox.Text = suggested;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Derives a suggested workspace name from a source path.
+    /// E.g. "C:\src\MyProj1\" → "myproj1_ws"
+    ///      "C:\src\MyProj1\MyProj1.sln" → "myproj1_ws"
+    /// </summary>
+    private static string SuggestWorkspaceName(string sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath)) return string.Empty;
+
+        string leafName;
+        if (System.IO.Directory.Exists(sourcePath))
+        {
+            leafName = new System.IO.DirectoryInfo(sourcePath).Name;
+        }
+        else
+        {
+            // Strip extension for files like .sln / .csproj
+            leafName = System.IO.Path.GetFileNameWithoutExtension(sourcePath);
+        }
+
+        // Lowercase and append _ws; keep only safe characters.
+        leafName = leafName.ToLowerInvariant().Trim();
+        if (string.IsNullOrEmpty(leafName)) return string.Empty;
+
+        return leafName + "_ws";
     }
 
     private void SetPanelVisible(string name, bool visible)
@@ -184,10 +224,10 @@ public partial class SetupWizardDialog : Window
             _vm.WorkspaceName = tb.Text ?? string.Empty;
     }
 
-    private void OnProfileNameChanged(object? sender, TextChangedEventArgs e)
+    private void OnProfileNameSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is TextBox tb)
-            _vm.ProfileName = tb.Text ?? string.Empty;
+        if (sender is ComboBox cb && cb.SelectedItem is ComboBoxItem item)
+            _vm.ProfileName = item.Content?.ToString() ?? "Default";
     }
 
     private void OnNewSystemNameChanged(object? sender, TextChangedEventArgs e)

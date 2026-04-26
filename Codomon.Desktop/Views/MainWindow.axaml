@@ -13,11 +13,14 @@
       <StackPanel Orientation="Horizontal" Spacing="6">
         <Button Content="New Workspace"  Click="OnNewWorkspaceClick"  Padding="10,4"/>
         <Button Content="Open Workspace" Click="OnOpenWorkspaceClick" Padding="10,4"/>
-        <Button Content="Save Workspace" Click="OnSaveWorkspaceClick" Padding="10,4"/>
+        <Button Content="Save"           Click="OnSaveWorkspaceClick" Padding="10,4"/>
+        <Button Content="Save As…"       Click="OnSaveAsWorkspaceClick" Padding="10,4"/>
         <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
         <Button Content="Scan"           Padding="10,4"/>
         <Button Content="Run"            Padding="10,4"/>
         <Button Content="Replay Logs"    Padding="10,4"/>
+        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
+        <Button Content="Dev Console"    Click="OnDevConsoleClick" Padding="10,4"/>
       </StackPanel>
     </Border>
 

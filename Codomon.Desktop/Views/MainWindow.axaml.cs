@@ -16,6 +16,9 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm;
     private MainCanvasControl? _canvas;
 
+    // Keep at most one Dev Console open at a time.
+    private DevConsoleWindow? _devConsole;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -28,7 +31,13 @@ public partial class MainWindow : Window
 
         _vm.Selection.PropertyChanged += (_, _) => UpdatePropertiesPanel();
         _vm.PropertyChanged += OnViewModelPropertyChanged;
+
+        // Intercept window close to warn about unsaved changes.
+        Closing += OnWindowClosing;
+
+        AppLogger.Info("App started");
     }
+
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -42,6 +51,10 @@ public partial class MainWindow : Window
             var statusText = this.FindControl<TextBlock>("StatusText");
             if (statusText != null)
                 statusText.Text = _vm.StatusMessage;
+        }
+        else if (e.PropertyName == nameof(MainViewModel.IsDirty))
+        {
+            UpdateWindowTitle();
         }
     }
 
@@ -62,6 +75,7 @@ public partial class MainWindow : Window
                 result.ProfileName,
                 result.SystemNames);
             UpdateWindowTitle();
+            AppLogger.Info($"New workspace created: {result.WorkspaceName}");
         });
     }
 
@@ -84,6 +98,7 @@ public partial class MainWindow : Window
         {
             await _vm.OpenWorkspaceAsync(folderPath);
             UpdateWindowTitle();
+            AppLogger.Info($"Workspace opened: {folderPath}");
         });
     }
 
@@ -97,6 +112,101 @@ public partial class MainWindow : Window
         }
 
         await ExecuteSafeAsync(_vm.SaveWorkspaceAsync);
+        AppLogger.Info($"Workspace saved: {_vm.WorkspaceFolderPath}");
+    }
+
+    private async void OnSaveAsWorkspaceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await SaveAsAsync();
+    }
+
+    private async void OnDevConsoleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_devConsole != null)
+        {
+            _devConsole.Activate();
+            return;
+        }
+
+        _devConsole = new DevConsoleWindow();
+        _devConsole.Closed += (_, _) => _devConsole = null;
+        _devConsole.Show(this);
+    }
+
+    private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (!_vm.IsDirty) return;
+
+        // Cancel the close first; re-open after the user answers.
+        e.Cancel = true;
+
+        var save = await ShowUnsavedChangesDialogAsync();
+        if (save == null) return;   // user chose Cancel — do nothing
+
+        if (save == true)
+        {
+            if (string.IsNullOrEmpty(_vm.WorkspaceFolderPath))
+            {
+                await SaveAsAsync();
+                if (_vm.IsDirty) return;   // save was not completed (folder picker cancelled or error)
+            }
+            else
+            {
+                await ExecuteSafeAsync(_vm.SaveWorkspaceAsync);
+            }
+        }
+
+        // "Discard" or save succeeded — close for real.
+        _vm.IsDirty = false;
+        Close();
+    }
+
+    private async Task<bool?> ShowUnsavedChangesDialogAsync()
+    {
+        bool? result = null;
+
+        var dialog = new Window
+        {
+            Title = "Unsaved Changes",
+            Width = 400,
+            Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var saveBtn = new Button { Content = "Save", Padding = new Avalonia.Thickness(20, 4) };
+        var discardBtn = new Button { Content = "Discard", Padding = new Avalonia.Thickness(20, 4) };
+        var cancelBtn = new Button { Content = "Cancel", Padding = new Avalonia.Thickness(20, 4) };
+
+        saveBtn.Click += (_, _) => { result = true; dialog.Close(); };
+        discardBtn.Click += (_, _) => { result = false; dialog.Close(); };
+        cancelBtn.Click += (_, _) => { result = null; dialog.Close(); };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "You have unsaved changes. Save before closing?",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Foreground = Avalonia.Media.Brushes.White
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Children = { saveBtn, discardBtn, cancelBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return result;
     }
 
     private async Task SaveAsAsync()
@@ -104,42 +214,41 @@ public partial class MainWindow : Window
         var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
         if (storageProvider == null) return;
 
-        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Save Workspace As",
-            SuggestedFileName = _vm.Workspace.WorkspaceName,
-            FileTypeChoices = new[]
-            {
-                new FilePickerFileType("Codomon Workspace") { Patterns = new[] { "*.codomon" } }
-            }
+            Title = "Save Workspace As — Choose or Create Folder",
+            AllowMultiple = false
         });
 
-        if (file == null) return;
+        if (folders.Count == 0) return;
 
-        var folderPath = file.Path.LocalPath;
-
-        if (System.IO.File.Exists(folderPath))
-            System.IO.File.Delete(folderPath);
+        var folderPath = folders[0].Path.LocalPath;
 
         await ExecuteSafeAsync(async () =>
         {
             await _vm.SaveWorkspaceAsAsync(folderPath);
             UpdateWindowTitle();
+            AppLogger.Info($"Workspace saved as: {folderPath}");
         });
     }
 
     private void UpdateWindowTitle()
-        => this.Title = $"Codomon — {_vm.Workspace.WorkspaceName}";
+        => this.Title = _vm.IsDirty
+            ? $"Codomon — {_vm.Workspace.WorkspaceName} *"
+            : $"Codomon — {_vm.Workspace.WorkspaceName}";
 
     // ── Canvas / TreeView ────────────────────────────────────────────────────
 
     private void SetupCanvas()
     {
         _canvas = new MainCanvasControl(_vm.Workspace, _vm.Selection);
+        _canvas.OnLayoutChanged = () => _vm.IsDirty = true;
 
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
             host.Content = _canvas;
+
+        AppLogger.Debug("Canvas initialized");
     }
 
     private void UpdatePropertiesPanel()

@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.DevConsoleWindow"
+        Title="Dev Console"
+        Width="700" Height="440"
+        MinWidth="500" MinHeight="280"
+        WindowStartupLocation="CenterOwner"
+        Background="#0D1117">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Toolbar -->
+    <Border DockPanel.Dock="Top" Background="#161B22"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="8,5">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="ClearButton" Content="Clear" Click="OnClearClick" Padding="10,3"/>
+        <TextBlock Text="Filter:" Foreground="#88AABB" VerticalAlignment="Center"/>
+        <TextBox x:Name="FilterBox" Width="180" Watermark="type to filter…"
+                 TextChanged="OnFilterChanged" Padding="6,3" Background="#1C2128" Foreground="White"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Log list -->
+    <Border Background="#0D1117">
+      <ScrollViewer x:Name="LogScroller" HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="LogItems" Margin="0"/>
+      </ScrollViewer>
+    </Border>
+
+  </DockPanel>
+</Window>

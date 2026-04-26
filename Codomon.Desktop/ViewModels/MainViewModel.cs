@@ -10,6 +10,7 @@ public class MainViewModel : INotifyPropertyChanged
     private WorkspaceModel _workspace = DemoData.Workspace;
     private string _workspaceFolderPath = string.Empty;
     private string _statusMessage = "Demo workspace loaded.";
+    private bool _isDirty = false;
 
     public WorkspaceModel Workspace
     {
@@ -29,6 +30,13 @@ public class MainViewModel : INotifyPropertyChanged
         private set { _statusMessage = value; OnPropertyChanged(); }
     }
 
+    /// <summary>True when the workspace has unsaved changes.</summary>
+    public bool IsDirty
+    {
+        get => _isDirty;
+        set { _isDirty = value; OnPropertyChanged(); }
+    }
+
     public SelectionStateModel Selection { get; } = new SelectionStateModel();
 
     public async Task NewWorkspaceAsync(
@@ -42,6 +50,7 @@ public class MainViewModel : INotifyPropertyChanged
             folderPath, workspaceName, sourceProjectPath, profileName, initialSystemNames);
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
+        IsDirty = false;
         ClearSelection();
         StatusMessage = $"New workspace created: {folderPath}";
     }
@@ -51,6 +60,7 @@ public class MainViewModel : INotifyPropertyChanged
         var workspace = await WorkspaceSerializer.LoadAsync(folderPath);
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
+        IsDirty = false;
         ClearSelection();
         StatusMessage = $"Opened: {folderPath}";
     }
@@ -61,6 +71,7 @@ public class MainViewModel : INotifyPropertyChanged
             throw new InvalidOperationException("No workspace folder is set. Use Save As.");
 
         await WorkspaceSerializer.SaveAsync(Workspace, WorkspaceFolderPath);
+        IsDirty = false;
         StatusMessage = $"Saved: {WorkspaceFolderPath}";
     }
 
@@ -68,6 +79,7 @@ public class MainViewModel : INotifyPropertyChanged
     {
         await WorkspaceSerializer.SaveAsync(Workspace, folderPath);
         WorkspaceFolderPath = folderPath;
+        IsDirty = false;
         StatusMessage = $"Saved: {folderPath}";
     }
 
