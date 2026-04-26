@@ -234,6 +234,8 @@ public partial class MainWindow : Window
 
     private async void OnDeleteProfileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (!_vm.HasWorkspace) return;
+
         var activeProfile = _vm.Workspace.ActiveProfile;
         if (activeProfile == null) return;
 

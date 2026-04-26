@@ -171,10 +171,13 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (wasActive)
         {
-            var next = Workspace.Profiles.First();
-            Workspace.ActiveProfileId = next.Id;
-            WorkspaceSerializer.ApplyProfileLayout(next, Workspace.Systems);
-            OnPropertyChanged(nameof(ActiveProfileId));
+            var next = Workspace.Profiles.FirstOrDefault();
+            if (next != null)
+            {
+                Workspace.ActiveProfileId = next.Id;
+                WorkspaceSerializer.ApplyProfileLayout(next, Workspace.Systems);
+                OnPropertyChanged(nameof(ActiveProfileId));
+            }
         }
 
         IsDirty = true;

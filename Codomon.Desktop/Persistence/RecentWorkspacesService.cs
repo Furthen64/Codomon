@@ -81,7 +81,7 @@ public static class RecentWorkspacesService
         {
             FolderPath = folderPath,
             WorkspaceName = string.IsNullOrWhiteSpace(workspaceName) ? folderPath : workspaceName,
-            LastOpened = DateTime.Now
+            LastOpened = DateTime.UtcNow
         });
 
         // Keep list bounded.
