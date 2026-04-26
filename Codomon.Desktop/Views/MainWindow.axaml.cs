@@ -71,6 +71,7 @@ public partial class MainWindow : Window
             SetupCanvas();
             SetupTreeView();
             RefreshProfileComboBox();
+            RefreshRoslynConnectionsPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.LogReplay))
         {
@@ -884,6 +885,136 @@ public partial class MainWindow : Window
             });
         }
         combo.SelectedIndex = 1;  // 1× default
+    }
+
+    // ── Roslyn Scan ───────────────────────────────────────────────────────────
+
+    private async void OnScanClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before running a Roslyn scan.");
+            return;
+        }
+
+        var scanVm = new ViewModels.RoslynScanViewModel(
+            _vm.Workspace.SourceProjectPath,
+            _vm.WorkspaceFolderPath);
+
+        var dialog = new RoslynScanDialog(scanVm);
+        var result = await dialog.ShowDialog<ViewModels.RoslynScanViewModel?>(this);
+
+        if (result == null || result.PromotedConnections.Count == 0) return;
+
+        await ExecuteSafeAsync(() =>
+        {
+            _vm.AddRoslynConnections(result.PromotedConnections);
+            RefreshRoslynConnectionsPanel();
+            return Task.CompletedTask;
+        });
+    }
+
+    // ── Connections panel (Roslyn-origin connections) ─────────────────────────
+
+    /// <summary>
+    /// Rebuilds the Connections tab list, showing all workspace connections with
+    /// Roslyn-origin ones clearly badged as read-only.
+    /// </summary>
+    private void RefreshRoslynConnectionsPanel()
+    {
+        var listBox = this.FindControl<ListBox>("ConnectionsListBox");
+        if (listBox == null) return;
+
+        listBox.Items.Clear();
+
+        foreach (var conn in _vm.Workspace.Connections)
+        {
+            var isRoslyn = conn.Origin == Models.ConnectionOrigin.Roslyn;
+            var badge = isRoslyn
+                ? (conn.IsReadOnly ? " [ROSLYN · read-only]" : " [ROSLYN · promoted]")
+                : string.Empty;
+
+            listBox.Items.Add(new ListBoxItem
+            {
+                Tag = conn,
+                Padding = new Avalonia.Thickness(8, 4),
+                Content = new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = conn.Name,
+                            Foreground = Avalonia.Media.Brushes.LightGray,
+                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                        },
+                        new Border
+                        {
+                            IsVisible = isRoslyn,
+                            Background = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.Parse("#1A3A5A")),
+                            CornerRadius = new Avalonia.CornerRadius(3),
+                            Padding = new Avalonia.Thickness(4, 1),
+                            Child = new TextBlock
+                            {
+                                Text = conn.IsReadOnly ? "ROSLYN · read-only" : "ROSLYN · promoted",
+                                FontSize = 9,
+                                Foreground = new Avalonia.Media.SolidColorBrush(
+                                    conn.IsReadOnly
+                                        ? Avalonia.Media.Color.Parse("#4A9FBF")
+                                        : Avalonia.Media.Color.Parse("#4ABF7A")),
+                                FontWeight = Avalonia.Media.FontWeight.Bold,
+                                LetterSpacing = 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        if (_vm.Workspace.Connections.Count == 0)
+        {
+            listBox.Items.Add(new ListBoxItem
+            {
+                IsEnabled = false,
+                Content = new TextBlock
+                {
+                    Text = "No connections yet. Run a Roslyn scan or add connections manually.",
+                    Foreground = new Avalonia.Media.SolidColorBrush(
+                        Avalonia.Media.Color.Parse("#556677")),
+                    FontSize = 12,
+                    Margin = new Avalonia.Thickness(8, 6)
+                }
+            });
+        }
+    }
+
+    private void OnConnectionsListSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var promoteBtn = this.FindControl<Button>("PromoteConnectionButton");
+        if (promoteBtn == null) return;
+
+        if (e.AddedItems.Count > 0 && e.AddedItems[0] is ListBoxItem item &&
+            item.Tag is Models.ConnectionModel conn)
+        {
+            promoteBtn.IsEnabled = conn.Origin == Models.ConnectionOrigin.Roslyn && conn.IsReadOnly;
+        }
+        else
+        {
+            promoteBtn.IsEnabled = false;
+        }
+    }
+
+    private void OnPromoteConnectionClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("ConnectionsListBox");
+        if (listBox?.SelectedItem is not ListBoxItem item) return;
+        if (item.Tag is not Models.ConnectionModel conn) return;
+
+        _vm.PromoteConnectionToManual(conn.Id);
+        RefreshRoslynConnectionsPanel();
     }
 
     // ── Dev Console ───────────────────────────────────────────────────────────

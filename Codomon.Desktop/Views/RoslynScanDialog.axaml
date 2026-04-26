@@ -1,0 +1,181 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.RoslynScanDialog"
+        Title="Roslyn C# Scan"
+        Width="660" Height="540"
+        MinWidth="560" MinHeight="440"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="4">
+          <!-- Step indicators -->
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Ellipse x:Name="Dot1" Width="10" Height="10" Fill="#3A8FBF"/>
+            <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="#2A3F5A"/>
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="Roslyn C# Scan" FontSize="16" FontWeight="Bold" Foreground="White"/>
+          <TextBlock x:Name="StepTitleText" Text="Step 1 — Preflight Check"
+                     FontSize="12" Foreground="#88AABB"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button x:Name="CloseButton" Content="Close" Click="OnCloseClick"
+                Padding="16,6" DockPanel.Dock="Left"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button x:Name="CancelScanButton" Content="⏹ Cancel Scan"
+                  Click="OnCancelScanClick"
+                  Padding="16,6" IsVisible="False"/>
+          <Button x:Name="StartScanButton" Content="▶ Start Scan"
+                  Click="OnStartScanClick"
+                  Padding="16,6" IsEnabled="False"/>
+          <Button x:Name="ViewResultsButton" Content="Browse Results →"
+                  Click="OnViewResultsClick"
+                  Padding="16,6" IsVisible="False"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Content area -->
+    <Border Padding="0">
+      <Grid>
+
+        <!-- ── Step 1: Preflight ─────────────────────────────────────── -->
+        <DockPanel x:Name="PreflightPanel" Margin="24,20" IsVisible="True">
+
+          <StackPanel DockPanel.Dock="Top" Spacing="14">
+            <TextBlock Text="Checking whether a Roslyn scan can be started for this workspace…"
+                       Foreground="#AABBCC" TextWrapping="Wrap"/>
+
+            <!-- Result card -->
+            <Border x:Name="PreflightResultCard"
+                    Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                    CornerRadius="4" Padding="14,12">
+              <StackPanel Spacing="8">
+                <TextBlock x:Name="PreflightStatusIcon" Text="⏳" FontSize="20"/>
+                <TextBlock x:Name="PreflightMessageText"
+                           Text="Running preflight check…"
+                           Foreground="#AABBCC" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
+            <!-- Details grid (shown when check succeeds) -->
+            <Border x:Name="PreflightDetailsCard" IsVisible="False"
+                    Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                    CornerRadius="4" Padding="14,12">
+              <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="160,*">
+                  <TextBlock Grid.Column="0" Text="Source path:" Foreground="#778899"/>
+                  <TextBlock x:Name="PreflightSourcePathText" Grid.Column="1"
+                             Text="—" Foreground="#AABBCC" TextWrapping="Wrap"/>
+                </Grid>
+                <Grid ColumnDefinitions="160,*">
+                  <TextBlock Grid.Column="0" Text="C# files found:" Foreground="#778899"/>
+                  <TextBlock x:Name="PreflightFileCountText" Grid.Column="1"
+                             Text="—" Foreground="#AABBCC"/>
+                </Grid>
+                <Grid ColumnDefinitions="160,*">
+                  <TextBlock Grid.Column="0" Text=".NET SDK version:" Foreground="#778899"/>
+                  <TextBlock x:Name="PreflightDotnetText" Grid.Column="1"
+                             Text="—" Foreground="#AABBCC"/>
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+        </DockPanel>
+
+        <!-- ── Step 2: Scanning ──────────────────────────────────────── -->
+        <DockPanel x:Name="ScanningPanel" Margin="24,16" IsVisible="False" LastChildFill="True">
+
+          <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <TextBlock Text="Scan in progress — parsing C# files and extracting code structure…"
+                       Foreground="#AABBCC" TextWrapping="Wrap"/>
+            <ProgressBar x:Name="ScanProgressBar" IsIndeterminate="True" Height="4"/>
+          </StackPanel>
+
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="3">
+            <ListBox x:Name="ProgressListBox"
+                     Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     FontFamily="Monospace"
+                     FontSize="11"/>
+          </Border>
+
+        </DockPanel>
+
+        <!-- ── Step 3: Results ───────────────────────────────────────── -->
+        <Grid x:Name="ResultsPanel" IsVisible="False">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+
+          <!-- Left: file / class tree -->
+          <Border Grid.Column="0" BorderBrush="#2A3F5A" BorderThickness="0,0,1,0">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Padding="10,7" Background="#1A2435">
+                <TextBlock Text="Code Structure" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+              </Border>
+              <TreeView x:Name="CodeTreeView" Background="Transparent" Margin="4"
+                        SelectionChanged="OnCodeTreeSelectionChanged"/>
+            </DockPanel>
+          </Border>
+
+          <!-- Right: detail + connections -->
+          <DockPanel Grid.Column="1">
+
+            <!-- Suggested connections panel -->
+            <Border DockPanel.Dock="Bottom" Height="200"
+                    BorderBrush="#2A3F5A" BorderThickness="0,1,0,0">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Padding="10,7" Background="#1A2435">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                      <Button x:Name="PromoteButton" Content="⬆ Promote to Workspace"
+                              Click="OnPromoteClick"
+                              Padding="10,3" FontSize="11" IsEnabled="False"/>
+                    </StackPanel>
+                    <TextBlock Text="Suggested Connections  (Roslyn-origin, read-only)"
+                               FontWeight="Bold" Foreground="#AABBCC" FontSize="12"
+                               VerticalAlignment="Center"/>
+                  </DockPanel>
+                </Border>
+                <ListBox x:Name="SuggestedConnectionsListBox"
+                         Background="Transparent"
+                         SelectionChanged="OnSuggestedConnectionSelected"/>
+              </DockPanel>
+            </Border>
+
+            <!-- Detail panel -->
+            <DockPanel Margin="12,10">
+              <TextBlock DockPanel.Dock="Top" x:Name="DetailTitleText"
+                         Text="Select a file or class to view details."
+                         Foreground="#778899" FontSize="12" Margin="0,0,0,8"/>
+              <ScrollViewer>
+                <StackPanel x:Name="DetailStackPanel" Spacing="6"/>
+              </ScrollViewer>
+            </DockPanel>
+
+          </DockPanel>
+        </Grid>
+
+      </Grid>
+    </Border>
+
+  </DockPanel>
+</Window>

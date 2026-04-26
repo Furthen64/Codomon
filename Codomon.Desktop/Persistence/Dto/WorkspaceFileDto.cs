@@ -50,6 +50,7 @@ public class ConnectionEntryDto
     public string FromId { get; set; } = string.Empty;
     public string ToId { get; set; } = string.Empty;
     public string Origin { get; set; } = "Manual";
+    public bool IsReadOnly { get; set; } = false;
 }
 
 public class ConnectionsFileDto

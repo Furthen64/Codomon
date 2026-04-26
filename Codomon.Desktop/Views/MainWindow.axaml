@@ -50,7 +50,7 @@
             <TextBlock Text="DEVTOOLS" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
                        LetterSpacing="1" HorizontalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="Scan"         Padding="8,3"/>
+              <Button Content="Scan"         Click="OnScanClick"    Padding="8,3"/>
               <Button Content="Run"          Padding="8,3"/>
               <Button Content="Replay Logs"  Click="OnImportLogClick" Padding="8,3"/>
               <Button Content="Dev Console"  Click="OnDevConsoleClick" Padding="8,3"/>
@@ -96,6 +96,24 @@
         <TabItem Header="Timeline">
           <TextBlock Text="Timeline — no events recorded yet."
                      Foreground="#888888" Margin="12" VerticalAlignment="Center"/>
+        </TabItem>
+        <TabItem Header="Connections">
+          <DockPanel>
+            <!-- Toolbar -->
+            <Border DockPanel.Dock="Top" Background="#1A2435" Padding="6,4" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="Workspace connections — Roslyn-origin connections are marked read-only."
+                           VerticalAlignment="Center" Foreground="#556677" FontSize="11"/>
+                <Button x:Name="PromoteConnectionButton" Content="⬆ Promote to Manual"
+                        Click="OnPromoteConnectionClick"
+                        Padding="8,3" IsEnabled="False"/>
+              </StackPanel>
+            </Border>
+            <!-- Connections list -->
+            <ListBox x:Name="ConnectionsListBox"
+                     Background="Transparent"
+                     SelectionChanged="OnConnectionsListSelectionChanged"/>
+          </DockPanel>
         </TabItem>
       </TabControl>
     </Border>
