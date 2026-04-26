@@ -32,7 +32,7 @@ public class RuleEditorDialog : Window
     {
         _rule = rule;
 
-        Title = rule.Id == rule.Id && string.IsNullOrEmpty(rule.Pattern)
+        Title = string.IsNullOrEmpty(rule.Pattern)
             ? "Add Mapping Rule"
             : "Edit Mapping Rule";
         Width = 480;

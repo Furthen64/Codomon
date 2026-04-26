@@ -224,8 +224,8 @@ public class MappingRulesDialog : Window
         _editBtn.IsEnabled   = has;
         _deleteBtn.IsEnabled = has;
         _toggleBtn.IsEnabled = has;
-        if (has && selected != null)
-            _toggleBtn.Content = selected.IsEnabled ? "⏸ Disable" : "▶ Enable";
+        if (has)
+            _toggleBtn.Content = selected!.IsEnabled ? "⏸ Disable" : "▶ Enable";
     }
 
     private void OnRulesListSelectionChanged(object? sender, SelectionChangedEventArgs e)
