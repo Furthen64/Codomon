@@ -26,6 +26,9 @@ public partial class MainWindow : Window
         _vm = new MainViewModel();
         DataContext = _vm;
 
+        // Set the window title with version and build date embedded at build time.
+        Title = $"Codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
+
         SetupCanvas();
         SetupTreeView();
 
@@ -233,9 +236,12 @@ public partial class MainWindow : Window
     }
 
     private void UpdateWindowTitle()
-        => this.Title = _vm.IsDirty
-            ? $"Codomon — {_vm.Workspace.WorkspaceName} *"
-            : $"Codomon — {_vm.Workspace.WorkspaceName}";
+    {
+        var workspaceSuffix = _vm.IsDirty
+            ? $" — {_vm.Workspace.WorkspaceName} *"
+            : $" — {_vm.Workspace.WorkspaceName}";
+        Title = $"Codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate}){workspaceSuffix}";
+    }
 
     // ── Canvas / TreeView ────────────────────────────────────────────────────
 
