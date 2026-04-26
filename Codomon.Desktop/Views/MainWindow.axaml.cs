@@ -49,32 +49,18 @@ public partial class MainWindow : Window
 
     private async void OnNewWorkspaceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
-        if (storageProvider == null) return;
-
-        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Create New Workspace",
-            SuggestedFileName = "NewWorkspace",
-            FileTypeChoices = new[]
-            {
-                new FilePickerFileType("Codomon Workspace") { Patterns = new[] { "*.codomon" } }
-            }
-        });
-
-        if (file == null) return;
-
-        var folderPath = file.Path.LocalPath;
-
-        // SaveFilePicker may create an empty file at that path — remove it so we can create a directory.
-        if (System.IO.File.Exists(folderPath))
-            System.IO.File.Delete(folderPath);
-
-        var workspaceName = System.IO.Path.GetFileNameWithoutExtension(folderPath);
+        var wizard = new SetupWizardDialog();
+        var result = await wizard.ShowDialog<SetupWizardViewModel?>(this);
+        if (result == null) return;
 
         await ExecuteSafeAsync(async () =>
         {
-            await _vm.NewWorkspaceAsync(folderPath, workspaceName);
+            await _vm.NewWorkspaceAsync(
+                result.WorkspaceFolderPath,
+                result.WorkspaceName,
+                result.SourceProjectPath,
+                result.ProfileName,
+                result.SystemNames);
             UpdateWindowTitle();
         });
     }

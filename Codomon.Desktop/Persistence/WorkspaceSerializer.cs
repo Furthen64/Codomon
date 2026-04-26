@@ -217,14 +217,39 @@ public static class WorkspaceSerializer
         return workspace;
     }
 
-    public static async Task<WorkspaceModel> CreateNewAsync(string folderPath, string workspaceName)
+    public static async Task<WorkspaceModel> CreateNewAsync(
+        string folderPath,
+        string workspaceName,
+        string sourceProjectPath = "",
+        string profileName = "Default",
+        IEnumerable<string>? initialSystemNames = null)
     {
+        const double InitialXOffset = 40;
+        const double InitialYOffset = 40;
+        const double SystemHorizontalSpacing = 260;
+
         var workspace = new WorkspaceModel
         {
             WorkspaceName = workspaceName,
-            SourceProjectPath = string.Empty,
-            ActiveProfile = new ProfileModel { ProfileName = "Default" }
+            SourceProjectPath = sourceProjectPath,
+            ActiveProfile = new ProfileModel { ProfileName = profileName }
         };
+
+        if (initialSystemNames != null)
+        {
+            double xOffset = InitialXOffset;
+            foreach (var name in initialSystemNames)
+            {
+                workspace.Systems.Add(new Models.SystemBoxModel
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = name,
+                    X = xOffset,
+                    Y = InitialYOffset
+                });
+                xOffset += SystemHorizontalSpacing;
+            }
+        }
 
         await SaveAsync(workspace, folderPath);
         return workspace;
