@@ -11,6 +11,9 @@ public class WorkspaceModel
     public ObservableCollection<ProfileModel> Profiles { get; set; } = new();
     public string ActiveProfileId { get; set; } = string.Empty;
 
+    /// <summary>Workspace-level rules that map log data to Systems and Modules.</summary>
+    public List<MappingRuleModel> MappingRules { get; set; } = new();
+
     /// <summary>The currently active profile, or null if no profiles exist.</summary>
     public ProfileModel? ActiveProfile =>
         Profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? Profiles.FirstOrDefault();

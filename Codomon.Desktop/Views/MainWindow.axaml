@@ -144,8 +144,26 @@
                 <TextBlock Text="Name:" Foreground="#AABBCC" FontWeight="SemiBold"/>
                 <TextBlock x:Name="PropNameText" Text="None" Foreground="White" Margin="0,0,0,8"/>
                 <TextBlock Text="Type:" Foreground="#AABBCC" FontWeight="SemiBold"/>
-                <TextBlock x:Name="PropTypeText" Text="-" Foreground="White"/>
+                <TextBlock x:Name="PropTypeText" Text="-" Foreground="White" Margin="0,0,0,8"/>
               </StackPanel>
+
+              <!-- Mapping rules section — visible only when an item is selected -->
+              <StackPanel x:Name="PropRulesPanel" IsVisible="False" Spacing="4">
+                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                <TextBlock Text="Mapping Rules" Foreground="#AABBCC" FontWeight="SemiBold"/>
+                <TextBlock x:Name="PropRulesCountText" Foreground="#778899" FontSize="11"/>
+                <Button x:Name="EditRulesButton" Content="📏 Edit Rules…"
+                        Padding="8,4" Click="OnEditRulesClick"/>
+              </StackPanel>
+
+              <!-- Last match info — visible during/after log replay -->
+              <StackPanel x:Name="PropMatchPanel" IsVisible="False" Spacing="4">
+                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                <TextBlock Text="Last Match" Foreground="#AABBCC" FontWeight="SemiBold"/>
+                <TextBlock x:Name="PropMatchText" Foreground="#88CCAA" FontSize="11"
+                           TextWrapping="Wrap"/>
+              </StackPanel>
+
             </StackPanel>
           </DockPanel>
         </Border>
