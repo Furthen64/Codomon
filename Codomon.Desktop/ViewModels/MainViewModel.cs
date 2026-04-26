@@ -31,9 +31,15 @@ public class MainViewModel : INotifyPropertyChanged
 
     public SelectionStateModel Selection { get; } = new SelectionStateModel();
 
-    public async Task NewWorkspaceAsync(string folderPath, string workspaceName)
+    public async Task NewWorkspaceAsync(
+        string folderPath,
+        string workspaceName,
+        string sourceProjectPath = "",
+        string profileName = "Default",
+        IEnumerable<string>? initialSystemNames = null)
     {
-        var workspace = await WorkspaceSerializer.CreateNewAsync(folderPath, workspaceName);
+        var workspace = await WorkspaceSerializer.CreateNewAsync(
+            folderPath, workspaceName, sourceProjectPath, profileName, initialSystemNames);
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
         ClearSelection();

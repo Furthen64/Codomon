@@ -1,0 +1,137 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.SetupWizardDialog"
+        Title="New Workspace — Setup Wizard"
+        Width="580" Height="480"
+        MinWidth="480" MinHeight="420"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="4">
+          <!-- Step dots -->
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Ellipse x:Name="Dot1" Width="10" Height="10" Fill="#3A8FBF"/>
+            <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot4" Width="10" Height="10" Fill="#2A3F5A"/>
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="New Workspace" FontSize="16" FontWeight="Bold" Foreground="White"/>
+          <TextBlock x:Name="StepTitleText" Text="Step 1 of 4 — Source Project"
+                     FontSize="12" Foreground="#88AABB"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button x:Name="CancelButton" Content="Cancel" Click="OnCancelClick"
+                Padding="16,6" DockPanel.Dock="Left"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button x:Name="BackButton" Content="← Back" Click="OnBackClick"
+                  Padding="16,6" IsEnabled="False"/>
+          <Button x:Name="NextButton" Content="Next →" Click="OnNextClick"
+                  Padding="16,6"/>
+          <Button x:Name="FinishButton" Content="✓ Create Workspace" Click="OnFinishClick"
+                  Padding="16,6" IsVisible="False"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Content area -->
+    <Border Padding="24,20">
+      <Grid>
+
+        <!-- Validation error banner (shared across steps) -->
+        <Border x:Name="ErrorBanner" IsVisible="False"
+                Background="#3A1A1A" BorderBrush="#CC4444" BorderThickness="1"
+                CornerRadius="4" Padding="10,7" VerticalAlignment="Top" ZIndex="10">
+          <TextBlock x:Name="ErrorText" Foreground="#FF8888" TextWrapping="Wrap" FontSize="12"/>
+        </Border>
+
+        <!-- Step 1: Source project -->
+        <StackPanel x:Name="Step1Panel" Spacing="12" Margin="0,36,0,0">
+          <TextBlock Text="Select the source project, solution, or folder that this workspace will track."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+          <TextBlock Text="Accepted: .sln, .csproj, or project folder"
+                     Foreground="#667788" FontSize="11"/>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <TextBox x:Name="SourcePathBox" Grid.Column="0"
+                     Watermark="Path to .sln, .csproj, or folder…"
+                     TextChanged="OnSourcePathChanged"/>
+            <Button Grid.Column="1" Content="Browse…" Click="OnBrowseSourceClick"
+                    Margin="8,0,0,0" Padding="12,4"/>
+          </Grid>
+        </StackPanel>
+
+        <!-- Step 2: Workspace folder -->
+        <StackPanel x:Name="Step2Panel" Spacing="12" Margin="0,36,0,0" IsVisible="False">
+          <TextBlock Text="Choose or create a folder where the workspace files will be stored."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+          <TextBlock Text="A new .codomon folder will be initialised inside the chosen location."
+                     Foreground="#667788" FontSize="11"/>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <TextBox x:Name="WorkspaceFolderBox" Grid.Column="0"
+                     Watermark="Workspace folder path…"
+                     TextChanged="OnWorkspaceFolderChanged"/>
+            <Button Grid.Column="1" Content="Browse…" Click="OnBrowseWorkspaceFolderClick"
+                    Margin="8,0,0,0" Padding="12,4"/>
+          </Grid>
+        </StackPanel>
+
+        <!-- Step 3: Names -->
+        <StackPanel x:Name="Step3Panel" Spacing="16" Margin="0,36,0,0" IsVisible="False">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Workspace Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <TextBox x:Name="WorkspaceNameBox" Watermark="e.g. MyProject"
+                     TextChanged="OnWorkspaceNameChanged"/>
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Default Profile Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <TextBox x:Name="ProfileNameBox" Watermark="e.g. Default"
+                     TextChanged="OnProfileNameChanged"/>
+          </StackPanel>
+          <TextBlock Text="A profile stores layout, filters, and visual settings. You can add more profiles later."
+                     Foreground="#667788" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Step 4: Initial systems (optional) -->
+        <DockPanel x:Name="Step4Panel" Margin="0,36,0,0" IsVisible="False" LastChildFill="True">
+          <StackPanel DockPanel.Dock="Top" Spacing="10">
+            <TextBlock Text="Optionally add initial System names. You can always add more later."
+                       Foreground="#AABBCC" TextWrapping="Wrap"/>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox x:Name="NewSystemNameBox" Grid.Column="0"
+                       Watermark="System name…"
+                       KeyDown="OnSystemNameKeyDown"
+                       TextChanged="OnNewSystemNameChanged"/>
+              <Button Grid.Column="1" Content="+ Add" Click="OnAddSystemClick"
+                      Margin="8,0,0,0" Padding="12,4"/>
+            </Grid>
+          </StackPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Systems to create:" Foreground="#667788"
+                     FontSize="11" Margin="0,12,0,4"/>
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="3">
+            <ScrollViewer>
+              <ItemsControl x:Name="SystemsList" Margin="6">
+                <!-- Items added in code-behind -->
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </DockPanel>
+
+      </Grid>
+    </Border>
+
+  </DockPanel>
+</Window>
