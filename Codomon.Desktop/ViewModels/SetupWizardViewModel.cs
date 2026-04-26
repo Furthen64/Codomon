@@ -115,12 +115,15 @@ public class SetupWizardViewModel : INotifyPropertyChanged
                     ValidationError = "The chosen path is a file, not a folder.";
                     return false;
                 }
-                // Warn if folder already contains workspace files.
-                var workspaceFile = System.IO.Path.Combine(WorkspaceFolderPath, WorkspaceFileName);
-                if (System.IO.File.Exists(workspaceFile))
+                // Block non-empty folders — workspace initialisation requires an empty directory.
+                if (System.IO.Directory.Exists(WorkspaceFolderPath))
                 {
-                    ValidationError = "That folder already contains a Codomon workspace. Choose a different folder.";
-                    return false;
+                    bool hasContents = System.IO.Directory.EnumerateFileSystemEntries(WorkspaceFolderPath).Any();
+                    if (hasContents)
+                    {
+                        ValidationError = "The chosen folder is not empty. Please choose an empty folder or create a new one.";
+                        return false;
+                    }
                 }
                 break;
 

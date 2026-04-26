@@ -27,6 +27,7 @@ public class ImportWizardViewModel : INotifyPropertyChanged
     private string _customTimestampFormat = string.Empty;
     private string _timeZoneId            = "UTC";
     private string _validationError       = string.Empty;
+    private string _knownFormatKey        = "none";
 
     // ── Static option lists ────────────────────────────────────────────────────
 
@@ -60,6 +61,13 @@ public class ImportWizardViewModel : INotifyPropertyChanged
         new TimestampFormatOption("custom",     "Custom…",                                    null),
     };
 
+    /// <summary>Known application log format presets. Selecting one auto-fills Step 2 and Step 3 settings.</summary>
+    public static readonly IReadOnlyList<KnownAppLogFormat> KnownAppLogFormats = new[]
+    {
+        new KnownAppLogFormat("none",        "— None (configure manually) —", "tab",  "",  -1, "auto",   ""),
+        new KnownAppLogFormat("orcaslicer",  "OrcaSlicer",                    "tab",  "",   1, "custom", "yyyy-MM-dd HH:mm:ss.ffffff"),
+    };
+
     /// <summary>Timezone choices shown in Step 3 (IANA IDs work on all platforms in .NET 8).</summary>
     public static readonly IReadOnlyList<TimeZoneOption> TimeZoneOptions = new[]
     {
@@ -91,6 +99,29 @@ public class ImportWizardViewModel : INotifyPropertyChanged
     {
         get => _filePath;
         set { _filePath = value; OnPropertyChanged(); ClearValidation(); }
+    }
+
+    /// <summary>Key of the selected known-application log format preset, or "none".</summary>
+    public string KnownFormatKey
+    {
+        get => _knownFormatKey;
+        set { _knownFormatKey = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Applies the settings from the named known-application preset,
+    /// overwriting delimiter, timestamp column, and timestamp format fields.
+    /// </summary>
+    public void ApplyKnownFormat(string key)
+    {
+        var fmt = KnownAppLogFormats.FirstOrDefault(f => f.Key == key);
+        if (fmt == null) return;
+        KnownFormatKey           = key;
+        DelimiterKey             = fmt.DelimiterKey;
+        CustomDelimiter          = fmt.CustomDelimiter;
+        TimestampColumnIndex     = fmt.TimestampColumnIndex;
+        TimestampFormatKey       = fmt.TimestampFormatKey;
+        CustomTimestampFormat    = fmt.CustomTimestampFormat;
     }
 
     /// <summary>Number of lines in the selected file (set by code-behind after browse).</summary>
@@ -309,3 +340,16 @@ public sealed record DelimiterOption(string Key, string Label, string Value, boo
 public sealed record TimestampFormatOption(string Key, string Label, string? Format);
 
 public sealed record TimeZoneOption(string Id, string Label);
+
+/// <summary>
+/// Describes a known application's log format, so the user can apply it as a preset
+/// instead of configuring the delimiter and timestamp settings by hand.
+/// </summary>
+public sealed record KnownAppLogFormat(
+    string Key,
+    string Label,
+    string DelimiterKey,
+    string CustomDelimiter,
+    int    TimestampColumnIndex,
+    string TimestampFormatKey,
+    string CustomTimestampFormat);

@@ -72,6 +72,20 @@
                     Margin="8,0,0,0" Padding="12,4"/>
           </Grid>
           <TextBlock x:Name="FileInfoText" Foreground="#667788" FontSize="11"/>
+
+          <!-- Known application log format preset -->
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                  CornerRadius="3" Padding="12,10" Margin="0,4,0,0">
+            <StackPanel Spacing="6">
+              <TextBlock Text="Known Application (optional)" Foreground="#AABBCC"
+                         FontWeight="SemiBold" FontSize="12"/>
+              <TextBlock Text="Select an application to auto-fill the delimiter and timestamp settings."
+                         Foreground="#667788" FontSize="11" TextWrapping="Wrap"/>
+              <ComboBox x:Name="KnownFormatComboBox"
+                        HorizontalAlignment="Stretch" Padding="6,2"
+                        SelectionChanged="OnKnownFormatSelectionChanged"/>
+            </StackPanel>
+          </Border>
         </StackPanel>
 
         <!-- ── Step 2: Delimiter ─────────────────────────────────────────────── -->
