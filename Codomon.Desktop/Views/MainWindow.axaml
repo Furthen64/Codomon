@@ -94,8 +94,9 @@
           </DockPanel>
         </TabItem>
         <TabItem Header="Timeline">
-          <TextBlock Text="Timeline — no events recorded yet."
-                     Foreground="#888888" Margin="12" VerticalAlignment="Center"/>
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ContentControl x:Name="TimelineHost" HorizontalContentAlignment="Stretch"/>
+          </ScrollViewer>
         </TabItem>
       </TabControl>
     </Border>

@@ -20,6 +20,7 @@ public class MainViewModel : INotifyPropertyChanged
     public MainViewModel()
     {
         _logReplay = new LogReplayViewModel(_workspace);
+        _timeline  = new TimelineViewModel();
     }
 
     public bool HasWorkspace
@@ -40,6 +41,9 @@ public class MainViewModel : INotifyPropertyChanged
             // Re-create the replay VM so it references the new workspace model.
             _logReplay = new LogReplayViewModel(value);
             OnPropertyChanged(nameof(LogReplay));
+            // Re-create the timeline VM; existing data is stale for the new workspace.
+            _timeline = new TimelineViewModel();
+            OnPropertyChanged(nameof(Timeline));
         }
     }
 
@@ -70,6 +74,11 @@ public class MainViewModel : INotifyPropertyChanged
 
     /// <summary>The replay controller for imported log files.</summary>
     public LogReplayViewModel LogReplay => _logReplay;
+
+    private TimelineViewModel _timeline;
+
+    /// <summary>Aggregated day-timeline built from imported log entries.</summary>
+    public TimelineViewModel Timeline => _timeline;
 
     /// <summary>
     /// Imports a log file from <paramref name="sourcePath"/> into the workspace

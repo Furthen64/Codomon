@@ -28,6 +28,9 @@ public partial class MainWindow : Window
     // when a new workspace (and therefore a new LogReplayViewModel) is loaded.
     private LogReplayViewModel? _subscribedReplay;
 
+    // Timeline control instance; re-created when the workspace changes.
+    private TimelineControl? _timelineControl;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -40,6 +43,7 @@ public partial class MainWindow : Window
 
         SetupCanvas();
         SetupTreeView();
+        SetupTimeline();
         RefreshProfileComboBox();
         PopulateRecentWorkspaces();
         SetupReplaySpeedComboBox();
@@ -72,6 +76,11 @@ public partial class MainWindow : Window
             SetupTreeView();
             RefreshProfileComboBox();
         }
+        else if (e.PropertyName == nameof(MainViewModel.Timeline))
+        {
+            // A new workspace was loaded — replace the timeline control.
+            SetupTimeline();
+        }
         else if (e.PropertyName == nameof(MainViewModel.LogReplay))
         {
             // A new workspace was loaded — unsubscribe from the old VM and subscribe to the new one.
@@ -96,6 +105,7 @@ public partial class MainWindow : Window
         {
             SyncProfileComboBoxSelection();
             _canvas?.InvalidateVisual();
+            RebuildTimeline();
         }
     }
 
@@ -777,6 +787,7 @@ public partial class MainWindow : Window
             e.PropertyName == nameof(LogReplayViewModel.CurrentIndex))
         {
             RefreshLogReplayPanel();
+            UpdateTimelineCursor();
         }
     }
 
@@ -849,6 +860,9 @@ public partial class MainWindow : Window
             listBox.ItemsSource = null;  // force reset
             listBox.ItemTemplate = BuildLogItemTemplate();
             listBox.ItemsSource = replay.Entries;
+
+            // Entries have changed — rebuild the timeline.
+            RebuildTimeline();
         }
     }
 
@@ -1026,6 +1040,43 @@ public partial class MainWindow : Window
             host.Content = _canvas;
 
         AppLogger.Debug("Canvas initialized");
+    }
+
+    // ── Timeline ──────────────────────────────────────────────────────────────
+
+    private void SetupTimeline()
+    {
+        _timelineControl = new TimelineControl(_vm.Timeline);
+        _timelineControl.BucketSelected += OnTimelineBucketSelected;
+
+        var host = this.FindControl<ContentControl>("TimelineHost");
+        if (host != null)
+            host.Content = _timelineControl;
+    }
+
+    private void RebuildTimeline()
+    {
+        _vm.Timeline.Build(_vm.LogReplay.Entries, _vm.Workspace);
+    }
+
+    private void UpdateTimelineCursor()
+    {
+        var entry = _vm.LogReplay.CurrentEntry;
+        _vm.Timeline.ReplayCursorTime = entry?.Timestamp?.TimeOfDay;
+    }
+
+    private void OnTimelineBucketSelected(TimelineBucket bucket)
+    {
+        // Scroll the log list to the first matching entry for this bucket.
+        var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
+        if (listBox == null) return;
+
+        var firstId = bucket.MatchingLogEntryIds.FirstOrDefault(-1);
+        if (firstId < 0 || firstId >= listBox.ItemCount) return;
+
+        var item = listBox.Items[firstId];
+        if (item != null)
+            listBox.ScrollIntoView(item);
     }
 
     private void UpdatePropertiesPanel()
