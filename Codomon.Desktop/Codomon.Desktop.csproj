@@ -8,7 +8,23 @@
     <RootNamespace>Codomon.Desktop</RootNamespace>
     <AssemblyName>Codomon.Desktop</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- AppVersion and BuildDate can be overridden by build.sh via -p:AppVersion=... -p:BuildDate=... -->
+    <AppVersion Condition="'$(AppVersion)' == ''">0.1.0-dev</AppVersion>
+    <BuildDate Condition="'$(BuildDate)' == ''">dev</BuildDate>
+    <Version>$(AppVersion)</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embed AppVersion and BuildDate into assembly metadata so BuildInfo.cs can read them at runtime. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>AppVersion</_Parameter1>
+      <_Parameter2>$(AppVersion)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuildDate</_Parameter1>
+      <_Parameter2>$(BuildDate)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.3" />

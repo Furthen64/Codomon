@@ -18,6 +18,7 @@ public static class WorkspaceSerializer
     private const string ConnectionsFile = "connections.json";
     private const string ProfilesFolder = "profiles";
     private const string DefaultProfileFile = "default.json";
+    private const string VersionFile = ".wsversion";
 
     private static readonly string[] RequiredFiles =
     {
@@ -32,6 +33,10 @@ public static class WorkspaceSerializer
         Directory.CreateDirectory(Path.Combine(folderPath, "logs", "raw"));
         Directory.CreateDirectory(Path.Combine(folderPath, "logs", "imported"));
         Directory.CreateDirectory(Path.Combine(folderPath, "autosaves"));
+
+        // Write workspace version file so we can detect incompatible workspaces later.
+        var versionContent = $"codomon-version={BuildInfo.AppVersion}{Environment.NewLine}build-date={BuildInfo.BuildDate}{Environment.NewLine}";
+        await File.WriteAllTextAsync(Path.Combine(folderPath, VersionFile), versionContent);
 
         var workspaceDto = new WorkspaceFileDto
         {

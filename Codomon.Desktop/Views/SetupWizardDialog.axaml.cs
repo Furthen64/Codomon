@@ -17,8 +17,8 @@ public partial class SetupWizardDialog : Window
 
     public SetupWizardDialog()
     {
-        InitializeComponent();
         _vm = new SetupWizardViewModel();
+        InitializeComponent();
         DataContext = _vm;
 
         SyncStepUi();
