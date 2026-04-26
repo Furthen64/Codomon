@@ -58,6 +58,23 @@ public class ConnectionsFileDto
     public List<ConnectionEntryDto> Connections { get; set; } = new();
 }
 
+public class MappingRuleEntryDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string TargetType { get; set; } = "System";
+    public string TargetId { get; set; } = string.Empty;
+    public string RuleType { get; set; } = string.Empty;
+    public string Pattern { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; } = true;
+    public string Notes { get; set; } = string.Empty;
+}
+
+public class MappingRulesFileDto
+{
+    public string Schema { get; set; } = "codomon-rules/1";
+    public List<MappingRuleEntryDto> Rules { get; set; } = new();
+}
+
 public class LayoutPositionDto
 {
     public double X { get; set; }

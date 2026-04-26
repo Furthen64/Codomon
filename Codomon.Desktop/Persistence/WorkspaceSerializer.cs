@@ -16,6 +16,7 @@ public static class WorkspaceSerializer
     private const string SystemsFile = "systems.json";
     private const string ModulesFile = "modules.json";
     private const string ConnectionsFile = "connections.json";
+    private const string RulesFile = "rules.json";
     private const string ProfilesFolder = "profiles";
     private const string VersionFile = ".wsversion";
 
@@ -87,6 +88,21 @@ public static class WorkspaceSerializer
         };
         await WriteJsonAsync(Path.Combine(folderPath, ConnectionsFile), connectionsDto);
 
+        var rulesDto = new MappingRulesFileDto
+        {
+            Rules = workspace.MappingRules.Select(r => new MappingRuleEntryDto
+            {
+                Id = r.Id,
+                TargetType = r.TargetType.ToString(),
+                TargetId = r.TargetId,
+                RuleType = r.RuleType.ToString(),
+                Pattern = r.Pattern,
+                IsEnabled = r.IsEnabled,
+                Notes = r.Notes
+            }).ToList()
+        };
+        await WriteJsonAsync(Path.Combine(folderPath, RulesFile), rulesDto);
+
         // Capture live layout into the active profile before saving.
         var activeProfile = workspace.ActiveProfile;
         if (activeProfile != null)
@@ -119,6 +135,12 @@ public static class WorkspaceSerializer
         var systemsDto = await ReadJsonAsync<SystemsFileDto>(Path.Combine(folderPath, SystemsFile));
         var modulesDto = await ReadJsonAsync<ModulesFileDto>(Path.Combine(folderPath, ModulesFile));
         var connectionsDto = await ReadJsonAsync<ConnectionsFileDto>(Path.Combine(folderPath, ConnectionsFile));
+
+        // rules.json is optional (backward-compatible with pre-Phase-08 workspaces).
+        var rulesPath = Path.Combine(folderPath, RulesFile);
+        var rulesDto = File.Exists(rulesPath)
+            ? await ReadJsonAsync<MappingRulesFileDto>(rulesPath)
+            : new MappingRulesFileDto();
 
         // Load all profiles from profiles/*.json
         var profiles = new List<ProfileModel>();
@@ -205,6 +227,18 @@ public static class WorkspaceSerializer
         foreach (var p in profiles) workspace.Profiles.Add(p);
         workspace.Systems.AddRange(systems);
         workspace.Connections.AddRange(connections);
+
+        var rules = rulesDto.Rules.Select(r => new MappingRuleModel
+        {
+            Id = r.Id,
+            TargetType = Enum.TryParse<RuleTargetType>(r.TargetType, out var tt) ? tt : RuleTargetType.System,
+            TargetId = r.TargetId,
+            RuleType = Enum.TryParse<RuleType>(r.RuleType, out var rt) ? rt : RuleType.LogSourcePattern,
+            Pattern = r.Pattern,
+            IsEnabled = r.IsEnabled,
+            Notes = r.Notes
+        }).ToList();
+        workspace.MappingRules.AddRange(rules);
 
         return workspace;
     }

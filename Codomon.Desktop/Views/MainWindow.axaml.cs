@@ -798,6 +798,9 @@ public partial class MainWindow : Window
             _canvas.HighlightSystem(match.System.Id);
         }
 
+        // Show which rule/reason caused the match in the properties panel.
+        ShowMatchInfo(match);
+
         // Scroll the log list to the current entry.
         var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
         if (listBox != null)
@@ -1032,12 +1035,70 @@ public partial class MainWindow : Window
     {
         var nameText = this.FindControl<TextBlock>("PropNameText");
         var typeText = this.FindControl<TextBlock>("PropTypeText");
+        var rulesPanel = this.FindControl<StackPanel>("PropRulesPanel");
+        var rulesCountText = this.FindControl<TextBlock>("PropRulesCountText");
 
         var sel = _vm.Selection;
         if (nameText != null)
             nameText.Text = string.IsNullOrEmpty(sel.SelectedName) ? "None" : sel.SelectedName;
         if (typeText != null)
             typeText.Text = string.IsNullOrEmpty(sel.SelectedType) ? "-" : sel.SelectedType;
+
+        bool hasSelection = !string.IsNullOrEmpty(sel.SelectedId);
+        if (rulesPanel != null)
+            rulesPanel.IsVisible = hasSelection;
+
+        if (hasSelection && rulesCountText != null)
+        {
+            var targetType = sel.SelectedType == "Module"
+                ? RuleTargetType.Module
+                : RuleTargetType.System;
+            var count = _vm.Workspace.MappingRules
+                .Count(r => r.TargetType == targetType && r.TargetId == sel.SelectedId);
+            rulesCountText.Text = count == 0
+                ? "No rules defined."
+                : $"{count} rule{(count == 1 ? "" : "s")} defined.";
+        }
+    }
+
+    private async void OnEditRulesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var sel = _vm.Selection;
+        if (string.IsNullOrEmpty(sel.SelectedId)) return;
+
+        var targetType = sel.SelectedType == "Module" ? RuleTargetType.Module : RuleTargetType.System;
+
+        var dialog = new MappingRulesDialog(
+            _vm.Workspace.MappingRules,
+            targetType,
+            sel.SelectedId,
+            sel.SelectedName);
+
+        await dialog.ShowDialog(this);
+
+        if (dialog.HasChanges)
+        {
+            _vm.IsDirty = true;
+            UpdatePropertiesPanel();
+            AppLogger.Info($"Mapping rules updated for {sel.SelectedType} '{sel.SelectedName}'");
+        }
+    }
+
+    private void ShowMatchInfo(MatchResult match)
+    {
+        var matchPanel = this.FindControl<StackPanel>("PropMatchPanel");
+        var matchText  = this.FindControl<TextBlock>("PropMatchText");
+
+        if (matchPanel == null || matchText == null) return;
+
+        if (match.Strength == MatchStrength.None)
+        {
+            matchPanel.IsVisible = false;
+            return;
+        }
+
+        matchPanel.IsVisible = true;
+        matchText.Text = match.MatchReason;
     }
 
     private void SetupTreeView()
