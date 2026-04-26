@@ -11,7 +11,10 @@
     <!-- Top Toolbar -->
     <Border DockPanel.Dock="Top" Background="#1E2A3A" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="4">
       <StackPanel Orientation="Horizontal" Spacing="6">
-        <Button Content="Open Workspace" Padding="10,4"/>
+        <Button Content="New Workspace"  Click="OnNewWorkspaceClick"  Padding="10,4"/>
+        <Button Content="Open Workspace" Click="OnOpenWorkspaceClick" Padding="10,4"/>
+        <Button Content="Save Workspace" Click="OnSaveWorkspaceClick" Padding="10,4"/>
+        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
         <Button Content="Scan"           Padding="10,4"/>
         <Button Content="Run"            Padding="10,4"/>
         <Button Content="Replay Logs"    Padding="10,4"/>
@@ -20,7 +23,7 @@
 
     <!-- Status Bar -->
     <Border DockPanel.Dock="Bottom" Background="#111820" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="#2A3F5A">
-      <TextBlock Text="Ready" Foreground="#88AABB" FontSize="11"/>
+      <TextBlock x:Name="StatusText" Text="Ready" Foreground="#88AABB" FontSize="11"/>
     </Border>
 
     <!-- Bottom Panel (Logs / Timeline) -->
