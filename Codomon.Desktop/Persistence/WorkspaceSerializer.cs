@@ -83,7 +83,8 @@ public static class WorkspaceSerializer
                 Notes = c.Notes,
                 FromId = c.FromId,
                 ToId = c.ToId,
-                Origin = c.Origin.ToString()
+                Origin = c.Origin.ToString(),
+                IsReadOnly = c.IsReadOnly
             }).ToList()
         };
         await WriteJsonAsync(Path.Combine(folderPath, ConnectionsFile), connectionsDto);
@@ -214,7 +215,8 @@ public static class WorkspaceSerializer
             ToId = c.ToId,
             Origin = Enum.TryParse<ConnectionOrigin>(c.Origin, out var origin)
                 ? origin
-                : ConnectionOrigin.Manual
+                : ConnectionOrigin.Manual,
+            IsReadOnly = c.IsReadOnly
         }).ToList();
 
         var workspace = new WorkspaceModel

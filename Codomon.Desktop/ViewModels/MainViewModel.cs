@@ -379,6 +379,44 @@ public class MainViewModel : INotifyPropertyChanged
         Selection.SelectedName = string.Empty;
     }
 
+    // ── Roslyn scan integration ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Adds Roslyn-origin connections (promoted from a scan) to the workspace connection list.
+    /// The connections are marked read-only and their Origin is set to
+    /// <see cref="ConnectionOrigin.Roslyn"/>.
+    /// </summary>
+    public void AddRoslynConnections(IEnumerable<Models.ConnectionModel> connections)
+    {
+        foreach (var conn in connections)
+        {
+            // Avoid duplicates by ID.
+            if (Workspace.Connections.Any(c => c.Id == conn.Id)) continue;
+            Workspace.Connections.Add(conn);
+        }
+
+        IsDirty = true;
+        StatusMessage = "Roslyn connections added to workspace.";
+        AppLogger.Info($"Roslyn scan: added {connections.Count()} connection(s).");
+    }
+
+    /// <summary>
+    /// Promotes a Roslyn-origin connection to a manual connection by clearing
+    /// the read-only flag and changing its origin to <see cref="ConnectionOrigin.Manual"/>.
+    /// </summary>
+    public void PromoteConnectionToManual(string connectionId)
+    {
+        var conn = Workspace.Connections.FirstOrDefault(c => c.Id == connectionId);
+        if (conn == null) return;
+
+        conn.IsReadOnly = false;
+        conn.Origin = Models.ConnectionOrigin.Manual;
+
+        IsDirty = true;
+        StatusMessage = $"Connection '{conn.Name}' promoted to manual.";
+        AppLogger.Info($"Roslyn connection promoted to manual: {conn.Id}");
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
