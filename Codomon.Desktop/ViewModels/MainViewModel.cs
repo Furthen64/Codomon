@@ -12,7 +12,7 @@ public class MainViewModel : INotifyPropertyChanged
     private string _statusMessage = "Demo workspace loaded.";
     private bool _isDirty = false;
 
-    /// <summary>Periodic autosave timer — fires every 5 minutes while a workspace is open.</summary>
+    /// <summary>Periodic autosave timer -- fires every 5 minutes while a workspace is open.</summary>
     private System.Timers.Timer? _autosaveTimer;
 
     public WorkspaceModel Workspace

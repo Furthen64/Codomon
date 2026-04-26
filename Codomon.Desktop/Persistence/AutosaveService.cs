@@ -18,7 +18,7 @@ public static class AutosaveService
 {
     private const string AutosavePrefix = "codomon_as_";
     private const string AutosavesFolder = "autosaves";
-    private const string HashFile = ".wshash";
+    private const string HashFileName = ".wshash";
     private const string ProfilesFolder = "profiles";
     private const int MaxAutosaves = 10;
     private const string TimestampFormat = "yyyyMMdd_HHmmss";
@@ -60,7 +60,7 @@ public static class AutosaveService
 
         // Write integrity hash.
         var hash = await ComputeHashAsync(autosavePath);
-        await File.WriteAllTextAsync(System.IO.Path.Combine(autosavePath, HashFile), hash);
+        await File.WriteAllTextAsync(System.IO.Path.Combine(autosavePath, HashFileName), hash);
 
         PruneAutosaves(workspaceFolderPath);
 
@@ -73,7 +73,7 @@ public static class AutosaveService
     /// </summary>
     public static async Task<bool> ValidateAutosaveAsync(string autosavePath)
     {
-        var hashFilePath = System.IO.Path.Combine(autosavePath, HashFile);
+        var hashFilePath = System.IO.Path.Combine(autosavePath, HashFileName);
         if (!File.Exists(hashFilePath))
             return false;
 
@@ -86,14 +86,14 @@ public static class AutosaveService
     /// Copies all files from <paramref name="autosavePath"/> back into <paramref name="workspaceFolderPath"/>,
     /// overwriting existing files. The .wshash file is excluded.
     /// </summary>
-    public static async Task RestoreAutosaveAsync(string autosavePath, string workspaceFolderPath)
+    public static Task RestoreAutosaveAsync(string autosavePath, string workspaceFolderPath)
     {
         foreach (var file in Directory.EnumerateFiles(autosavePath, "*", SearchOption.AllDirectories))
         {
             var relativePath = System.IO.Path.GetRelativePath(autosavePath, file);
 
-            // Normalise to forward slashes for comparison.
-            if (relativePath.Replace('\\', '/') == HashFile)
+            // Exclude .wshash at any directory level.
+            if (System.IO.Path.GetFileName(relativePath) == HashFileName)
                 continue;
 
             var destPath = System.IO.Path.Combine(workspaceFolderPath, relativePath);
@@ -101,7 +101,7 @@ public static class AutosaveService
             File.Copy(file, destPath, overwrite: true);
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -153,7 +153,7 @@ public static class AutosaveService
             .EnumerateFiles(autosavePath, "*", SearchOption.AllDirectories)
             .Select(f => System.IO.Path.GetRelativePath(autosavePath, f)
                              .Replace('\\', '/'))
-            .Where(r => r != HashFile)
+            .Where(r => System.IO.Path.GetFileName(r) != HashFileName)
             .OrderBy(r => r, StringComparer.Ordinal)
             .ToList();
 
