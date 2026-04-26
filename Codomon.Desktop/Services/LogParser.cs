@@ -90,4 +90,127 @@ public static class LogParser
         "FATAL" or "CRITICAL" => "ERROR",
         var v => v
     };
+
+    // ── Delimited (CSV / TSV / custom separator) parsing ─────────────────────
+
+    private static readonly HashSet<string> KnownLevels =
+        new(StringComparer.OrdinalIgnoreCase)
+        { "TRACE", "VERBOSE", "DEBUG", "INFO", "INFORMATION", "WARN", "WARNING", "ERROR", "FATAL", "CRITICAL" };
+
+    /// <summary>
+    /// Parses a single line from a delimiter-separated log file using
+    /// <paramref name="options"/> to locate the timestamp, detect the level,
+    /// and build the message from remaining columns.
+    /// </summary>
+    public static LogEntryModel ParseDelimited(string line, ImportOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+            return new LogEntryModel { RawLine = line, IsParsed = false };
+
+        var parts = line.Split(options.Delimiter);
+
+        DateTimeOffset? ts     = null;
+        string          level  = string.Empty;
+        var             msgBuf = new List<string>(parts.Length);
+
+        for (int i = 0; i < parts.Length; i++)
+        {
+            var cell = parts[i].Trim();
+
+            // Try timestamp —————————————————————————————————————————————————
+            if (ts == null)
+            {
+                bool isCandidate = options.TimestampColumnIndex < 0   // auto-detect: try every column
+                                || options.TimestampColumnIndex == i;  // or exact column
+                if (isCandidate)
+                {
+                    var parsed = TryParseTimestamp(cell, options.TimestampFormat, options.TimeZoneId);
+                    if (parsed != null)
+                    {
+                        ts = parsed;
+                        continue;      // consumed as timestamp
+                    }
+                }
+            }
+
+            // Try log level (short cells only) ——————————————————————————————
+            if (string.IsNullOrEmpty(level) && cell.Length <= 15 && KnownLevels.Contains(cell))
+            {
+                level = NormalizeLevel(cell);
+                continue;
+            }
+
+            msgBuf.Add(cell);
+        }
+
+        return new LogEntryModel
+        {
+            Timestamp = ts,
+            Level     = level,
+            Source    = string.Empty,
+            Message   = string.Join(" | ", msgBuf),
+            RawLine   = line,
+            IsParsed  = true
+        };
+    }
+
+    /// <summary>
+    /// Attempts to parse <paramref name="value"/> as a <see cref="DateTimeOffset"/>.
+    /// When <paramref name="format"/> is non-null it is used with
+    /// <c>TryParseExact</c>; otherwise <c>TryParse</c> is used for flexible matching.
+    /// The returned value is adjusted to the offset described by
+    /// <paramref name="timeZoneId"/>.
+    /// </summary>
+    public static DateTimeOffset? TryParseTimestamp(string value, string? format, string timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        TimeZoneInfo tz = ResolveTimeZone(timeZoneId);
+
+        DateTimeOffset result;
+
+        if (!string.IsNullOrEmpty(format))
+        {
+            // Exact format – try DateTimeOffset first, then DateTime.
+            if (DateTimeOffset.TryParseExact(value, format, null,
+                    System.Globalization.DateTimeStyles.None, out result))
+                return AdjustToZone(result, tz);
+
+            if (DateTime.TryParseExact(value, format, null,
+                    System.Globalization.DateTimeStyles.None, out var dt))
+                return new DateTimeOffset(dt, tz.GetUtcOffset(dt));
+
+            return null;
+        }
+
+        // Auto-detect – flexible parse.
+        var styles = System.Globalization.DateTimeStyles.AllowWhiteSpaces;
+        if (DateTimeOffset.TryParse(value, null, styles, out result))
+            return AdjustToZone(result, tz);
+
+        return null;
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(string id)
+    {
+        if (string.IsNullOrEmpty(id) || id.Equals("UTC", StringComparison.OrdinalIgnoreCase))
+            return TimeZoneInfo.Utc;
+        if (id.Equals("Local", StringComparison.OrdinalIgnoreCase))
+            return TimeZoneInfo.Local;
+        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+        catch { return TimeZoneInfo.Utc; }
+    }
+
+    /// <summary>
+    /// When <paramref name="tz"/> has a fixed offset (UTC, fixed-offset zones) the
+    /// value is already fine; for DST-aware zones we re-interpret the DateTime part
+    /// in the target zone to get the correct UTC offset.
+    /// </summary>
+    private static DateTimeOffset AdjustToZone(DateTimeOffset dto, TimeZoneInfo tz)
+    {
+        if (dto.Offset == TimeSpan.Zero && tz == TimeZoneInfo.Utc) return dto;
+        // Re-interpret as an unspecified local time in the target zone.
+        var unspecified = DateTime.SpecifyKind(dto.DateTime, DateTimeKind.Unspecified);
+        return new DateTimeOffset(unspecified, tz.GetUtcOffset(unspecified));
+    }
 }

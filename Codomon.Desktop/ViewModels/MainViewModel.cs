@@ -88,6 +88,23 @@ public class MainViewModel : INotifyPropertyChanged
         AppLogger.Info($"Log imported: {destPath} ({entries.Count} entries)");
     }
 
+    /// <summary>
+    /// Imports a delimiter-separated log file using the wizard-supplied
+    /// <paramref name="options"/> (delimiter, timestamp column, format, timezone).
+    /// </summary>
+    public async Task ImportLogsWithOptionsAsync(string sourcePath, Services.ImportOptions options)
+    {
+        if (string.IsNullOrEmpty(WorkspaceFolderPath))
+            throw new InvalidOperationException("No workspace is open. Please open or create a workspace first.");
+
+        var destPath = await LogImportService.CopyToWorkspaceAsync(sourcePath, WorkspaceFolderPath);
+        var entries  = await LogImportService.LoadEntriesWithOptionsAsync(destPath, options);
+        _logReplay.LoadEntries(entries);
+
+        StatusMessage = $"Imported {entries.Count} log entries from {Path.GetFileName(destPath)}";
+        AppLogger.Info($"Log imported (wizard): {destPath} ({entries.Count} entries)");
+    }
+
     // ── Profile management ───────────────────────────────────────────────────
 
     /// <summary>All profiles in the current workspace.</summary>
