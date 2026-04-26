@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using Codomon.Desktop.Controls;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Persistence;
+using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
 using System;
 using System.ComponentModel;
@@ -23,6 +24,10 @@ public partial class MainWindow : Window
     // Guards against re-entrant profile ComboBox updates.
     private bool _updatingProfileComboBox;
 
+    // Tracks the LogReplayViewModel we have subscribed to, so we can unsubscribe correctly
+    // when a new workspace (and therefore a new LogReplayViewModel) is loaded.
+    private LogReplayViewModel? _subscribedReplay;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -37,9 +42,11 @@ public partial class MainWindow : Window
         SetupTreeView();
         RefreshProfileComboBox();
         PopulateRecentWorkspaces();
+        SetupReplaySpeedComboBox();
 
         _vm.Selection.PropertyChanged += (_, _) => UpdatePropertiesPanel();
         _vm.PropertyChanged += OnViewModelPropertyChanged;
+        SubscribeToLogReplay(_vm.LogReplay);
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
@@ -64,6 +71,12 @@ public partial class MainWindow : Window
             SetupCanvas();
             SetupTreeView();
             RefreshProfileComboBox();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.LogReplay))
+        {
+            // A new workspace was loaded — unsubscribe from the old VM and subscribe to the new one.
+            SubscribeToLogReplay(_vm.LogReplay);
+            RefreshLogReplayPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.StatusMessage))
         {
@@ -703,6 +716,189 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
         return confirmed;
     }
+
+    // ── Log import + replay handlers ─────────────────────────────────────────
+
+    /// <summary>
+    /// Unsubscribes from the previously tracked <see cref="LogReplayViewModel"/> (if any)
+    /// and subscribes to <paramref name="replay"/>.
+    /// </summary>
+    private void SubscribeToLogReplay(LogReplayViewModel replay)
+    {
+        if (_subscribedReplay != null)
+        {
+            _subscribedReplay.PropertyChanged -= OnLogReplayPropertyChanged;
+            _subscribedReplay.EntryActivated  -= OnLogEntryActivated;
+        }
+        _subscribedReplay = replay;
+        _subscribedReplay.PropertyChanged += OnLogReplayPropertyChanged;
+        _subscribedReplay.EntryActivated  += OnLogEntryActivated;
+    }
+
+    private async void OnImportLogClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before importing a log file.");
+            return;
+        }
+
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider == null) return;
+
+        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import Log File",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Log files") { Patterns = new[] { "*.log", "*.txt", "*.out" } },
+                new FilePickerFileType("All files") { Patterns = new[] { "*.*" } }
+            }
+        });
+
+        if (files.Count == 0) return;
+
+        await ExecuteSafeAsync(async () =>
+        {
+            await _vm.ImportLogsAsync(files[0].Path.LocalPath);
+            RefreshLogReplayPanel();
+        });
+    }
+
+    private void OnReplayPlayClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _vm.LogReplay.Play();
+
+    private void OnReplayPauseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _vm.LogReplay.Pause();
+
+    private void OnReplayStopClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _vm.LogReplay.Stop();
+
+    private void OnReplaySpeedChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox combo) return;
+        if (combo.SelectedItem is not ComboBoxItem item) return;
+        if (double.TryParse(item.Tag?.ToString(), out var speed))
+            _vm.LogReplay.SpeedMultiplier = speed;
+    }
+
+    private void OnLogReplayPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LogReplayViewModel.IsPlaying) ||
+            e.PropertyName == nameof(LogReplayViewModel.CurrentIndex))
+        {
+            RefreshLogReplayPanel();
+        }
+    }
+
+    private void OnLogEntryActivated(LogEntryModel entry)
+    {
+        if (_canvas == null) return;
+
+        var match = LogMatcher.Match(entry, _vm.Workspace);
+
+        if (match.Strength == MatchStrength.ModuleExact &&
+            match.Module != null && match.System != null &&
+            match.Module.IsVisible)
+        {
+            _canvas.HighlightModule(match.Module.Id, match.System.Id);
+        }
+        else if (match.Strength == MatchStrength.SystemOnly &&
+                 match.System != null && match.System.IsVisible)
+        {
+            _canvas.HighlightSystem(match.System.Id);
+        }
+
+        // Scroll the log list to the current entry.
+        var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
+        if (listBox != null)
+        {
+            var idx = _vm.LogReplay.CurrentIndex;
+            if (idx >= 0 && idx < listBox.ItemCount)
+            {
+                var item = listBox.Items[idx];
+                if (item != null)
+                    listBox.ScrollIntoView(item);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Populates the ImportedLogsListBox and synchronises the replay toolbar state
+    /// (button enabled states, status text).
+    /// </summary>
+    private void RefreshLogReplayPanel()
+    {
+        var replay   = _vm.LogReplay;
+        var listBox  = this.FindControl<ListBox>("ImportedLogsListBox");
+        var playBtn  = this.FindControl<Button>("ReplayPlayButton");
+        var pauseBtn = this.FindControl<Button>("ReplayPauseButton");
+        var stopBtn  = this.FindControl<Button>("ReplayStopButton");
+        var statusTb = this.FindControl<TextBlock>("ReplayStatusText");
+
+        bool hasEntries = replay.Entries.Count > 0;
+
+        if (playBtn  != null) playBtn.IsEnabled  = hasEntries;
+        if (pauseBtn != null) pauseBtn.IsEnabled = replay.IsPlaying;
+        if (stopBtn  != null) stopBtn.IsEnabled  = hasEntries;
+
+        if (statusTb != null)
+        {
+            if (!hasEntries)
+                statusTb.Text = "No log loaded";
+            else if (replay.IsPlaying)
+                statusTb.Text = $"Replaying… {replay.CurrentIndex + 1} / {replay.Entries.Count}";
+            else if (replay.CurrentIndex < 0)
+                statusTb.Text = $"{replay.Entries.Count} entries — press ▶ to replay";
+            else
+                statusTb.Text = $"Paused at {replay.CurrentIndex + 1} / {replay.Entries.Count}";
+        }
+
+        // (Re-)bind the log list if the entry set has changed.
+        if (listBox != null && !ReferenceEquals(listBox.ItemsSource, replay.Entries))
+        {
+            listBox.ItemsSource = null;  // force reset
+            listBox.ItemTemplate = BuildLogItemTemplate();
+            listBox.ItemsSource = replay.Entries;
+        }
+    }
+
+    private static Avalonia.Controls.Templates.FuncDataTemplate<LogEntryModel> BuildLogItemTemplate()
+    {
+        return new Avalonia.Controls.Templates.FuncDataTemplate<LogEntryModel>((entry, _) =>
+        {
+            if (entry == null) return new TextBlock();
+            return new TextBlock
+            {
+                Text = entry.Formatted,
+                FontFamily = new Avalonia.Media.FontFamily("Monospace"),
+                FontSize = 11,
+                Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse(entry.LevelColor)),
+                Padding = new Avalonia.Thickness(4, 1)
+            };
+        });
+    }
+
+    private void SetupReplaySpeedComboBox()
+    {
+        var combo = this.FindControl<ComboBox>("ReplaySpeedComboBox");
+        if (combo == null) return;
+
+        var speeds = new[] { ("0.5×", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0), ("8×", 8.0) };
+        foreach (var (label, value) in speeds)
+        {
+            combo.Items.Add(new ComboBoxItem
+            {
+                Content = label,
+                Tag = value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
+        }
+        combo.SelectedIndex = 1;  // 1× default
+    }
+
+    // ── Dev Console ───────────────────────────────────────────────────────────
 
     private async void OnDevConsoleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
