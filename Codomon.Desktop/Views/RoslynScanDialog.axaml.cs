@@ -425,13 +425,13 @@ public partial class RoslynScanDialog : Window
                 Margin = new Avalonia.Thickness(0, 6, 0, 2)
             });
 
-            foreach (var m in cls.Methods)
+            foreach (var method in cls.Methods)
             {
-                var loggingBadge = m.LoggingCalls.Count > 0
-                    ? $"  [log×{m.LoggingCalls.Count}]" : string.Empty;
+                var loggingBadge = method.LoggingCalls.Count > 0
+                    ? $"  [log×{method.LoggingCalls.Count}]" : string.Empty;
                 panel.Children.Add(new TextBlock
                 {
-                    Text = $"  {m.Accessibility} {m.ReturnType} {m.Name}(){loggingBadge}  :{m.LineNumber}",
+                    Text = $"  {method.Accessibility} {method.ReturnType} {method.Name}(){loggingBadge}  :{method.LineNumber}",
                     Foreground = Avalonia.Media.Brushes.LightGray,
                     FontFamily = new Avalonia.Media.FontFamily("Monospace"),
                     FontSize = 11

@@ -230,12 +230,20 @@ public static class RoslynScanService
                         if (callee == cls.FullName) continue;   // ignore self-calls
 
                         var key = (cls.FullName, callee);
+                        var callSite = $"{cls.FullName}.{method.Name}";
                         if (!callMap.TryGetValue(key, out var entry))
-                            callMap[key] = (1, new List<string> { $"{cls.FullName}.{method.Name}" });
+                        {
+                            callMap[key] = (1, new List<string> { callSite });
+                        }
+                        else if (entry.Sites.Count < 10 && !entry.Sites.Contains(callSite))
+                        {
+                            entry.Sites.Add(callSite);
+                            callMap[key] = (entry.Count + 1, entry.Sites);
+                        }
                         else
-                            callMap[key] = (entry.Count + 1,
-                                entry.Sites.Append($"{cls.FullName}.{method.Name}")
-                                    .Distinct().Take(10).ToList());
+                        {
+                            callMap[key] = (entry.Count + 1, entry.Sites);
+                        }
                     }
                 }
             }
@@ -377,7 +385,7 @@ public static class RoslynScanService
                         _ => null
                     };
 
-                    if (candidate != null && char.IsUpper(candidate[0]))
+                    if (candidate != null && candidate.Length > 0 && char.IsUpper(candidate[0]))
                         names.Add(candidate);
                 }
             }
