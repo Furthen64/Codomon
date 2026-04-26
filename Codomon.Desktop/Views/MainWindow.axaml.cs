@@ -123,6 +123,168 @@ public partial class MainWindow : Window
         await SaveAsAsync();
     }
 
+    private async void OnLoadAutosaveClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_vm.WorkspaceFolderPath))
+        {
+            await ShowErrorAsync("No workspace is open. Please open a workspace before loading an autosave.");
+            return;
+        }
+
+        var entries = _vm.GetAutosaveEntries();
+        if (entries.Count == 0)
+        {
+            await ShowErrorAsync("No autosaves found for the current workspace.");
+            return;
+        }
+
+        var selected = await ShowAutosavePickerAsync(entries);
+        if (selected == null) return;
+
+        var confirmed = await ShowAutosaveWarningAsync(selected.DisplayName);
+        if (!confirmed) return;
+
+        await ExecuteSafeAsync(async () =>
+        {
+            await _vm.LoadAutosaveAsync(selected.Path);
+            UpdateWindowTitle();
+            AppLogger.Info($"Autosave loaded: {selected.DisplayName}");
+        });
+    }
+
+    private async Task<Codomon.Desktop.Persistence.AutosaveEntry?> ShowAutosavePickerAsync(
+        List<Codomon.Desktop.Persistence.AutosaveEntry> entries)
+    {
+        Codomon.Desktop.Persistence.AutosaveEntry? result = null;
+
+        var dialog = new Window
+        {
+            Title = "Load Autosave",
+            Width = 480,
+            Height = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var listBox = new ListBox
+        {
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#1A2435")),
+            Margin = new Avalonia.Thickness(0, 0, 0, 8)
+        };
+
+        foreach (var entry in entries)
+        {
+            listBox.Items.Add(new ListBoxItem
+            {
+                Content = new TextBlock
+                {
+                    Text = entry.DisplayName,
+                    Foreground = Avalonia.Media.Brushes.White,
+                    FontFamily = new Avalonia.Media.FontFamily("Monospace"),
+                    Padding = new Avalonia.Thickness(4, 2)
+                },
+                Tag = entry
+            });
+        }
+
+        var loadBtn = new Button
+        {
+            Content = "Load Selected",
+            Padding = new Avalonia.Thickness(20, 4),
+            IsEnabled = false
+        };
+        var cancelBtn = new Button
+        {
+            Content = "Cancel",
+            Padding = new Avalonia.Thickness(20, 4)
+        };
+
+        listBox.SelectionChanged += (_, _) =>
+            loadBtn.IsEnabled = listBox.SelectedItem != null;
+
+        loadBtn.Click += (_, _) =>
+        {
+            if (listBox.SelectedItem is ListBoxItem item &&
+                item.Tag is Codomon.Desktop.Persistence.AutosaveEntry entry)
+                result = entry;
+            dialog.Close();
+        };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Select an autosave to restore:",
+                    Foreground = Avalonia.Media.Brushes.White,
+                    FontWeight = Avalonia.Media.FontWeight.SemiBold
+                },
+                listBox,
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Children = { loadBtn, cancelBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return result;
+    }
+
+    private async Task<bool> ShowAutosaveWarningAsync(string autosaveName)
+    {
+        bool confirmed = false;
+
+        var dialog = new Window
+        {
+            Title = "Restore Autosave",
+            Width = 440,
+            Height = 180,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var restoreBtn = new Button { Content = "Restore", Padding = new Avalonia.Thickness(20, 4) };
+        var cancelBtn = new Button { Content = "Cancel", Padding = new Avalonia.Thickness(20, 4) };
+
+        restoreBtn.Click += (_, _) => { confirmed = true; dialog.Close(); };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Restoring autosave \"{autosaveName}\" will overwrite the current workspace metadata and profile settings. This cannot be undone.\n\nContinue?",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Foreground = Avalonia.Media.Brushes.White
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Children = { restoreBtn, cancelBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return confirmed;
+    }
+
     private async void OnDevConsoleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_devConsole != null)

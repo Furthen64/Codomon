@@ -12,6 +12,9 @@ public class MainViewModel : INotifyPropertyChanged
     private string _statusMessage = "Demo workspace loaded.";
     private bool _isDirty = false;
 
+    /// <summary>Periodic autosave timer -- fires every 5 minutes while a workspace is open.</summary>
+    private System.Timers.Timer? _autosaveTimer;
+
     public WorkspaceModel Workspace
     {
         get => _workspace;
@@ -53,6 +56,8 @@ public class MainViewModel : INotifyPropertyChanged
         IsDirty = false;
         ClearSelection();
         StatusMessage = $"New workspace created: {folderPath}";
+        StartAutosaveTimer();
+        await TryCreateAutosaveAsync();
     }
 
     public async Task OpenWorkspaceAsync(string folderPath)
@@ -63,6 +68,7 @@ public class MainViewModel : INotifyPropertyChanged
         IsDirty = false;
         ClearSelection();
         StatusMessage = $"Opened: {folderPath}";
+        StartAutosaveTimer();
     }
 
     public async Task SaveWorkspaceAsync()
@@ -73,6 +79,7 @@ public class MainViewModel : INotifyPropertyChanged
         await WorkspaceSerializer.SaveAsync(Workspace, WorkspaceFolderPath);
         IsDirty = false;
         StatusMessage = $"Saved: {WorkspaceFolderPath}";
+        await TryCreateAutosaveAsync();
     }
 
     public async Task SaveWorkspaceAsAsync(string folderPath)
@@ -81,6 +88,66 @@ public class MainViewModel : INotifyPropertyChanged
         WorkspaceFolderPath = folderPath;
         IsDirty = false;
         StatusMessage = $"Saved: {folderPath}";
+        StartAutosaveTimer();
+        await TryCreateAutosaveAsync();
+    }
+
+    /// <summary>
+    /// Loads the autosave at <paramref name="autosavePath"/> after verifying its integrity,
+    /// then reloads the workspace from disk.
+    /// Throws <see cref="InvalidOperationException"/> if integrity validation fails.
+    /// </summary>
+    public async Task LoadAutosaveAsync(string autosavePath)
+    {
+        if (!await AutosaveService.ValidateAutosaveAsync(autosavePath))
+            throw new InvalidOperationException(
+                "Autosave integrity check failed. The snapshot may be corrupt and cannot be loaded.");
+
+        await AutosaveService.RestoreAutosaveAsync(autosavePath, WorkspaceFolderPath);
+
+        var workspace = await WorkspaceSerializer.LoadAsync(WorkspaceFolderPath);
+        Workspace = workspace;
+        IsDirty = false;
+        ClearSelection();
+        StatusMessage = $"Autosave restored: {Path.GetFileName(autosavePath)}";
+    }
+
+    /// <summary>Returns autosave entries for the active workspace, newest first.</summary>
+    public List<AutosaveEntry> GetAutosaveEntries() =>
+        string.IsNullOrEmpty(WorkspaceFolderPath)
+            ? new List<AutosaveEntry>()
+            : AutosaveService.GetAutosaveEntries(WorkspaceFolderPath);
+
+    // ── Autosave timer ────────────────────────────────────────────────────────
+
+    private void StartAutosaveTimer()
+    {
+        _autosaveTimer?.Dispose();
+        if (string.IsNullOrEmpty(WorkspaceFolderPath)) return;
+
+        _autosaveTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds)
+        {
+            AutoReset = true
+        };
+        _autosaveTimer.Elapsed += async (_, _) => await TryCreateAutosaveAsync();
+        _autosaveTimer.Start();
+    }
+
+    /// <summary>
+    /// Attempts to create an autosave; logs any error but does not propagate it so a
+    /// background timer failure never crashes the application.
+    /// </summary>
+    public async Task TryCreateAutosaveAsync()
+    {
+        if (string.IsNullOrEmpty(WorkspaceFolderPath)) return;
+        try
+        {
+            await AutosaveService.CreateAutosaveAsync(WorkspaceFolderPath);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"Autosave failed: {ex.Message}");
+        }
     }
 
     private void ClearSelection()

@@ -20,6 +20,8 @@
         <Button Content="Run"            Padding="10,4"/>
         <Button Content="Replay Logs"    Padding="10,4"/>
         <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
+        <Button Content="Load Autosave"  Click="OnLoadAutosaveClick" Padding="10,4"/>
+        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
         <Button Content="Dev Console"    Click="OnDevConsoleClick" Padding="10,4"/>
       </StackPanel>
     </Border>
