@@ -98,8 +98,11 @@
           </StackPanel>
           <StackPanel Spacing="6">
             <TextBlock Text="Default Profile Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
-            <TextBox x:Name="ProfileNameBox" Watermark="e.g. Default"
-                     TextChanged="OnProfileNameChanged"/>
+            <ComboBox x:Name="ProfileNameBox" SelectedIndex="0"
+                      SelectionChanged="OnProfileNameSelectionChanged"
+                      HorizontalAlignment="Stretch">
+              <ComboBoxItem Content="Default"/>
+            </ComboBox>
           </StackPanel>
           <TextBlock Text="A profile stores layout, filters, and visual settings. You can add more profiles later."
                      Foreground="#667788" FontSize="11" TextWrapping="Wrap"/>
