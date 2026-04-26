@@ -8,28 +8,56 @@
 
   <DockPanel LastChildFill="True">
 
-    <!-- Top Toolbar -->
-    <Border DockPanel.Dock="Top" Background="#1E2A3A" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="4">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <Button Content="New Workspace"  Click="OnNewWorkspaceClick"  Padding="10,4"/>
-        <Button Content="Open Workspace" Click="OnOpenWorkspaceClick" Padding="10,4"/>
-        <Button Content="Save"           Click="OnSaveWorkspaceClick" Padding="10,4"/>
-        <Button Content="Save As…"       Click="OnSaveAsWorkspaceClick" Padding="10,4"/>
-        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
-        <Button Content="Scan"           Padding="10,4"/>
-        <Button Content="Run"            Padding="10,4"/>
-        <Button Content="Replay Logs"    Padding="10,4"/>
-        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
-        <Button Content="Load Autosave"  Click="OnLoadAutosaveClick" Padding="10,4"/>
-        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
-        <TextBlock Text="Profile:" Foreground="#AABBCC" VerticalAlignment="Center" Margin="4,0,2,0"/>
-        <ComboBox x:Name="ProfileComboBox" Width="150" Padding="6,2"
-                  SelectionChanged="OnProfileComboBoxSelectionChanged"/>
-        <Button Content="New"       Click="OnNewProfileClick"       Padding="8,4"/>
-        <Button Content="Rename"    Click="OnRenameProfileClick"    Padding="8,4"/>
-        <Button Content="Duplicate" Click="OnDuplicateProfileClick" Padding="8,4"/>
-        <Separator Width="1" Background="#2A3F5A" Margin="4,0"/>
-        <Button Content="Dev Console"    Click="OnDevConsoleClick" Padding="10,4"/>
+    <!-- Top Toolbar — three labelled panel groups -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="6,4">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+
+        <!-- ── Workspace group ───────────────────────────── -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="WORKSPACE" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <Button Content="New"      Click="OnNewWorkspaceClick"    Padding="8,3"/>
+              <Button Content="Open"     Click="OnOpenWorkspaceClick"   Padding="8,3"/>
+              <Button Content="Save"     Click="OnSaveWorkspaceClick"   Padding="8,3"/>
+              <Button Content="Save As…" Click="OnSaveAsWorkspaceClick" Padding="8,3"/>
+              <Button Content="Autosave" Click="OnLoadAutosaveClick"    Padding="8,3"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ── Profiles group ────────────────────────────── -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="PROFILES" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ComboBox x:Name="ProfileComboBox" Width="150" Padding="6,2" VerticalAlignment="Center"
+                        SelectionChanged="OnProfileComboBoxSelectionChanged"/>
+              <Button Content="New"       Click="OnNewProfileClick"       Padding="8,3"/>
+              <Button Content="Rename"    Click="OnRenameProfileClick"    Padding="8,3"/>
+              <Button Content="Duplicate" Click="OnDuplicateProfileClick" Padding="8,3"/>
+              <Button Content="Delete"    Click="OnDeleteProfileClick"    Padding="8,3"
+                      Background="#3A1A1A" Foreground="#FF7070"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- ── Devtools group ────────────────────────────── -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="DEVTOOLS" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <Button Content="Scan"         Padding="8,3"/>
+              <Button Content="Run"          Padding="8,3"/>
+              <Button Content="Replay Logs"  Padding="8,3"/>
+              <Button Content="Dev Console"  Click="OnDevConsoleClick" Padding="8,3"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
       </StackPanel>
     </Border>
 
@@ -47,66 +75,98 @@
               <TextBlock Foreground="#88CCAA" FontFamily="Monospace" Text="[INFO]  App started"/>
             </ListBoxItem>
             <ListBoxItem>
-              <TextBlock Foreground="#88CCAA" FontFamily="Monospace" Text="[INFO]  Demo data loaded: 3 systems, 5 modules"/>
-            </ListBoxItem>
-            <ListBoxItem>
               <TextBlock Foreground="#AAAAAA" FontFamily="Monospace" Text="[DEBUG] Canvas initialized"/>
             </ListBoxItem>
           </ListBox>
         </TabItem>
         <TabItem Header="Timeline">
-          <TextBlock Text="Timeline — no events recorded yet." 
+          <TextBlock Text="Timeline — no events recorded yet."
                      Foreground="#888888" Margin="12" VerticalAlignment="Center"/>
         </TabItem>
       </TabControl>
     </Border>
 
-    <!-- Main 3-column area -->
+    <!-- Main Content Area -->
     <Grid>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="250"/>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="300"/>
-      </Grid.ColumnDefinitions>
 
-      <!-- Left Panel: TreeView -->
-      <Border Grid.Column="0" Background="#141C28" BorderThickness="0,0,1,0" BorderBrush="#2A3F5A">
-        <DockPanel>
-          <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-            <TextBlock Text="Architecture" FontWeight="Bold" Foreground="#AABBCC"/>
-          </Border>
-          <TreeView x:Name="ArchTreeView" Background="Transparent" Margin="4"/>
-        </DockPanel>
-      </Border>
+      <!-- ── 3-column workspace layout ─── -->
+      <Grid x:Name="WorkspaceGrid" IsVisible="False">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="250"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="300"/>
+        </Grid.ColumnDefinitions>
 
-      <!-- Center Panel: Canvas -->
-      <Border Grid.Column="1" Background="#0F141E" ClipToBounds="True">
-        <DockPanel>
-          <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-            <TextBlock Text="Canvas" FontWeight="Bold" Foreground="#AABBCC"/>
-          </Border>
-          <ContentControl x:Name="CanvasHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
-        </DockPanel>
-      </Border>
+        <!-- Left Panel: TreeView -->
+        <Border Grid.Column="0" Background="#141C28" BorderThickness="0,0,1,0" BorderBrush="#2A3F5A">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+              <TextBlock Text="Architecture" FontWeight="Bold" Foreground="#AABBCC"/>
+            </Border>
+            <TreeView x:Name="ArchTreeView" Background="Transparent" Margin="4"/>
+          </DockPanel>
+        </Border>
 
-      <!-- Right Panel: Properties -->
-      <Border Grid.Column="2" Background="#141C28" BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
-        <DockPanel>
-          <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-            <TextBlock Text="Properties" FontWeight="Bold" Foreground="#AABBCC"/>
-          </Border>
-          <StackPanel Margin="10" Spacing="8">
-            <TextBlock Text="Selected Item" Foreground="#778899" FontSize="11"/>
-            <StackPanel Spacing="4">
-              <TextBlock Text="Name:" Foreground="#AABBCC" FontWeight="SemiBold"/>
-              <TextBlock x:Name="PropNameText" Text="None" Foreground="White" Margin="0,0,0,8"/>
-              <TextBlock Text="Type:" Foreground="#AABBCC" FontWeight="SemiBold"/>
-              <TextBlock x:Name="PropTypeText" Text="-" Foreground="White"/>
+        <!-- Center Panel: Canvas -->
+        <Border Grid.Column="1" Background="#0F141E" ClipToBounds="True">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+              <TextBlock Text="Canvas" FontWeight="Bold" Foreground="#AABBCC"/>
+            </Border>
+            <ContentControl x:Name="CanvasHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+          </DockPanel>
+        </Border>
+
+        <!-- Right Panel: Properties -->
+        <Border Grid.Column="2" Background="#141C28" BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+              <TextBlock Text="Properties" FontWeight="Bold" Foreground="#AABBCC"/>
+            </Border>
+            <StackPanel Margin="10" Spacing="8">
+              <TextBlock Text="Selected Item" Foreground="#778899" FontSize="11"/>
+              <StackPanel Spacing="4">
+                <TextBlock Text="Name:" Foreground="#AABBCC" FontWeight="SemiBold"/>
+                <TextBlock x:Name="PropNameText" Text="None" Foreground="White" Margin="0,0,0,8"/>
+                <TextBlock Text="Type:" Foreground="#AABBCC" FontWeight="SemiBold"/>
+                <TextBlock x:Name="PropTypeText" Text="-" Foreground="White"/>
+              </StackPanel>
+            </StackPanel>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- ── Welcome / Recent Workspaces overlay ─── -->
+      <Grid x:Name="WelcomeOverlay" Background="#0F141E" IsVisible="True">
+        <DockPanel Margin="60,40">
+
+          <!-- Header row -->
+          <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,28">
+            <TextBlock Text="Codomon" FontSize="32" FontWeight="Bold" Foreground="#AABBCC"/>
+            <TextBlock Text="Recent Workspaces" FontSize="20" Foreground="#778899"/>
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,12,0,0">
+              <Button Content="✚  New Workspace"  Click="OnNewWorkspaceClick"  Padding="14,6" FontSize="13"/>
+              <Button Content="📂  Open Workspace" Click="OnOpenWorkspaceClick" Padding="14,6" FontSize="13"/>
             </StackPanel>
           </StackPanel>
+
+          <!-- Separator -->
+          <Border DockPanel.Dock="Top" Height="1" Background="#2A3F5A" Margin="0,0,0,16"/>
+
+          <!-- Recent workspaces list -->
+          <ScrollViewer>
+            <ListBox x:Name="RecentWorkspacesListBox"
+                     Background="Transparent"
+                     SelectionChanged="OnRecentWorkspaceSelected">
+              <!-- Items populated from code-behind -->
+            </ListBox>
+          </ScrollViewer>
+
         </DockPanel>
-      </Border>
+      </Grid>
+
     </Grid>
 
   </DockPanel>
 </Window>
+

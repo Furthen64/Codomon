@@ -7,13 +7,20 @@ namespace Codomon.Desktop.ViewModels;
 
 public class MainViewModel : INotifyPropertyChanged
 {
-    private WorkspaceModel _workspace = DemoData.Workspace;
+    private WorkspaceModel _workspace = new WorkspaceModel();
     private string _workspaceFolderPath = string.Empty;
-    private string _statusMessage = "Demo workspace loaded.";
+    private string _statusMessage = "Ready";
     private bool _isDirty = false;
+    private bool _hasWorkspace = false;
 
     /// <summary>Periodic autosave timer -- fires every 5 minutes while a workspace is open.</summary>
     private System.Timers.Timer? _autosaveTimer;
+
+    public bool HasWorkspace
+    {
+        get => _hasWorkspace;
+        private set { _hasWorkspace = value; OnPropertyChanged(); }
+    }
 
     public WorkspaceModel Workspace
     {
@@ -145,6 +152,36 @@ public class MainViewModel : INotifyPropertyChanged
         return copy;
     }
 
+    /// <summary>
+    /// Deletes the profile with the given ID from the workspace.
+    /// Throws <see cref="InvalidOperationException"/> when only one profile remains.
+    /// If the deleted profile was active, the first remaining profile becomes active.
+    /// </summary>
+    public void DeleteProfile(string profileId)
+    {
+        if (Workspace.Profiles.Count <= 1)
+            throw new InvalidOperationException(
+                "Cannot delete the last profile. At least one profile must remain.");
+
+        var profile = Workspace.Profiles.FirstOrDefault(p => p.Id == profileId);
+        if (profile == null) return;
+
+        bool wasActive = Workspace.ActiveProfileId == profileId;
+        Workspace.Profiles.Remove(profile);
+
+        if (wasActive)
+        {
+            var next = Workspace.Profiles.First();
+            Workspace.ActiveProfileId = next.Id;
+            WorkspaceSerializer.ApplyProfileLayout(next, Workspace.Systems);
+            OnPropertyChanged(nameof(ActiveProfileId));
+        }
+
+        IsDirty = true;
+        OnPropertyChanged(nameof(Profiles));
+        StatusMessage = $"Profile deleted: {profile.ProfileName}";
+    }
+
     /// <summary>Captures the live canvas layout into the currently active profile in memory.</summary>
     public void CaptureLayoutToActiveProfile()
     {
@@ -167,8 +204,10 @@ public class MainViewModel : INotifyPropertyChanged
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
         IsDirty = false;
+        HasWorkspace = true;
         ClearSelection();
         StatusMessage = $"New workspace created: {folderPath}";
+        RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName);
         StartAutosaveTimer();
         await TryCreateAutosaveAsync();
     }
@@ -179,8 +218,10 @@ public class MainViewModel : INotifyPropertyChanged
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
         IsDirty = false;
+        HasWorkspace = true;
         ClearSelection();
         StatusMessage = $"Opened: {folderPath}";
+        RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName);
         StartAutosaveTimer();
     }
 
