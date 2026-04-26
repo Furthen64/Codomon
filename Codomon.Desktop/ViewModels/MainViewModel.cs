@@ -1,5 +1,6 @@
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Persistence;
+using Codomon.Desktop.Services;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -16,6 +17,11 @@ public class MainViewModel : INotifyPropertyChanged
     /// <summary>Periodic autosave timer -- fires every 5 minutes while a workspace is open.</summary>
     private System.Timers.Timer? _autosaveTimer;
 
+    public MainViewModel()
+    {
+        _logReplay = new LogReplayViewModel(_workspace);
+    }
+
     public bool HasWorkspace
     {
         get => _hasWorkspace;
@@ -25,7 +31,16 @@ public class MainViewModel : INotifyPropertyChanged
     public WorkspaceModel Workspace
     {
         get => _workspace;
-        private set { _workspace = value; OnPropertyChanged(); OnPropertyChanged(nameof(Profiles)); OnPropertyChanged(nameof(ActiveProfileId)); }
+        private set
+        {
+            _workspace = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Profiles));
+            OnPropertyChanged(nameof(ActiveProfileId));
+            // Re-create the replay VM so it references the new workspace model.
+            _logReplay = new LogReplayViewModel(value);
+            OnPropertyChanged(nameof(LogReplay));
+        }
     }
 
     public string WorkspaceFolderPath
@@ -48,6 +63,30 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public SelectionStateModel Selection { get; } = new SelectionStateModel();
+
+    // ── Log Replay ────────────────────────────────────────────────────────────
+
+    private LogReplayViewModel _logReplay;
+
+    /// <summary>The replay controller for imported log files.</summary>
+    public LogReplayViewModel LogReplay => _logReplay;
+
+    /// <summary>
+    /// Imports a log file from <paramref name="sourcePath"/> into the workspace
+    /// <c>logs/imported/</c> folder and loads its entries into <see cref="LogReplay"/>.
+    /// </summary>
+    public async Task ImportLogsAsync(string sourcePath)
+    {
+        if (string.IsNullOrEmpty(WorkspaceFolderPath))
+            throw new InvalidOperationException("No workspace is open. Please open or create a workspace first.");
+
+        var destPath = await LogImportService.CopyToWorkspaceAsync(sourcePath, WorkspaceFolderPath);
+        var entries  = await LogImportService.LoadEntriesAsync(destPath);
+        _logReplay.LoadEntries(entries);
+
+        StatusMessage = $"Imported {entries.Count} log entries from {Path.GetFileName(destPath)}";
+        AppLogger.Info($"Log imported: {destPath} ({entries.Count} entries)");
+    }
 
     // ── Profile management ───────────────────────────────────────────────────
 

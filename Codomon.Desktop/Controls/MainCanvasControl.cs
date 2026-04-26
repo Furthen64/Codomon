@@ -2,8 +2,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Codomon.Desktop.Models;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Codomon.Desktop.Controls;
@@ -21,19 +23,38 @@ public class MainCanvasControl : Control
 
     private static readonly IBrush SystemFill = new SolidColorBrush(Color.FromRgb(30, 58, 95));
     private static readonly IBrush SystemFillSelected = new SolidColorBrush(Color.FromRgb(0, 120, 215));
+    private static readonly IBrush SystemFillSoftHighlight = new SolidColorBrush(Color.FromRgb(20, 100, 140));
+    private static readonly IBrush SystemFillMuted = new SolidColorBrush(Color.FromArgb(80, 30, 58, 95));
     private static readonly IBrush SystemStroke = new SolidColorBrush(Color.FromRgb(100, 160, 220));
+    private static readonly IBrush SystemStrokeMuted = new SolidColorBrush(Color.FromArgb(80, 100, 160, 220));
     private static readonly IBrush ModuleFill = new SolidColorBrush(Color.FromRgb(50, 90, 130));
     private static readonly IBrush ModuleFillSelected = new SolidColorBrush(Color.FromRgb(0, 180, 100));
+    private static readonly IBrush ModuleFillHighlight = new SolidColorBrush(Color.FromRgb(0, 220, 160));
+    private static readonly IBrush ModuleFillMuted = new SolidColorBrush(Color.FromArgb(80, 50, 90, 130));
     private static readonly IBrush ModuleStroke = new SolidColorBrush(Color.FromRgb(100, 200, 160));
+    private static readonly IBrush ModuleStrokeMuted = new SolidColorBrush(Color.FromArgb(80, 100, 200, 160));
+    private static readonly IBrush ModuleStrokeHighlight = new SolidColorBrush(Color.FromRgb(0, 255, 200));
     private static readonly IBrush ConnectionBrush = new SolidColorBrush(Color.FromRgb(180, 180, 60));
     private static readonly IBrush LabelBrush = Brushes.White;
+    private static readonly IBrush LabelBrushMuted = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255));
     private static readonly IBrush BackgroundBrush = new SolidColorBrush(Color.FromRgb(20, 25, 35));
 
     private static readonly Pen SystemPen = new Pen(SystemStroke, 2);
     private static readonly Pen SystemPenSelected = new Pen(SystemFillSelected, 3);
+    private static readonly Pen SystemPenSoftHighlight = new Pen(SystemFillSoftHighlight, 2.5);
+    private static readonly Pen SystemPenMuted = new Pen(SystemStrokeMuted, 1);
     private static readonly Pen ModulePen = new Pen(ModuleStroke, 1.5);
     private static readonly Pen ModulePenSelected = new Pen(ModuleFillSelected, 2);
+    private static readonly Pen ModulePenHighlight = new Pen(ModuleStrokeHighlight, 2.5);
+    private static readonly Pen ModulePenMuted = new Pen(ModuleStrokeMuted, 1);
     private static readonly Pen ConnectionPen = new Pen(ConnectionBrush, 1.5) { DashStyle = DashStyle.Dash };
+
+    // ── Highlight state ───────────────────────────────────────────────────────
+
+    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(2);
+    private readonly Dictionary<string, DateTimeOffset> _moduleHighlights = new();
+    private readonly Dictionary<string, DateTimeOffset> _systemSoftHighlights = new();
+    private readonly DispatcherTimer _decayTimer;
 
     public MainCanvasControl(WorkspaceModel workspace, SelectionStateModel selectionState)
     {
@@ -48,6 +69,50 @@ public class MainCanvasControl : Control
         PointerPressed += OnPointerPressed;
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
+
+        // Decay timer: checks every 300 ms and redraws if any highlight has expired.
+        _decayTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(300), DispatcherPriority.Background, OnDecayTick);
+        _decayTimer.Start();
+    }
+
+    // ── Highlight API ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Applies a strong highlight to <paramref name="moduleId"/> and a soft highlight to
+    /// <paramref name="systemId"/>.  Both decay after <see cref="HighlightDuration"/>.
+    /// </summary>
+    public void HighlightModule(string moduleId, string systemId)
+    {
+        var expiry = DateTimeOffset.UtcNow + HighlightDuration;
+        _moduleHighlights[moduleId] = expiry;
+        _systemSoftHighlights[systemId] = expiry;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Applies a soft highlight to <paramref name="systemId"/> only.
+    /// </summary>
+    public void HighlightSystem(string systemId)
+    {
+        _systemSoftHighlights[systemId] = DateTimeOffset.UtcNow + HighlightDuration;
+        InvalidateVisual();
+    }
+
+    private void OnDecayTick(object? sender, EventArgs e)
+    {
+        var now = DateTimeOffset.UtcNow;
+        bool changed = false;
+
+        foreach (var key in _moduleHighlights.Keys.ToList())
+        {
+            if (_moduleHighlights[key] <= now) { _moduleHighlights.Remove(key); changed = true; }
+        }
+        foreach (var key in _systemSoftHighlights.Keys.ToList())
+        {
+            if (_systemSoftHighlights[key] <= now) { _systemSoftHighlights.Remove(key); changed = true; }
+        }
+
+        if (changed) InvalidateVisual();
     }
 
     private static Rect GetModuleAbsoluteBounds(ModuleBoxModel mod, SystemBoxModel sys)
@@ -67,18 +132,46 @@ public class MainCanvasControl : Control
 
         foreach (var sys in _workspace.Systems)
         {
-            if (sys.IsVisible)
-                DrawSystem(context, sys);
+            DrawSystem(context, sys);
         }
     }
 
     private void DrawSystem(DrawingContext context, SystemBoxModel sys)
     {
         bool isSelected = _selectionState.SelectedId == sys.Id;
-        var fill = isSelected ? SystemFillSelected : SystemFill;
-        var pen = isSelected ? SystemPenSelected : SystemPen;
-        var bounds = GetSystemBounds(sys);
+        bool isSoftHighlight = _systemSoftHighlights.ContainsKey(sys.Id);
+        bool isMuted = !sys.IsVisible;
 
+        IBrush fill;
+        Pen pen;
+        IBrush labelBrush;
+
+        if (isMuted)
+        {
+            fill = SystemFillMuted;
+            pen  = SystemPenMuted;
+            labelBrush = LabelBrushMuted;
+        }
+        else if (isSelected)
+        {
+            fill = SystemFillSelected;
+            pen  = SystemPenSelected;
+            labelBrush = LabelBrush;
+        }
+        else if (isSoftHighlight)
+        {
+            fill = SystemFillSoftHighlight;
+            pen  = SystemPenSoftHighlight;
+            labelBrush = LabelBrush;
+        }
+        else
+        {
+            fill = SystemFill;
+            pen  = SystemPen;
+            labelBrush = LabelBrush;
+        }
+
+        var bounds = GetSystemBounds(sys);
         context.FillRectangle(fill, bounds);
         context.DrawRectangle(pen, bounds);
 
@@ -88,18 +181,45 @@ public class MainCanvasControl : Control
             FlowDirection.LeftToRight,
             Typeface.Default,
             14,
-            LabelBrush);
+            labelBrush);
         context.DrawText(tf, new Point(bounds.X + 8, bounds.Y + 8));
 
         foreach (var mod in sys.Modules)
         {
-            if (!mod.IsVisible) continue;
-
+            bool modMuted = !mod.IsVisible;
             bool modSelected = _selectionState.SelectedId == mod.Id;
-            var mFill = modSelected ? ModuleFillSelected : ModuleFill;
-            var mPen = modSelected ? ModulePenSelected : ModulePen;
-            var mBounds = GetModuleAbsoluteBounds(mod, sys);
+            bool modHighlight = _moduleHighlights.ContainsKey(mod.Id);
 
+            IBrush mFill;
+            Pen mPen;
+            IBrush mLabelBrush;
+
+            if (modMuted)
+            {
+                mFill = ModuleFillMuted;
+                mPen  = ModulePenMuted;
+                mLabelBrush = LabelBrushMuted;
+            }
+            else if (modSelected)
+            {
+                mFill = ModuleFillSelected;
+                mPen  = ModulePenSelected;
+                mLabelBrush = LabelBrush;
+            }
+            else if (modHighlight)
+            {
+                mFill = ModuleFillHighlight;
+                mPen  = ModulePenHighlight;
+                mLabelBrush = LabelBrush;
+            }
+            else
+            {
+                mFill = ModuleFill;
+                mPen  = ModulePen;
+                mLabelBrush = LabelBrush;
+            }
+
+            var mBounds = GetModuleAbsoluteBounds(mod, sys);
             context.FillRectangle(mFill, mBounds);
             context.DrawRectangle(mPen, mBounds);
 
@@ -109,7 +229,7 @@ public class MainCanvasControl : Control
                 FlowDirection.LeftToRight,
                 Typeface.Default,
                 11,
-                LabelBrush);
+                mLabelBrush);
             context.DrawText(mtf, new Point(mBounds.X + 4, mBounds.Y + 4));
         }
     }
