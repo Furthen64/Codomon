@@ -51,11 +51,21 @@
             <!-- Model Name -->
             <StackPanel Spacing="6">
               <TextBlock Text="Model Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
-              <TextBlock Text="Model identifier to pass in the API request (e.g. llama3, gpt-4o)"
-                         Foreground="#556677" FontSize="11"/>
-              <TextBox x:Name="ModelNameBox"
-                       Watermark="model name…"
-                       TextChanged="OnModelNameChanged"/>
+              <TextBlock Text="Type a model name, or click Probe Models to fetch available models from the host."
+                         Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox x:Name="ModelNameBox" Grid.Column="0"
+                         Watermark="model name…"
+                         TextChanged="OnModelNameChanged"/>
+                <Button x:Name="ProbeModelsButton" Content="Probe Models" Grid.Column="1"
+                        Click="OnProbeModelsClick" Padding="10,5" Margin="8,0,0,0"/>
+              </Grid>
+              <ComboBox x:Name="ModelPickerComboBox"
+                        PlaceholderText="— select from probed models —"
+                        HorizontalAlignment="Stretch"
+                        IsEnabled="False"
+                        SelectionChanged="OnModelPickerSelectionChanged"/>
+              <TextBlock x:Name="ProbeStatusText" Text="" Foreground="#AABBCC" FontSize="11"/>
             </StackPanel>
 
             <!-- Test Connection -->

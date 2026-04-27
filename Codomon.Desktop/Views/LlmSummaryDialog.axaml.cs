@@ -91,6 +91,69 @@ public partial class LlmSummaryDialog : Window
         }
     }
 
+    private async void OnProbeModelsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var btn = this.FindControl<Button>("ProbeModelsButton");
+        var probeText = this.FindControl<TextBlock>("ProbeStatusText");
+        var picker = this.FindControl<ComboBox>("ModelPickerComboBox");
+
+        if (btn != null) btn.IsEnabled = false;
+        if (probeText != null)
+        {
+            probeText.Text = "Probing…";
+            probeText.Foreground = Avalonia.Media.Brushes.Gray;
+        }
+
+        try
+        {
+            await _vm.FetchModelsAsync();
+
+            var count = _vm.AvailableModels.Count;
+            if (picker != null)
+            {
+                picker.ItemsSource = _vm.AvailableModels;
+                picker.IsEnabled = count > 0;
+            }
+
+            if (probeText != null)
+            {
+                if (count > 0)
+                {
+                    probeText.Text = $"Found {count} model(s).";
+                    probeText.Foreground = Avalonia.Media.Brushes.LightGreen;
+                }
+                else
+                {
+                    probeText.Text = "No models returned — check endpoint and try Test Connection first.";
+                    probeText.Foreground = new Avalonia.Media.SolidColorBrush(
+                        Avalonia.Media.Color.Parse("#FF8888"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (probeText != null)
+            {
+                probeText.Text = $"Probe failed: {ex.Message}";
+                probeText.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse("#FF8888"));
+            }
+        }
+        finally
+        {
+            if (btn != null) btn.IsEnabled = true;
+        }
+    }
+
+    private void OnModelPickerSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox cb && cb.SelectedItem is string modelId)
+        {
+            var modelBox = this.FindControl<TextBox>("ModelNameBox");
+            if (modelBox != null) modelBox.Text = modelId;
+        }
+    }
+
     private void SyncConnectionStatus()
     {
         var text = this.FindControl<TextBlock>("ConnectionStatusText");
