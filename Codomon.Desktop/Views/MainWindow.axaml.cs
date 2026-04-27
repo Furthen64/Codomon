@@ -916,7 +916,8 @@ public partial class MainWindow : Window
 
         var scanVm = new ViewModels.RoslynScanViewModel(
             _vm.Workspace.SourceProjectPath,
-            _vm.WorkspaceFolderPath);
+            _vm.WorkspaceFolderPath,
+            _vm.Workspace);
 
         var dialog = new RoslynScanDialog(scanVm);
         var result = await dialog.ShowDialog<ViewModels.RoslynScanViewModel?>(this);
@@ -1188,10 +1189,10 @@ public partial class MainWindow : Window
             host.Content = _timelineControl;
     }
 
-    private void RebuildTimeline()
+    private async void RebuildTimeline()
     {
         if (!_vm.HasWorkspace) return;
-        _vm.Timeline.Build(_vm.LogReplay.Entries, _vm.Workspace);
+        await _vm.Timeline.BuildAsync(_vm.LogReplay.Entries, _vm.Workspace);
     }
 
     private void UpdateTimelineCursor()

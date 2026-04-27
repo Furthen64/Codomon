@@ -53,15 +53,25 @@ public class TimelineViewModel : INotifyPropertyChanged
     /// <summary>
     /// Rebuilds all timeline buckets from <paramref name="entries"/> matched against
     /// <paramref name="workspace"/>. Only Systems with <c>IsVisible = true</c> produce rows.
+    /// The heavy bucket-building work is offloaded to a background thread; observable
+    /// properties are updated on the UI thread when the work completes.
     /// </summary>
-    public void Build(IReadOnlyList<LogEntryModel> entries, WorkspaceModel workspace)
+    public async Task BuildAsync(IReadOnlyList<LogEntryModel> entries, WorkspaceModel workspace)
     {
+        // Snapshot collections on the calling (UI) thread before handing off to a
+        // background thread.  This avoids accessing mutable collections from a
+        // non-UI thread while still being safe to enumerate.
+        var entriesSnapshot  = entries.ToList();
+        var systemsSnapshot  = workspace.Systems.ToList();
+        var rulesSnapshot    = workspace.MappingRules.ToList();
+
+        // Reset immediately so the UI shows an empty timeline while computing.
         _activeSystems.Clear();
         _bucketsBySystem.Clear();
         MaxBucketCount = 0;
         HasTimestamps = false;
 
-        if (entries.Count == 0 || workspace.Systems.Count == 0)
+        if (entriesSnapshot.Count == 0 || systemsSnapshot.Count == 0)
         {
             OnPropertyChanged(nameof(ActiveSystems));
             OnPropertyChanged(nameof(BucketsBySystem));
@@ -70,16 +80,53 @@ public class TimelineViewModel : INotifyPropertyChanged
             return;
         }
 
-        // Temporary mutable buckets: SystemId → slot index → bucket.
+        // Heavy bucket-building work on a background thread.
+        var (newActiveSystems, newBuckets, newMax, newHasTs) =
+            await Task.Run(() => ComputeBuckets(entriesSnapshot, systemsSnapshot, rulesSnapshot));
+
+        // Apply results back on the UI thread (captured by the initial await context).
+        _activeSystems.Clear();
+        _bucketsBySystem.Clear();
+        foreach (var s in newActiveSystems) _activeSystems.Add(s);
+        foreach (var kv in newBuckets) _bucketsBySystem[kv.Key] = kv.Value;
+        MaxBucketCount = newMax;
+        HasTimestamps = newHasTs;
+
+        OnPropertyChanged(nameof(ActiveSystems));
+        OnPropertyChanged(nameof(BucketsBySystem));
+        OnPropertyChanged(nameof(MaxBucketCount));
+        OnPropertyChanged(nameof(HasTimestamps));
+    }
+
+    // ── Private computation ───────────────────────────────────────────────────
+
+    private static (
+        List<SystemBoxModel> ActiveSystems,
+        Dictionary<string, IReadOnlyList<TimelineBucket>> BucketsBySystem,
+        int MaxBucketCount,
+        bool HasTimestamps)
+    ComputeBuckets(
+        List<LogEntryModel> entries,
+        List<SystemBoxModel> systems,
+        List<MappingRuleModel> rules)
+    {
+        // Build a lightweight workspace snapshot for LogMatcher (read-only use).
+        var snapshotWorkspace = new WorkspaceModel
+        {
+            Systems       = systems,
+            MappingRules  = rules
+        };
+
         var slotsBySystem = new Dictionary<string, Dictionary<int, MutableBucket>>();
+        bool hasTimestamps = false;
 
         for (int i = 0; i < entries.Count; i++)
         {
             var entry = entries[i];
             if (entry.Timestamp == null) continue;
 
-            HasTimestamps = true;
-            var match = LogMatcher.Match(entry, workspace);
+            hasTimestamps = true;
+            var match = LogMatcher.Match(entry, snapshotWorkspace);
             if (match.Strength == MatchStrength.None || match.System == null) continue;
             if (!match.System.IsVisible) continue;
 
@@ -108,8 +155,11 @@ public class TimelineViewModel : INotifyPropertyChanged
             bucket.EntryIds.Add(i);
         }
 
-        // Convert to immutable model; build ActiveSystems list.
-        foreach (var sys in workspace.Systems)
+        var activeSystems    = new List<SystemBoxModel>();
+        var bucketsBySystem  = new Dictionary<string, IReadOnlyList<TimelineBucket>>();
+        int maxBucketCount   = 0;
+
+        foreach (var sys in systems)
         {
             if (!sys.IsVisible) continue;
             if (!slotsBySystem.TryGetValue(sys.Id, out var slots)) continue;
@@ -117,30 +167,27 @@ public class TimelineViewModel : INotifyPropertyChanged
             var buckets = new List<TimelineBucket>(slots.Count);
             foreach (var kv in slots.OrderBy(x => x.Key))
             {
-                var s = kv.Key;
+                var s  = kv.Key;
                 var mb = kv.Value;
                 var start = TimeSpan.FromMinutes(s * BucketSize.TotalMinutes);
                 buckets.Add(new TimelineBucket
                 {
-                    SystemId = sys.Id,
-                    StartTime = start,
-                    EndTime = start + BucketSize,
-                    Count = mb.Count,
+                    SystemId            = sys.Id,
+                    StartTime           = start,
+                    EndTime             = start + BucketSize,
+                    Count               = mb.Count,
                     MatchingLogEntryIds = mb.EntryIds
                 });
 
-                if (mb.Count > MaxBucketCount)
-                    MaxBucketCount = mb.Count;
+                if (mb.Count > maxBucketCount)
+                    maxBucketCount = mb.Count;
             }
 
-            _bucketsBySystem[sys.Id] = buckets;
-            _activeSystems.Add(sys);
+            bucketsBySystem[sys.Id] = buckets;
+            activeSystems.Add(sys);
         }
 
-        OnPropertyChanged(nameof(ActiveSystems));
-        OnPropertyChanged(nameof(BucketsBySystem));
-        OnPropertyChanged(nameof(MaxBucketCount));
-        OnPropertyChanged(nameof(HasTimestamps));
+        return (activeSystems, bucketsBySystem, maxBucketCount, hasTimestamps);
     }
 
     // ── INotifyPropertyChanged ────────────────────────────────────────────────

@@ -122,6 +122,12 @@ public static class LogParser
             try { parts = Regex.Split(line, options.Delimiter); }
             catch { parts = new[] { line }; }
         }
+        else if (string.IsNullOrEmpty(options.Delimiter))
+        {
+            // An empty delimiter would split into individual characters; treat the
+            // whole line as a single unparsed part instead.
+            parts = new[] { line };
+        }
         else
         {
             parts = line.Split(new[] { options.Delimiter }, StringSplitOptions.None);

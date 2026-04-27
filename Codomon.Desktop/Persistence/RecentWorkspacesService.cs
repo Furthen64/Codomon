@@ -10,13 +10,13 @@ public sealed class RecentWorkspaceEntry
     public string WorkspaceName { get; set; } = string.Empty;
     public DateTime LastOpened { get; set; }
 
-    /// <summary>Last modification time of workspace.json on disk, or default if unavailable.</summary>
+    /// <summary>Last modification time of workspace.json on disk (UTC), or default if unavailable.</summary>
     public DateTime LastModified
     {
         get
         {
             var wsFile = Path.Combine(FolderPath, "workspace.json");
-            return File.Exists(wsFile) ? File.GetLastWriteTime(wsFile) : default;
+            return File.Exists(wsFile) ? File.GetLastWriteTimeUtc(wsFile) : default;
         }
     }
 }

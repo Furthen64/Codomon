@@ -14,6 +14,7 @@ public class RoslynScanViewModel : INotifyPropertyChanged
 {
     private readonly string _sourcePath;
     private readonly string _workspaceFolderPath;
+    private readonly WorkspaceModel? _workspace;
 
     private ScanDialogStep _step = ScanDialogStep.Preflight;
     private bool _isRunning;
@@ -29,10 +30,11 @@ public class RoslynScanViewModel : INotifyPropertyChanged
 
     private CancellationTokenSource? _cts;
 
-    public RoslynScanViewModel(string sourcePath, string workspaceFolderPath)
+    public RoslynScanViewModel(string sourcePath, string workspaceFolderPath, WorkspaceModel? workspace = null)
     {
         _sourcePath = sourcePath;
         _workspaceFolderPath = workspaceFolderPath;
+        _workspace = workspace;
     }
 
     /// <summary>The source path being scanned.</summary>
@@ -197,6 +199,9 @@ public class RoslynScanViewModel : INotifyPropertyChanged
     /// Promotes <paramref name="suggestion"/> to a <see cref="ConnectionModel"/> with
     /// <see cref="ConnectionOrigin.Roslyn"/> and <c>IsReadOnly = true</c>.
     /// Returns the new connection so the caller can add it to the workspace.
+    /// When a workspace was supplied at construction time, attempts to resolve
+    /// <c>FromId</c> and <c>ToId</c> by matching the short class name against
+    /// workspace system and module names.
     /// </summary>
     public ConnectionModel? PromoteConnection(SuggestedConnection suggestion)
     {
@@ -211,8 +216,8 @@ public class RoslynScanViewModel : INotifyPropertyChanged
             Type = "Roslyn",
             Notes = $"Auto-generated from Roslyn scan. {suggestion.CallCount} call site(s).\n" +
                     $"From: {suggestion.FromClass}\nTo: {suggestion.ToClass}",
-            FromId = string.Empty,
-            ToId = string.Empty,
+            FromId = ResolveWorkspaceId(suggestion.FromClass) ?? string.Empty,
+            ToId   = ResolveWorkspaceId(suggestion.ToClass)   ?? string.Empty,
             Origin = ConnectionOrigin.Roslyn,
             IsReadOnly = true
         };
@@ -232,6 +237,32 @@ public class RoslynScanViewModel : INotifyPropertyChanged
     {
         var lastDot = fullName.LastIndexOf('.');
         return lastDot >= 0 ? fullName[(lastDot + 1)..] : fullName;
+    }
+
+    /// <summary>
+    /// Tries to find a workspace system or module whose name matches the short name
+    /// derived from <paramref name="className"/>. Returns the matching ID, or
+    /// <c>null</c> when no match is found or no workspace was provided.
+    /// </summary>
+    private string? ResolveWorkspaceId(string className)
+    {
+        if (_workspace == null) return null;
+        var shortName = ShortName(className);
+
+        // Try systems first.
+        var sys = _workspace.Systems.FirstOrDefault(s =>
+            string.Equals(s.Name, shortName, StringComparison.OrdinalIgnoreCase));
+        if (sys != null) return sys.Id;
+
+        // Then try modules across all systems.
+        foreach (var s in _workspace.Systems)
+        {
+            var mod = s.Modules.FirstOrDefault(m =>
+                string.Equals(m.Name, shortName, StringComparison.OrdinalIgnoreCase));
+            if (mod != null) return mod.Id;
+        }
+
+        return null;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

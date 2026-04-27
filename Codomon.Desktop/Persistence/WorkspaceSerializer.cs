@@ -256,6 +256,16 @@ public static class WorkspaceSerializer
         const double InitialYOffset = 40;
         const double SystemHorizontalSpacing = 260;
 
+        // Re-validate that the folder is still empty at creation time (guards against
+        // TOCTOU races between wizard validation and workspace creation).
+        if (Directory.Exists(folderPath) &&
+            Directory.EnumerateFileSystemEntries(folderPath).Any())
+        {
+            throw new InvalidOperationException(
+                $"The workspace folder '{folderPath}' is not empty. " +
+                "Please choose an empty folder.");
+        }
+
         var defaultProfileId = Guid.NewGuid().ToString();
         var workspace = new WorkspaceModel
         {

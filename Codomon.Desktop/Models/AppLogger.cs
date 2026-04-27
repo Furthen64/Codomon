@@ -7,6 +7,8 @@ namespace Codomon.Desktop.Models;
 /// <summary>Simple in-process log sink. Shared between the main window and the Dev Console.</summary>
 public static class AppLogger
 {
+    private const int MaxEntries = 10_000;
+
     public static ObservableCollection<LogEntry> Entries { get; } = new();
 
     public static void Info(string message) => Append("INFO", message);
@@ -17,7 +19,13 @@ public static class AppLogger
     private static void Append(string level, string message)
     {
         var entry = new LogEntry(DateTime.Now, level, message);
-        Dispatcher.UIThread.Post(() => Entries.Add(entry));
+        Dispatcher.UIThread.Post(() =>
+        {
+            // Discard the oldest entry when the cap is reached to bound memory usage.
+            while (Entries.Count >= MaxEntries)
+                Entries.RemoveAt(0);
+            Entries.Add(entry);
+        });
     }
 }
 

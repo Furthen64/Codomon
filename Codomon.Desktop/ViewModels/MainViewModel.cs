@@ -39,6 +39,7 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Profiles));
             OnPropertyChanged(nameof(ActiveProfileId));
             // Re-create the replay VM so it references the new workspace model.
+            _logReplay.Dispose();
             _logReplay = new LogReplayViewModel(value);
             OnPropertyChanged(nameof(LogReplay));
             // Re-create the timeline VM; existing data is stale for the new workspace.
@@ -388,7 +389,10 @@ public class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public void AddRoslynConnections(IEnumerable<Models.ConnectionModel> connections)
     {
-        foreach (var conn in connections)
+        // Materialise once to avoid double-enumeration of deferred LINQ queries.
+        var connectionList = connections.ToList();
+
+        foreach (var conn in connectionList)
         {
             // Avoid duplicates by ID.
             if (Workspace.Connections.Any(c => c.Id == conn.Id)) continue;
@@ -397,7 +401,7 @@ public class MainViewModel : INotifyPropertyChanged
 
         IsDirty = true;
         StatusMessage = "Roslyn connections added to workspace.";
-        AppLogger.Info($"Roslyn scan: added {connections.Count()} connection(s).");
+        AppLogger.Info($"Roslyn scan: added {connectionList.Count} connection(s).");
     }
 
     /// <summary>

@@ -240,10 +240,8 @@ public static class RoslynScanService
                             entry.Sites.Add(callSite);
                             callMap[key] = (entry.Count + 1, entry.Sites);
                         }
-                        else
-                        {
-                            callMap[key] = (entry.Count + 1, entry.Sites);
-                        }
+                        // When the call site is a duplicate or the sites list is full,
+                        // do not increment Count so it accurately reflects distinct call sites.
                     }
                 }
             }
