@@ -10,8 +10,9 @@ namespace Codomon.Desktop.ViewModels;
 
 /// <summary>
 /// Manages live log file monitoring.  Starts/stops a <see cref="LogWatcherService"/>,
-/// batches incoming lines into 100 ms UI-thread ticks to keep the UI responsive at up to
-/// 500 events per second, and raises <see cref="EntryArrived"/> for each new entry.
+/// batches incoming lines into 100 ms UI-thread ticks to keep the UI responsive, and
+/// raises <see cref="EntryArrived"/> for each new entry.
+/// Peak throughput: up to <see cref="MaxEntriesPerTick"/> × 10 ticks/s = 2,000 entries/s.
 /// </summary>
 public sealed class LiveMonitorViewModel : INotifyPropertyChanged, IDisposable
 {

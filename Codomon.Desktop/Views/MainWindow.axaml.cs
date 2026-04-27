@@ -37,7 +37,8 @@ public partial class MainWindow : Window
     // Tracks whether the log list is currently bound to live-monitor entries.
     private bool _logListShowingLive;
 
-    // Throttles timeline rebuilds during live monitoring (max once per 2 s).
+    // Throttles timeline rebuilds during live monitoring (max once per LiveTimelineRebuildThrottleSeconds).
+    private const double LiveTimelineRebuildThrottleSeconds = 2.0;
     private DateTimeOffset _lastLiveTimelineRebuild = DateTimeOffset.MinValue;
 
     public MainWindow()
@@ -1049,7 +1050,7 @@ public partial class MainWindow : Window
 
         // Rebuild the timeline at most once every 2 seconds to avoid hammering it.
         var now = DateTimeOffset.UtcNow;
-        if ((now - _lastLiveTimelineRebuild).TotalSeconds >= 2.0)
+        if ((now - _lastLiveTimelineRebuild).TotalSeconds >= LiveTimelineRebuildThrottleSeconds)
         {
             _lastLiveTimelineRebuild = now;
             RebuildLiveTimeline();

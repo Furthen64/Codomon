@@ -125,7 +125,7 @@ public sealed class LogWatcherService : IDisposable
             stream.Seek(_lastPosition, SeekOrigin.Begin);
 
             using var reader = new StreamReader(stream, detectEncodingFromByteOrderMarks: true,
-                                                bufferSize: 4096, leaveOpen: true);
+                                                bufferSize: 16384, leaveOpen: true);
             var lines = new List<string>();
             string? line;
             while ((line = reader.ReadLine()) != null)
