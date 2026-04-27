@@ -19,8 +19,9 @@ public class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        _logReplay = new LogReplayViewModel(_workspace);
-        _timeline  = new TimelineViewModel();
+        _logReplay   = new LogReplayViewModel(_workspace);
+        _timeline    = new TimelineViewModel();
+        _liveMonitor = new LiveMonitorViewModel();
     }
 
     public bool HasWorkspace
@@ -42,6 +43,11 @@ public class MainViewModel : INotifyPropertyChanged
             _logReplay.Dispose();
             _logReplay = new LogReplayViewModel(value);
             OnPropertyChanged(nameof(LogReplay));
+            // Stop live monitoring and create a fresh VM for the new workspace.
+            _liveMonitor.Stop();
+            _liveMonitor.Dispose();
+            _liveMonitor = new LiveMonitorViewModel();
+            OnPropertyChanged(nameof(LiveMonitor));
             // Re-create the timeline VM; existing data is stale for the new workspace.
             _timeline = new TimelineViewModel();
             OnPropertyChanged(nameof(Timeline));
@@ -81,6 +87,13 @@ public class MainViewModel : INotifyPropertyChanged
     /// <summary>Aggregated day-timeline built from imported log entries.</summary>
     public TimelineViewModel Timeline => _timeline;
 
+    // ── Live Monitor ──────────────────────────────────────────────────────────
+
+    private LiveMonitorViewModel _liveMonitor;
+
+    /// <summary>The live log monitoring controller.</summary>
+    public LiveMonitorViewModel LiveMonitor => _liveMonitor;
+
     /// <summary>
     /// Imports a log file from <paramref name="sourcePath"/> into the workspace
     /// <c>logs/imported/</c> folder and loads its entries into <see cref="LogReplay"/>.
@@ -89,6 +102,9 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (string.IsNullOrEmpty(WorkspaceFolderPath))
             throw new InvalidOperationException("No workspace is open. Please open or create a workspace first.");
+
+        // Stop live monitoring before an import so both sources don't write to the same list.
+        _liveMonitor.Stop();
 
         var destPath = await LogImportService.CopyToWorkspaceAsync(sourcePath, WorkspaceFolderPath);
         var entries  = await LogImportService.LoadEntriesAsync(destPath);
@@ -107,12 +123,48 @@ public class MainViewModel : INotifyPropertyChanged
         if (string.IsNullOrEmpty(WorkspaceFolderPath))
             throw new InvalidOperationException("No workspace is open. Please open or create a workspace first.");
 
+        // Stop live monitoring before an import so both sources don't write to the same list.
+        _liveMonitor.Stop();
+
         var destPath = await LogImportService.CopyToWorkspaceAsync(sourcePath, WorkspaceFolderPath);
         var entries  = await LogImportService.LoadEntriesWithOptionsAsync(destPath, options);
         _logReplay.LoadEntries(entries);
 
         StatusMessage = $"Imported {entries.Count} log entries from {Path.GetFileName(destPath)}";
         AppLogger.Info($"Log imported (wizard): {destPath} ({entries.Count} entries)");
+    }
+
+    /// <summary>
+    /// Starts live monitoring of <paramref name="filePath"/>.
+    /// The last-browsed folder and watched paths list are updated in the workspace model.
+    /// </summary>
+    public void StartLiveMonitoring(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+
+        // Remember the folder for the next file-picker open.
+        var folder = Path.GetDirectoryName(filePath) ?? string.Empty;
+        if (!string.IsNullOrEmpty(folder))
+            Workspace.LastBrowsedFolder = folder;
+
+        // Add the path to the workspace's configured paths list (no duplicates).
+        if (!Workspace.WatchedLogPaths.Contains(filePath, StringComparer.OrdinalIgnoreCase))
+            Workspace.WatchedLogPaths.Add(filePath);
+
+        _liveMonitor.Start(filePath);
+
+        IsDirty       = true;
+        StatusMessage = $"Watching: {Path.GetFileName(filePath)}";
+        AppLogger.Info($"Live monitoring started: {filePath}");
+    }
+
+    /// <summary>Stops live monitoring if currently active.</summary>
+    public void StopLiveMonitoring()
+    {
+        if (!_liveMonitor.IsWatching) return;
+        _liveMonitor.Stop();
+        StatusMessage = "Live monitoring stopped.";
+        AppLogger.Info("Live monitoring stopped.");
     }
 
     // ── Profile management ───────────────────────────────────────────────────
