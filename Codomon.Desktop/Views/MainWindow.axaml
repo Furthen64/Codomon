@@ -67,70 +67,84 @@
       <TextBlock x:Name="StatusText" Text="Ready" Foreground="#88AABB" FontSize="11"/>
     </Border>
 
-    <!-- Bottom Panel (Logs / Timeline) -->
-    <Border DockPanel.Dock="Bottom" Height="200" Background="#141C28" BorderThickness="0,1,0,0" BorderBrush="#2A3F5A">
-      <TabControl>
-        <TabItem Header="Log Stream">
-          <DockPanel>
-
-            <!-- Replay toolbar -->
-            <Border DockPanel.Dock="Top" Background="#1A2435" Padding="6,4" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Button x:Name="ImportLogButton"  Content="📂 Import"  Padding="8,3" Click="OnImportLogClick"/>
-                <Button x:Name="ReplayPlayButton"  Content="▶ Play"    Padding="8,3" Click="OnReplayPlayClick"  IsEnabled="False"/>
-                <Button x:Name="ReplayPauseButton" Content="⏸ Pause"   Padding="8,3" Click="OnReplayPauseClick" IsEnabled="False"/>
-                <Button x:Name="ReplayStopButton"  Content="⏹ Stop"    Padding="8,3" Click="OnReplayStopClick"  IsEnabled="False"/>
-                <TextBlock Text="Speed:" VerticalAlignment="Center" Foreground="#778899" Margin="8,0,2,0"/>
-                <ComboBox x:Name="ReplaySpeedComboBox" Width="70" Padding="4,2"
-                          SelectionChanged="OnReplaySpeedChanged"/>
-                <TextBlock x:Name="ReplayStatusText" VerticalAlignment="Center"
-                           Foreground="#556677" FontSize="11" Margin="12,0,0,0"
-                           Text="No log loaded"/>
-
-                <!-- Separator between replay and live-watch controls -->
-                <Border Width="1" Margin="6,2" Background="#2A3F5A"/>
-
-                <Button x:Name="WatchLogButton"  Content="📡 Watch…"  Padding="8,3" Click="OnWatchLogClick"  IsEnabled="False"/>
-                <Button x:Name="StopWatchButton" Content="⏹ Stop"     Padding="8,3" Click="OnStopWatchClick" IsEnabled="False"/>
-                <TextBlock x:Name="WatchStatusText" VerticalAlignment="Center"
-                           Foreground="#556677" FontSize="11" Margin="8,0,0,0"
-                           Text="Not watching"/>
-              </StackPanel>
-            </Border>
-
-            <!-- Log entry list -->
-            <ListBox x:Name="ImportedLogsListBox" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
-
-          </DockPanel>
-        </TabItem>
-        <TabItem Header="Timeline">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <ContentControl x:Name="TimelineHost" HorizontalContentAlignment="Stretch"/>
-          </ScrollViewer>
-        </TabItem>
-        <TabItem Header="Connections">
-          <DockPanel>
-            <!-- Toolbar -->
-            <Border DockPanel.Dock="Top" Background="#1A2435" Padding="6,4" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBlock Text="Workspace connections — Roslyn-origin connections are marked read-only."
-                           VerticalAlignment="Center" Foreground="#556677" FontSize="11"/>
-                <Button x:Name="PromoteConnectionButton" Content="⬆ Promote to Manual"
-                        Click="OnPromoteConnectionClick"
-                        Padding="8,3" IsEnabled="False"/>
-              </StackPanel>
-            </Border>
-            <!-- Connections list -->
-            <ListBox x:Name="ConnectionsListBox"
-                     Background="Transparent"
-                     SelectionChanged="OnConnectionsListSelectionChanged"/>
-          </DockPanel>
-        </TabItem>
-      </TabControl>
-    </Border>
-
-    <!-- Main Content Area -->
+    <!-- Main Content Area + resizable Bottom Panel -->
     <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="5" MinHeight="5"/>
+        <RowDefinition Height="200" MinHeight="80"/>
+      </Grid.RowDefinitions>
+
+      <!-- GridSplitter between main content and bottom panel -->
+      <GridSplitter Grid.Row="1"
+                    HorizontalAlignment="Stretch"
+                    Background="#2A3F5A"
+                    ResizeDirection="Rows"/>
+
+      <!-- Bottom Panel (Logs / Timeline) -->
+      <Border Grid.Row="2" Background="#141C28" BorderThickness="0,1,0,0" BorderBrush="#2A3F5A">
+        <TabControl>
+          <TabItem Header="Log Stream">
+            <DockPanel>
+
+              <!-- Replay toolbar -->
+              <Border DockPanel.Dock="Top" Background="#1A2435" Padding="6,4" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button x:Name="ImportLogButton"  Content="📂 Import"  Padding="8,3" Click="OnImportLogClick"/>
+                  <Button x:Name="ReplayPlayButton"  Content="▶ Play"    Padding="8,3" Click="OnReplayPlayClick"  IsEnabled="False"/>
+                  <Button x:Name="ReplayPauseButton" Content="⏸ Pause"   Padding="8,3" Click="OnReplayPauseClick" IsEnabled="False"/>
+                  <Button x:Name="ReplayStopButton"  Content="⏹ Stop"    Padding="8,3" Click="OnReplayStopClick"  IsEnabled="False"/>
+                  <TextBlock Text="Speed:" VerticalAlignment="Center" Foreground="#778899" Margin="8,0,2,0"/>
+                  <ComboBox x:Name="ReplaySpeedComboBox" Width="70" Padding="4,2"
+                            SelectionChanged="OnReplaySpeedChanged"/>
+                  <TextBlock x:Name="ReplayStatusText" VerticalAlignment="Center"
+                             Foreground="#556677" FontSize="11" Margin="12,0,0,0"
+                             Text="No log loaded"/>
+
+                  <!-- Separator between replay and live-watch controls -->
+                  <Border Width="1" Margin="6,2" Background="#2A3F5A"/>
+
+                  <Button x:Name="WatchLogButton"  Content="📡 Watch…"  Padding="8,3" Click="OnWatchLogClick"  IsEnabled="False"/>
+                  <Button x:Name="StopWatchButton" Content="⏹ Stop"     Padding="8,3" Click="OnStopWatchClick" IsEnabled="False"/>
+                  <TextBlock x:Name="WatchStatusText" VerticalAlignment="Center"
+                             Foreground="#556677" FontSize="11" Margin="8,0,0,0"
+                             Text="Not watching"/>
+                </StackPanel>
+              </Border>
+
+              <!-- Log entry list -->
+              <ListBox x:Name="ImportedLogsListBox" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="Timeline">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <ContentControl x:Name="TimelineHost" HorizontalContentAlignment="Stretch"/>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="Connections">
+            <DockPanel>
+              <!-- Toolbar -->
+              <Border DockPanel.Dock="Top" Background="#1A2435" Padding="6,4" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Workspace connections — Roslyn-origin connections are marked read-only."
+                             VerticalAlignment="Center" Foreground="#556677" FontSize="11"/>
+                  <Button x:Name="PromoteConnectionButton" Content="⬆ Promote to Manual"
+                          Click="OnPromoteConnectionClick"
+                          Padding="8,3" IsEnabled="False"/>
+                </StackPanel>
+              </Border>
+              <!-- Connections list -->
+              <ListBox x:Name="ConnectionsListBox"
+                       Background="Transparent"
+                       SelectionChanged="OnConnectionsListSelectionChanged"/>
+            </DockPanel>
+          </TabItem>
+        </TabControl>
+      </Border>
+
+      <!-- Main Content rows (row 0) -->
+      <Grid Grid.Row="0">
 
       <!-- ── 3-column workspace layout ─── -->
       <Grid x:Name="WorkspaceGrid" IsVisible="False">
@@ -226,7 +240,9 @@
         </DockPanel>
       </Grid>
 
-    </Grid>
+    </Grid><!-- end main content row 0 -->
+
+  </Grid><!-- end resizable outer Grid -->
 
   </DockPanel>
 </Window>
