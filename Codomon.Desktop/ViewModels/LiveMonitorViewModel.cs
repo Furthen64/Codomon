@@ -26,9 +26,6 @@ public sealed class LiveMonitorViewModel : INotifyPropertyChanged, IDisposable
     private string _watchedFilePath = string.Empty;
     private string _errorMessage    = string.Empty;
 
-    // Throttles timeline rebuilds during high-volume live monitoring.
-    private DateTimeOffset _lastTimelineRebuild = DateTimeOffset.MinValue;
-
     // ── Public state ──────────────────────────────────────────────────────────
 
     /// <summary>All log entries received since the last <see cref="Start"/> call.</summary>

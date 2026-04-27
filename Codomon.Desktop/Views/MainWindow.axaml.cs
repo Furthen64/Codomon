@@ -809,6 +809,7 @@ public partial class MainWindow : Window
         {
             RefreshLogReplayPanel();
             UpdateTimelineCursor();
+            RefreshLiveMonitorPanel();
         }
     }
 
@@ -1072,10 +1073,11 @@ public partial class MainWindow : Window
         var stopBtn   = this.FindControl<Button>("StopWatchButton");
         var statusTb  = this.FindControl<TextBlock>("WatchStatusText");
 
-        bool hasWorkspace = _vm.HasWorkspace;
-        bool isWatching   = _vm.LiveMonitor.IsWatching;
+        bool hasWorkspace  = _vm.HasWorkspace;
+        bool isWatching    = _vm.LiveMonitor.IsWatching;
+        bool replayPlaying = _vm.LogReplay.IsPlaying;
 
-        if (watchBtn != null) watchBtn.IsEnabled = hasWorkspace;
+        if (watchBtn != null) watchBtn.IsEnabled = hasWorkspace && !replayPlaying;
         if (stopBtn  != null) stopBtn.IsEnabled  = isWatching;
 
         if (statusTb != null)
@@ -1088,13 +1090,13 @@ public partial class MainWindow : Window
             }
             else if (isWatching)
             {
-                statusTb.Text       = $"● {System.IO.Path.GetFileName(_vm.LiveMonitor.WatchedFilePath)}  ({_vm.LiveMonitor.Entries.Count} lines)";
+                statusTb.Text       = $"● {System.IO.Path.GetFileName(_vm.LiveMonitor.WatchedFilePath)} ({_vm.LiveMonitor.Entries.Count} lines)";
                 statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.Parse("#66EE88"));
             }
             else if (_logListShowingLive && _vm.LiveMonitor.Entries.Count > 0)
             {
-                statusTb.Text       = $"Stopped  ({_vm.LiveMonitor.Entries.Count} lines captured)";
+                statusTb.Text       = $"Stopped ({_vm.LiveMonitor.Entries.Count} lines captured)";
                 statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.Parse("#778899"));
             }
