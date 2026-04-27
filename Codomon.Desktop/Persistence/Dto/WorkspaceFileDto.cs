@@ -14,6 +14,15 @@ public class WorkspaceFileDto
 
     /// <summary>Log file paths configured for live monitoring.</summary>
     public List<string> WatchedLogPaths { get; set; } = new();
+
+    /// <summary>LLM API configuration for summary generation.</summary>
+    public LlmSettingsDto LlmSettings { get; set; } = new();
+}
+
+public class LlmSettingsDto
+{
+    public string ApiEndpoint { get; set; } = "http://localhost:8080/v1";
+    public string ModelName { get; set; } = string.Empty;
 }
 
 public class SystemEntryDto

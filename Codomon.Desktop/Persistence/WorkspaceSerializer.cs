@@ -20,6 +20,22 @@ public static class WorkspaceSerializer
     private const string ProfilesFolder = "profiles";
     private const string VersionFile = ".wsversion";
 
+    private const string DefaultSummaryPrompt =
+        """
+        Please analyze the following C# source file and write a concise Markdown summary covering:
+
+        - **Purpose and responsibilities** of the file
+        - **Classes, interfaces, or records** defined
+        - **Key public methods** and their intent
+        - **Notable dependencies or patterns**
+
+        Source file path: `{FilePath}`
+
+        ```csharp
+        {SourceCode}
+        ```
+        """;
+
     private static readonly string[] RequiredFiles =
     {
         WorkspaceFile, SystemsFile, ModulesFile, ConnectionsFile
@@ -33,10 +49,16 @@ public static class WorkspaceSerializer
         Directory.CreateDirectory(Path.Combine(folderPath, "logs", "raw"));
         Directory.CreateDirectory(Path.Combine(folderPath, "logs", "imported"));
         Directory.CreateDirectory(Path.Combine(folderPath, "autosaves"));
+        Directory.CreateDirectory(Path.Combine(folderPath, "summaries"));
 
         // Write workspace version file so we can detect incompatible workspaces later.
         var versionContent = $"codomon-version={BuildInfo.AppVersion}{Environment.NewLine}build-date={BuildInfo.BuildDate}{Environment.NewLine}";
         await File.WriteAllTextAsync(Path.Combine(folderPath, VersionFile), versionContent);
+
+        // Create the default summary prompt file if it does not already exist.
+        var promptPath = Path.Combine(folderPath, "summary_prompt.md");
+        if (!File.Exists(promptPath))
+            await File.WriteAllTextAsync(promptPath, DefaultSummaryPrompt);
 
         var workspaceDto = new WorkspaceFileDto
         {
@@ -44,7 +66,12 @@ public static class WorkspaceSerializer
             SourceProjectPath = workspace.SourceProjectPath,
             ActiveProfileId = workspace.ActiveProfileId,
             LastBrowsedFolder = workspace.LastBrowsedFolder,
-            WatchedLogPaths = new List<string>(workspace.WatchedLogPaths)
+            WatchedLogPaths = new List<string>(workspace.WatchedLogPaths),
+            LlmSettings = new Dto.LlmSettingsDto
+            {
+                ApiEndpoint = workspace.LlmSettings.ApiEndpoint,
+                ModelName = workspace.LlmSettings.ModelName
+            }
         };
         await WriteJsonAsync(Path.Combine(folderPath, WorkspaceFile), workspaceDto);
 
@@ -247,6 +274,12 @@ public static class WorkspaceSerializer
 
         if (workspaceDto.WatchedLogPaths != null)
             workspace.WatchedLogPaths.AddRange(workspaceDto.WatchedLogPaths);
+
+        workspace.LlmSettings = new Models.LlmSettingsModel
+        {
+            ApiEndpoint = workspaceDto.LlmSettings?.ApiEndpoint ?? "http://localhost:8080/v1",
+            ModelName = workspaceDto.LlmSettings?.ModelName ?? string.Empty
+        };
 
         return workspace;
     }

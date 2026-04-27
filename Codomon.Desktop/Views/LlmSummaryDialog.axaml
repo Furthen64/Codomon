@@ -1,0 +1,189 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.LlmSummaryDialog"
+        Title="LLM Summaries"
+        Width="720" Height="580"
+        MinWidth="600" MinHeight="480"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <StackPanel Spacing="2">
+        <TextBlock Text="LLM Summaries" FontSize="16" FontWeight="Bold" Foreground="White"/>
+        <TextBlock Text="Generate Markdown summaries for C# source files using a local or OpenAI-compatible LLM."
+                   FontSize="12" Foreground="#88AABB"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button Content="Close" Click="OnCloseClick" Padding="16,6" DockPanel.Dock="Left"/>
+        <TextBlock x:Name="StatusText" Text="" Foreground="#88AABB" FontSize="11"
+                   VerticalAlignment="Center" HorizontalAlignment="Right"/>
+      </DockPanel>
+    </Border>
+
+    <!-- Tab content -->
+    <TabControl Background="#111820">
+
+      <!-- ── Tab 1: Setup ───────────────────────────────────────────────── -->
+      <TabItem Header="Setup">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="24,18" Spacing="16">
+
+            <!-- API Endpoint -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="API Endpoint" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <TextBlock Text="Base URL of your OpenAI-compatible endpoint (e.g. http://localhost:8080/v1)"
+                         Foreground="#556677" FontSize="11"/>
+              <TextBox x:Name="ApiEndpointBox"
+                       Watermark="http://localhost:8080/v1"
+                       TextChanged="OnApiEndpointChanged"/>
+            </StackPanel>
+
+            <!-- Model Name -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="Model Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <TextBlock Text="Model identifier to pass in the API request (e.g. llama3, gpt-4o)"
+                         Foreground="#556677" FontSize="11"/>
+              <TextBox x:Name="ModelNameBox"
+                       Watermark="model name…"
+                       TextChanged="OnModelNameChanged"/>
+            </StackPanel>
+
+            <!-- Test Connection -->
+            <StackPanel Spacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button x:Name="TestConnectionButton" Content="Test Connection"
+                        Click="OnTestConnectionClick" Padding="14,5"/>
+                <TextBlock x:Name="ConnectionStatusText"
+                           Text="" VerticalAlignment="Center"
+                           Foreground="#AABBCC" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <!-- Prompt Editor -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="Summary Prompt (summary_prompt.md)" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <TextBlock Text="This prompt is sent to the LLM for each file. Use {FilePath} and {SourceCode} as placeholders."
+                         Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+              <TextBox x:Name="PromptBox"
+                       AcceptsReturn="True"
+                       MinHeight="160"
+                       MaxHeight="300"
+                       FontFamily="Monospace"
+                       FontSize="11"
+                       Background="#0F141E"
+                       Foreground="#CCDDEE"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       TextWrapping="Wrap"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Save Prompt" Click="OnSavePromptClick" Padding="12,4"/>
+              </StackPanel>
+            </StackPanel>
+
+            <!-- Save Settings -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Save Settings" Click="OnSaveSettingsClick"
+                      Padding="14,5" Background="#1A3A5A" Foreground="White"/>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ── Tab 2: Generate ────────────────────────────────────────────── -->
+      <TabItem Header="Generate" x:Name="GenerateTab">
+        <DockPanel Margin="0">
+
+          <!-- Toolbar -->
+          <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="↺ Reload Files" Click="OnReloadFilesClick" Padding="10,4"/>
+              <Button Content="✓ Select All"   Click="OnSelectAllClick"   Padding="10,4"/>
+              <Button Content="✗ Deselect All" Click="OnDeselectAllClick" Padding="10,4"/>
+              <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
+              <Button x:Name="GenerateButton" Content="▶ Generate for Selected"
+                      Click="OnGenerateClick" Padding="10,4"
+                      Background="#1A3A2A" Foreground="White"/>
+              <Button x:Name="CancelGenerateButton" Content="⏹ Cancel"
+                      Click="OnCancelGenerateClick"
+                      Padding="10,4" IsEnabled="False"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Split: file list (left) | progress (right) -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="300" MinWidth="180"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- File list -->
+            <Border Grid.Column="0" BorderBrush="#2A3F5A" BorderThickness="0,0,1,0">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+                  <TextBlock x:Name="FileCountText" Text="C# Files"
+                             FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+                </Border>
+                <ListBox x:Name="CsFilesListBox"
+                         Background="Transparent"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+              </DockPanel>
+            </Border>
+
+            <!-- Progress log -->
+            <DockPanel Grid.Column="1">
+              <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+                <TextBlock Text="Progress" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+              </Border>
+              <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" Margin="8">
+                <ListBox x:Name="ProgressListBox"
+                         Background="Transparent"
+                         FontFamily="Monospace"
+                         FontSize="11"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+              </Border>
+            </DockPanel>
+
+          </Grid>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ── Tab 3: Browse Summaries ────────────────────────────────────── -->
+      <TabItem Header="Summaries" x:Name="BrowseTab">
+        <DockPanel>
+
+          <!-- Toolbar -->
+          <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="↺ Refresh" Click="OnRefreshSummariesClick" Padding="10,4"/>
+              <TextBlock Text="Double-click a summary to open it in your system editor."
+                         Foreground="#556677" FontSize="11" VerticalAlignment="Center"
+                         Margin="8,0,0,0"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Summaries list -->
+          <ListBox x:Name="SummariesListBox"
+                   Background="Transparent"
+                   DoubleTapped="OnSummaryDoubleTapped"/>
+
+        </DockPanel>
+      </TabItem>
+
+    </TabControl>
+
+  </DockPanel>
+</Window>

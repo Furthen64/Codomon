@@ -1144,6 +1144,32 @@ public partial class MainWindow : Window
         });
     }
 
+    // ── LLM Summaries ─────────────────────────────────────────────────────────
+
+    private async void OnSummariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before using LLM Summaries.");
+            return;
+        }
+
+        var summaryVm = new ViewModels.LlmSummaryViewModel(
+            _vm.Workspace,
+            _vm.WorkspaceFolderPath);
+
+        var dialog = new LlmSummaryDialog(summaryVm);
+        await dialog.ShowDialog(this);
+
+        // Persist any settings changes the user made in the dialog.
+        if (_vm.Workspace.LlmSettings.ApiEndpoint != summaryVm.ApiEndpoint ||
+            _vm.Workspace.LlmSettings.ModelName   != summaryVm.ModelName)
+        {
+            summaryVm.SaveSettings();
+            _vm.IsDirty = true;
+        }
+    }
+
     // ── Connections panel (Roslyn-origin connections) ─────────────────────────
 
     /// <summary>
