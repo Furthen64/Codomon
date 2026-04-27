@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 
 namespace Codomon.Desktop.Models;
 
@@ -16,7 +17,7 @@ public static class AppLogger
     private static void Append(string level, string message)
     {
         var entry = new LogEntry(DateTime.Now, level, message);
-        Entries.Add(entry);
+        Dispatcher.UIThread.Post(() => Entries.Add(entry));
     }
 }
 
