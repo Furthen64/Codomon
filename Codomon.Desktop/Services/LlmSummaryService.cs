@@ -29,6 +29,40 @@ public static class LlmSummaryService
     // ── Connection test ───────────────────────────────────────────────────────
 
     /// <summary>
+    /// Queries the <c>/models</c> endpoint and returns the list of available model IDs.
+    /// Returns an empty list when the endpoint is unreachable or returns no data.
+    /// </summary>
+    public static async Task<List<string>> FetchModelsAsync(
+        string apiEndpoint,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = BuildModelsUrl(apiEndpoint);
+            using var response = await Http.GetAsync(url, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return new List<string>();
+
+            var result = await response.Content.ReadFromJsonAsync<ModelsResponse>(JsonOptions, cancellationToken);
+            return result?.Data?
+                .Select(m => m.Id)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id!)
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                ?? new List<string>();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    /// <summary>
     /// Sends a minimal chat completion request to verify the endpoint and model are reachable.
     /// Returns a human-readable result message.
     /// </summary>
@@ -249,6 +283,17 @@ public static class LlmSummaryService
         return base_ + "/chat/completions";
     }
 
+    private static string BuildModelsUrl(string apiEndpoint)
+    {
+        var base_ = apiEndpoint.TrimEnd('/');
+        if (base_.EndsWith("/models", StringComparison.OrdinalIgnoreCase))
+            return base_;
+        // Strip any trailing API path so we always append to the base URL.
+        if (base_.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+            base_ = base_[..^"/chat/completions".Length];
+        return base_ + "/models";
+    }
+
     /// <summary>
     /// Converts a relative path like <c>src/Foo/Bar.cs</c> to a safe file name
     /// <c>src_Foo_Bar_cs</c> by replacing path separators and dots with underscores.
@@ -333,6 +378,18 @@ public static class LlmSummaryService
     {
         [JsonPropertyName("message")]
         public ChatMessage? Message { get; set; }
+    }
+
+    private sealed class ModelsResponse
+    {
+        [JsonPropertyName("data")]
+        public ModelInfo[]? Data { get; set; }
+    }
+
+    private sealed class ModelInfo
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
     }
 }
 

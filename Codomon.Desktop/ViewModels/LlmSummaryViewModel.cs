@@ -73,6 +73,17 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         private set { _isTestingConnection = value; OnPropertyChanged(); }
     }
 
+    private bool _isFetchingModels;
+
+    public bool IsFetchingModels
+    {
+        get => _isFetchingModels;
+        private set { _isFetchingModels = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Model IDs returned by the last successful probe of the endpoint.</summary>
+    public ObservableCollection<string> AvailableModels { get; } = new();
+
     // ── Generation state ──────────────────────────────────────────────────────
 
     public bool IsGenerating
@@ -128,6 +139,28 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         finally
         {
             IsTestingConnection = false;
+        }
+    }
+
+    /// <summary>
+    /// Queries the host's <c>/models</c> endpoint and populates <see cref="AvailableModels"/>.
+    /// Does nothing if a fetch is already in progress.
+    /// </summary>
+    public async Task FetchModelsAsync()
+    {
+        if (IsFetchingModels) return;
+
+        IsFetchingModels = true;
+        try
+        {
+            var models = await LlmSummaryService.FetchModelsAsync(ApiEndpoint, CancellationToken.None);
+            AvailableModels.Clear();
+            foreach (var m in models)
+                AvailableModels.Add(m);
+        }
+        finally
+        {
+            IsFetchingModels = false;
         }
     }
 
