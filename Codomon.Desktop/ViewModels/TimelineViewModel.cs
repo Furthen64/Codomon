@@ -61,9 +61,9 @@ public class TimelineViewModel : INotifyPropertyChanged
         // Snapshot collections on the calling (UI) thread before handing off to a
         // background thread.  This avoids accessing mutable collections from a
         // non-UI thread while still being safe to enumerate.
-        var entriesSnapshot  = entries.ToList();
-        var systemsSnapshot  = workspace.Systems.ToList();
-        var rulesSnapshot    = workspace.MappingRules.ToList();
+        var entriesSnapshot = entries.ToList();
+        var systemsSnapshot = workspace.Systems.ToList();
+        var rulesSnapshot   = workspace.MappingRules.ToList();
 
         // Reset immediately so the UI shows an empty timeline while computing.
         _activeSystems.Clear();
@@ -167,9 +167,9 @@ public class TimelineViewModel : INotifyPropertyChanged
             var buckets = new List<TimelineBucket>(slots.Count);
             foreach (var kv in slots.OrderBy(x => x.Key))
             {
-                var s  = kv.Key;
+                var slotIndex = kv.Key;
                 var mb = kv.Value;
-                var start = TimeSpan.FromMinutes(s * BucketSize.TotalMinutes);
+                var start = TimeSpan.FromMinutes(slotIndex * BucketSize.TotalMinutes);
                 buckets.Add(new TimelineBucket
                 {
                     SystemId            = sys.Id,
