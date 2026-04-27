@@ -14,6 +14,15 @@ public class WorkspaceModel
     /// <summary>Workspace-level rules that map log data to Systems and Modules.</summary>
     public List<MappingRuleModel> MappingRules { get; set; } = new();
 
+    /// <summary>
+    /// The last folder path the user browsed to when picking a log file.
+    /// Remembered across sessions so the picker opens in a familiar location.
+    /// </summary>
+    public string LastBrowsedFolder { get; set; } = string.Empty;
+
+    /// <summary>Log file paths configured for live monitoring in this workspace.</summary>
+    public List<string> WatchedLogPaths { get; set; } = new();
+
     /// <summary>The currently active profile, or null if no profiles exist.</summary>
     public ProfileModel? ActiveProfile =>
         Profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? Profiles.FirstOrDefault();

@@ -85,6 +85,15 @@
                 <TextBlock x:Name="ReplayStatusText" VerticalAlignment="Center"
                            Foreground="#556677" FontSize="11" Margin="12,0,0,0"
                            Text="No log loaded"/>
+
+                <!-- Separator between replay and live-watch controls -->
+                <Border Width="1" Margin="6,2" Background="#2A3F5A"/>
+
+                <Button x:Name="WatchLogButton"  Content="📡 Watch…"  Padding="8,3" Click="OnWatchLogClick"  IsEnabled="False"/>
+                <Button x:Name="StopWatchButton" Content="⏹ Stop"     Padding="8,3" Click="OnStopWatchClick" IsEnabled="False"/>
+                <TextBlock x:Name="WatchStatusText" VerticalAlignment="Center"
+                           Foreground="#556677" FontSize="11" Margin="8,0,0,0"
+                           Text="Not watching"/>
               </StackPanel>
             </Border>
 

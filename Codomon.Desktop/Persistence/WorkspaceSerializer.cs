@@ -42,7 +42,9 @@ public static class WorkspaceSerializer
         {
             Name = workspace.WorkspaceName,
             SourceProjectPath = workspace.SourceProjectPath,
-            ActiveProfileId = workspace.ActiveProfileId
+            ActiveProfileId = workspace.ActiveProfileId,
+            LastBrowsedFolder = workspace.LastBrowsedFolder,
+            WatchedLogPaths = new List<string>(workspace.WatchedLogPaths)
         };
         await WriteJsonAsync(Path.Combine(folderPath, WorkspaceFile), workspaceDto);
 
@@ -223,7 +225,8 @@ public static class WorkspaceSerializer
         {
             WorkspaceName = workspaceDto.Name,
             SourceProjectPath = workspaceDto.SourceProjectPath,
-            ActiveProfileId = activeProfileId
+            ActiveProfileId = activeProfileId,
+            LastBrowsedFolder = workspaceDto.LastBrowsedFolder ?? string.Empty
         };
 
         foreach (var p in profiles) workspace.Profiles.Add(p);
@@ -241,6 +244,9 @@ public static class WorkspaceSerializer
             Notes = r.Notes
         }).ToList();
         workspace.MappingRules.AddRange(rules);
+
+        if (workspaceDto.WatchedLogPaths != null)
+            workspace.WatchedLogPaths.AddRange(workspaceDto.WatchedLogPaths);
 
         return workspace;
     }

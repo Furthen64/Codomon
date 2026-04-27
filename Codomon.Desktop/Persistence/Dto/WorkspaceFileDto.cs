@@ -8,6 +8,12 @@ public class WorkspaceFileDto
     public string ActiveProfileId { get; set; } = string.Empty;
     public string ParserSettingsPlaceholder { get; set; } = string.Empty;
     public string LogSourceSettingsPlaceholder { get; set; } = string.Empty;
+
+    /// <summary>Last folder the user browsed to when picking a log file.</summary>
+    public string LastBrowsedFolder { get; set; } = string.Empty;
+
+    /// <summary>Log file paths configured for live monitoring.</summary>
+    public List<string> WatchedLogPaths { get; set; } = new();
 }
 
 public class SystemEntryDto

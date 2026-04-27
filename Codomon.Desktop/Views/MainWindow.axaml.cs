@@ -28,8 +28,17 @@ public partial class MainWindow : Window
     // when a new workspace (and therefore a new LogReplayViewModel) is loaded.
     private LogReplayViewModel? _subscribedReplay;
 
+    // Tracks the LiveMonitorViewModel we have subscribed to.
+    private LiveMonitorViewModel? _subscribedMonitor;
+
     // Timeline control instance; re-created when the workspace changes.
     private TimelineControl? _timelineControl;
+
+    // Tracks whether the log list is currently bound to live-monitor entries.
+    private bool _logListShowingLive;
+
+    // Throttles timeline rebuilds during live monitoring (max once per 2 s).
+    private DateTimeOffset _lastLiveTimelineRebuild = DateTimeOffset.MinValue;
 
     public MainWindow()
     {
@@ -51,6 +60,7 @@ public partial class MainWindow : Window
         _vm.Selection.PropertyChanged += (_, _) => UpdatePropertiesPanel();
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         SubscribeToLogReplay(_vm.LogReplay);
+        SubscribeToLiveMonitor(_vm.LiveMonitor);
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
@@ -69,9 +79,11 @@ public partial class MainWindow : Window
             if (workspaceGrid != null) workspaceGrid.IsVisible = has;
             if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has;
             UpdateWindowTitle();
+            RefreshLiveMonitorPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.Workspace))
         {
+            _logListShowingLive = false;
             SetupCanvas();
             SetupTreeView();
             RefreshProfileComboBox();
@@ -87,6 +99,12 @@ public partial class MainWindow : Window
             // A new workspace was loaded — unsubscribe from the old VM and subscribe to the new one.
             SubscribeToLogReplay(_vm.LogReplay);
             RefreshLogReplayPanel();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.LiveMonitor))
+        {
+            // A new workspace was loaded — re-subscribe to the new live monitor VM.
+            SubscribeToLiveMonitor(_vm.LiveMonitor);
+            RefreshLiveMonitorPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.StatusMessage))
         {
@@ -761,7 +779,9 @@ public partial class MainWindow : Window
         await ExecuteSafeAsync(async () =>
         {
             await _vm.ImportLogsWithOptionsAsync(result.FilePath, result.BuildImportOptions());
+            _logListShowingLive = false;
             RefreshLogReplayPanel();
+            RefreshLiveMonitorPanel();
         });
     }
 
@@ -833,6 +853,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void RefreshLogReplayPanel()
     {
+        // When live monitoring is active, the log list belongs to the live monitor.
+        if (_logListShowingLive) return;
+
         var replay   = _vm.LogReplay;
         var listBox  = this.FindControl<ListBox>("ImportedLogsListBox");
         var playBtn  = this.FindControl<Button>("ReplayPlayButton");
@@ -842,7 +865,7 @@ public partial class MainWindow : Window
 
         bool hasEntries = replay.Entries.Count > 0;
 
-        if (playBtn  != null) playBtn.IsEnabled  = hasEntries;
+        if (playBtn  != null) playBtn.IsEnabled  = hasEntries && !_vm.LiveMonitor.IsWatching;
         if (pauseBtn != null) pauseBtn.IsEnabled = replay.IsPlaying;
         if (stopBtn  != null) stopBtn.IsEnabled  = hasEntries;
 
@@ -902,6 +925,192 @@ public partial class MainWindow : Window
             });
         }
         combo.SelectedIndex = 1;  // 1× default
+    }
+
+    // ── Live log monitoring handlers ──────────────────────────────────────────
+
+    /// <summary>
+    /// Unsubscribes from the previously tracked <see cref="LiveMonitorViewModel"/> (if any)
+    /// and subscribes to <paramref name="monitor"/>.
+    /// </summary>
+    private void SubscribeToLiveMonitor(LiveMonitorViewModel monitor)
+    {
+        if (_subscribedMonitor != null)
+        {
+            _subscribedMonitor.PropertyChanged -= OnLiveMonitorPropertyChanged;
+            _subscribedMonitor.EntryArrived    -= OnLiveEntryArrived;
+            _subscribedMonitor.EntriesFlushed  -= OnLiveEntriesFlushed;
+        }
+        _subscribedMonitor = monitor;
+        _subscribedMonitor.PropertyChanged += OnLiveMonitorPropertyChanged;
+        _subscribedMonitor.EntryArrived    += OnLiveEntryArrived;
+        _subscribedMonitor.EntriesFlushed  += OnLiveEntriesFlushed;
+    }
+
+    private async void OnWatchLogClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before starting live monitoring.");
+            return;
+        }
+
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider == null) return;
+
+        // Start picker in the last-browsed folder when one is remembered.
+        IStorageFolder? suggestedFolder = null;
+        var lastFolder = _vm.Workspace.LastBrowsedFolder;
+        if (!string.IsNullOrEmpty(lastFolder) && System.IO.Directory.Exists(lastFolder))
+        {
+            try
+            {
+                suggestedFolder = await storageProvider.TryGetFolderFromPathAsync(lastFolder);
+            }
+            catch { /* Ignore — fall back to the default starting location. */ }
+        }
+
+        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Log File to Watch",
+            AllowMultiple = false,
+            SuggestedStartLocation = suggestedFolder,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Log files") { Patterns = new[] { "*.log", "*.txt", "*.csv" } },
+                new FilePickerFileType("All files") { Patterns = new[] { "*" } }
+            }
+        });
+
+        if (files.Count == 0) return;
+
+        var filePath = files[0].Path.LocalPath;
+
+        await ExecuteSafeAsync(() =>
+        {
+            _vm.StartLiveMonitoring(filePath);
+            // Switch the log list to show live entries.
+            _logListShowingLive = true;
+            BindLogListToLiveMonitor();
+            RefreshLiveMonitorPanel();
+            return Task.CompletedTask;
+        });
+    }
+
+    private void OnStopWatchClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _vm.StopLiveMonitoring();
+        // Keep the log list on live entries so the user can review what arrived.
+        RefreshLiveMonitorPanel();
+    }
+
+    private void OnLiveMonitorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(LiveMonitorViewModel.IsWatching)
+                           or nameof(LiveMonitorViewModel.ErrorMessage)
+                           or nameof(LiveMonitorViewModel.WatchedFilePath))
+        {
+            RefreshLiveMonitorPanel();
+        }
+    }
+
+    private void OnLiveEntryArrived(LogEntryModel entry)
+    {
+        if (_canvas == null) return;
+
+        var match = LogMatcher.Match(entry, _vm.Workspace);
+
+        if (match.Strength == MatchStrength.ModuleExact &&
+            match.Module != null && match.System != null &&
+            match.Module.IsVisible)
+        {
+            _canvas.HighlightModule(match.Module.Id, match.System.Id);
+        }
+        else if (match.Strength == MatchStrength.SystemOnly &&
+                 match.System != null && match.System.IsVisible)
+        {
+            _canvas.HighlightSystem(match.System.Id);
+        }
+
+        ShowMatchInfo(match);
+    }
+
+    private void OnLiveEntriesFlushed()
+    {
+        // Scroll the log list to the latest entry.
+        var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
+        if (listBox != null && listBox.ItemCount > 0)
+        {
+            var last = listBox.Items[listBox.ItemCount - 1];
+            if (last != null)
+                listBox.ScrollIntoView(last);
+        }
+
+        // Rebuild the timeline at most once every 2 seconds to avoid hammering it.
+        var now = DateTimeOffset.UtcNow;
+        if ((now - _lastLiveTimelineRebuild).TotalSeconds >= 2.0)
+        {
+            _lastLiveTimelineRebuild = now;
+            RebuildLiveTimeline();
+        }
+    }
+
+    private void BindLogListToLiveMonitor()
+    {
+        var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
+        if (listBox == null) return;
+
+        listBox.ItemsSource = null;
+        listBox.ItemTemplate = BuildLogItemTemplate();
+        listBox.ItemsSource = _vm.LiveMonitor.Entries;
+    }
+
+    /// <summary>Synchronises the Watch/Stop button states and status text.</summary>
+    private void RefreshLiveMonitorPanel()
+    {
+        var watchBtn  = this.FindControl<Button>("WatchLogButton");
+        var stopBtn   = this.FindControl<Button>("StopWatchButton");
+        var statusTb  = this.FindControl<TextBlock>("WatchStatusText");
+
+        bool hasWorkspace = _vm.HasWorkspace;
+        bool isWatching   = _vm.LiveMonitor.IsWatching;
+
+        if (watchBtn != null) watchBtn.IsEnabled = hasWorkspace;
+        if (stopBtn  != null) stopBtn.IsEnabled  = isWatching;
+
+        if (statusTb != null)
+        {
+            if (_vm.LiveMonitor.HasError)
+            {
+                statusTb.Text       = $"⚠ {_vm.LiveMonitor.ErrorMessage}";
+                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse("#FF7070"));
+            }
+            else if (isWatching)
+            {
+                statusTb.Text       = $"● {System.IO.Path.GetFileName(_vm.LiveMonitor.WatchedFilePath)}  ({_vm.LiveMonitor.Entries.Count} lines)";
+                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse("#66EE88"));
+            }
+            else if (_logListShowingLive && _vm.LiveMonitor.Entries.Count > 0)
+            {
+                statusTb.Text       = $"Stopped  ({_vm.LiveMonitor.Entries.Count} lines captured)";
+                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse("#778899"));
+            }
+            else
+            {
+                statusTb.Text       = "Not watching";
+                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse("#556677"));
+            }
+        }
+    }
+
+    private async void RebuildLiveTimeline()
+    {
+        if (!_vm.HasWorkspace) return;
+        await _vm.Timeline.BuildAsync(_vm.LiveMonitor.Entries, _vm.Workspace);
     }
 
     // ── Roslyn Scan ───────────────────────────────────────────────────────────
