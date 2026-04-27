@@ -23,6 +23,9 @@ public class WorkspaceModel
     /// <summary>Log file paths configured for live monitoring in this workspace.</summary>
     public List<string> WatchedLogPaths { get; set; } = new();
 
+    /// <summary>LLM API configuration for summary generation.</summary>
+    public LlmSettingsModel LlmSettings { get; set; } = new();
+
     /// <summary>The currently active profile, or null if no profiles exist.</summary>
     public ProfileModel? ActiveProfile =>
         Profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? Profiles.FirstOrDefault();
