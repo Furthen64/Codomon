@@ -12,7 +12,7 @@ namespace Codomon.Desktop.ViewModels;
 /// configurable speed, and raising <see cref="EntryActivated"/> for each replayed line
 /// so the canvas can apply highlights.
 /// </summary>
-public class LogReplayViewModel : INotifyPropertyChanged
+public class LogReplayViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly WorkspaceModel _workspace;
     private DispatcherTimer? _timer;
@@ -145,4 +145,12 @@ public class LogReplayViewModel : INotifyPropertyChanged
 
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    // ── IDisposable ───────────────────────────────────────────────────────────
+
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer = null;
+    }
 }

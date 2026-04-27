@@ -83,6 +83,12 @@ public class TimelineControl : Control
         InvalidateMeasure();
     }
 
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _vm.PropertyChanged -= OnVmPropertyChanged;
+    }
+
     // ── Measure ───────────────────────────────────────────────────────────────
 
     protected override Size MeasureOverride(Size availableSize)

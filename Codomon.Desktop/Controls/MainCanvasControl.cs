@@ -115,6 +115,12 @@ public class MainCanvasControl : Control
         if (changed) InvalidateVisual();
     }
 
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _decayTimer.Stop();
+    }
+
     private static Rect GetModuleAbsoluteBounds(ModuleBoxModel mod, SystemBoxModel sys)
         => new Rect(sys.X + mod.RelativeX, sys.Y + mod.RelativeY, mod.Width, mod.Height);
 

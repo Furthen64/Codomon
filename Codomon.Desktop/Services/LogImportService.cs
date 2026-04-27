@@ -27,7 +27,7 @@ public static class LogImportService
         if (File.Exists(destPath) &&
             !string.Equals(sourcePath, destPath, StringComparison.OrdinalIgnoreCase))
         {
-            var ts  = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var ts  = DateTime.Now.ToString("yyyyMMdd_HHmmssffff");
             var stem = Path.GetFileNameWithoutExtension(fileName);
             var ext  = Path.GetExtension(fileName);
             destPath = Path.Combine(destDir, $"{stem}_{ts}{ext}");

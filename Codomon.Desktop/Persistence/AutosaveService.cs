@@ -21,7 +21,7 @@ public static class AutosaveService
     private const string HashFileName = ".wshash";
     private const string ProfilesFolder = "profiles";
     private const int MaxAutosaves = 10;
-    private const string TimestampFormat = "yyyyMMdd_HHmmss";
+    private const string TimestampFormat = "yyyyMMdd_HHmmssffff";
 
     /// <summary>Root JSON files in the workspace folder that are included in every autosave.</summary>
     private static readonly string[] WorkspaceRootFiles =

@@ -139,7 +139,7 @@ public static class LogMatcher
 
     private static bool PatternMatches(string text, string pattern)
     {
-        if (string.IsNullOrEmpty(pattern) || pattern.Length < 2) return false;
+        if (string.IsNullOrEmpty(pattern)) return false;
         return text.Contains(pattern, StringComparison.OrdinalIgnoreCase);
     }
 
