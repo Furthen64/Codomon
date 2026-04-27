@@ -149,10 +149,11 @@ public static class LlmSummaryService
 
             foreach (var mdFile in Directory.EnumerateFiles(batchDir, "*.md"))
             {
+                var sourcePath = ReadSourcePathFromMetadata(mdFile);
                 entries.Add(new SummaryEntry
                 {
                     SummaryFilePath = mdFile,
-                    SourceRelativePath = SafeNameToRelativePath(Path.GetFileNameWithoutExtension(mdFile)),
+                    SourceRelativePath = sourcePath ?? SafeNameToRelativePath(Path.GetFileNameWithoutExtension(mdFile)),
                     GeneratedAt = ts
                 });
             }
@@ -206,7 +207,10 @@ public static class LlmSummaryService
     {
         var safeName = RelativePathToSafeName(relativeSourcePath) + ".md";
         var filePath = Path.Combine(batchFolder, safeName);
-        await File.WriteAllTextAsync(filePath, content);
+
+        // Prepend a hidden metadata comment so the original path can be recovered when browsing.
+        var fileContent = $"<!-- codomon-source: {relativeSourcePath} -->{Environment.NewLine}{Environment.NewLine}{content}";
+        await File.WriteAllTextAsync(filePath, fileContent);
         return filePath;
     }
 
@@ -267,6 +271,33 @@ public static class LlmSummaryService
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None,
             out result);
+    }
+
+    /// <summary>
+    /// Reads the first line of a summary .md file and extracts the source path from the
+    /// <c>&lt;!-- codomon-source: path --&gt;</c> metadata comment written by
+    /// <see cref="WriteSummaryFileAsync"/>.
+    /// Returns <c>null</c> if the metadata comment is absent (e.g. files written externally).
+    /// </summary>
+    private static string? ReadSourcePathFromMetadata(string mdFilePath)
+    {
+        try
+        {
+            using var reader = new StreamReader(mdFilePath);
+            var firstLine = reader.ReadLine();
+            if (firstLine == null) return null;
+
+            const string prefix = "<!-- codomon-source: ";
+            const string suffix = " -->";
+            if (firstLine.StartsWith(prefix, StringComparison.Ordinal) &&
+                firstLine.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                return firstLine[prefix.Length..^suffix.Length];
+            }
+        }
+        catch { /* Ignore — fall back to name-based display path. */ }
+
+        return null;
     }
 
     // ── OpenAI-compatible JSON DTOs ───────────────────────────────────────────
