@@ -1,3 +1,4 @@
+using Codomon.Desktop.Models;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -36,28 +37,43 @@ public static class LlmSummaryService
         string apiEndpoint,
         CancellationToken cancellationToken = default)
     {
+        var url = BuildModelsUrl(apiEndpoint);
+        AppLogger.Debug($"[LLM] FetchModels → GET {url}");
         try
         {
-            var url = BuildModelsUrl(apiEndpoint);
             using var response = await Http.GetAsync(url, cancellationToken);
+            AppLogger.Debug($"[LLM] FetchModels ← {(int)response.StatusCode} {response.ReasonPhrase}");
             if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                var snippet = body.Length > 300 ? body[..300] + "…" : body;
+                AppLogger.Warn($"[LLM] FetchModels non-success body: {snippet}");
                 return new List<string>();
+            }
 
             var result = await response.Content.ReadFromJsonAsync<ModelsResponse>(JsonOptions, cancellationToken);
-            return result?.Data?
+            var models = result?.Data?
                 .Select(m => m.Id)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .Select(id => id!)
                 .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
                 .ToList()
                 ?? new List<string>();
+
+            var modelPreview = models.Count > 10
+                ? string.Join(", ", models.Take(10)) + $"… and {models.Count - 10} more"
+                : string.Join(", ", models);
+            AppLogger.Debug($"[LLM] FetchModels found {models.Count} model(s): {modelPreview}");
+            return models;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce)
         {
+            AppLogger.Warn($"[LLM] FetchModels cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
             throw;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Error($"[LLM] FetchModels exception: {ex.GetType().Name}: {ex.Message}");
             return new List<string>();
         }
     }
@@ -71,9 +87,10 @@ public static class LlmSummaryService
         string modelName,
         CancellationToken cancellationToken = default)
     {
+        var url = BuildChatCompletionsUrl(apiEndpoint);
+        AppLogger.Debug($"[LLM] TestConnection → POST {url}  model={modelName}");
         try
         {
-            var url = BuildChatCompletionsUrl(apiEndpoint);
             var payload = new ChatRequest
             {
                 Model = modelName,
@@ -82,20 +99,30 @@ public static class LlmSummaryService
             };
 
             using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
+            AppLogger.Debug($"[LLM] TestConnection ← {(int)response.StatusCode} {response.ReasonPhrase}");
             if (response.IsSuccessStatusCode)
-                return (true, $"Connected successfully ({(int)response.StatusCode} {response.ReasonPhrase}).");
+            {
+                var msg = $"Connected successfully ({(int)response.StatusCode} {response.ReasonPhrase}).";
+                AppLogger.Info($"[LLM] TestConnection OK: {msg}");
+                return (true, msg);
+            }
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             var snippet = body.Length > 200 ? body[..200] + "…" : body;
-            return (false, $"Server returned {(int)response.StatusCode} {response.ReasonPhrase}: {snippet}");
+            var errMsg = $"Server returned {(int)response.StatusCode} {response.ReasonPhrase}: {snippet}";
+            AppLogger.Warn($"[LLM] TestConnection failed: {errMsg}");
+            return (false, errMsg);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce)
         {
+            AppLogger.Warn($"[LLM] TestConnection cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
             throw;
         }
         catch (Exception ex)
         {
-            return (false, $"Connection failed: {ex.Message}");
+            var errMsg = $"Connection failed: {ex.Message}";
+            AppLogger.Error($"[LLM] TestConnection exception: {ex.GetType().Name}: {ex.Message}");
+            return (false, errMsg);
         }
     }
 
@@ -115,17 +142,23 @@ public static class LlmSummaryService
         string searchRoot,
         CancellationToken cancellationToken = default)
     {
+        var relPath = Path.GetRelativePath(searchRoot, sourceFilePath);
+        AppLogger.Debug($"[LLM] GenerateSummary start: {relPath}  model={modelName}");
+
         // Build prompt from workspace template.
         var promptTemplate = await LoadPromptTemplateAsync(workspaceFolderPath);
         var sourceCode = await File.ReadAllTextAsync(sourceFilePath, cancellationToken);
-        var relPath = Path.GetRelativePath(searchRoot, sourceFilePath);
 
         var prompt = promptTemplate
             .Replace("{FilePath}", relPath)
             .Replace("{SourceCode}", sourceCode);
 
+        AppLogger.Debug($"[LLM] Prompt ready: template={promptTemplate.Length} chars, sourceCode={sourceCode.Length} chars, totalPrompt={prompt.Length} chars");
+
         // Call the LLM.
         var summary = await CallLlmAsync(apiEndpoint, modelName, prompt, cancellationToken);
+
+        AppLogger.Debug($"[LLM] GenerateSummary complete: {relPath}  summary={summary.Length} chars");
 
         // Remove any previous summary for this file, then save new one.
         DeleteExistingSummary(workspaceFolderPath, relPath);
@@ -210,28 +243,50 @@ public static class LlmSummaryService
         CancellationToken cancellationToken)
     {
         var url = BuildChatCompletionsUrl(apiEndpoint);
+        AppLogger.Debug($"[LLM] CallLlm → POST {url}  model={modelName}  promptLength={prompt.Length}");
+
         var payload = new ChatRequest
         {
             Model = modelName,
             Messages = new[] { new ChatMessage { Role = "user", Content = prompt } }
         };
 
-        using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException(
-                $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+            using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
+            AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                var snippet = body.Length > 500 ? body[..500] + "…" : body;
+                AppLogger.Error($"[LLM] CallLlm error body: {snippet}");
+                throw new InvalidOperationException(
+                    $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
+                ?? throw new InvalidOperationException("LLM API returned an empty response.");
+
+            var firstChoice = result.Choices?.FirstOrDefault();
+            var finishReason = firstChoice?.FinishReason ?? "(null)";
+            var content = firstChoice?.Message?.Content;
+
+            AppLogger.Debug($"[LLM] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}");
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                AppLogger.Warn($"[LLM] CallLlm: response content is empty. finish_reason={finishReason}");
+                throw new InvalidOperationException("LLM API returned a response with empty content.");
+            }
+
+            return content;
         }
-
-        var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
-            ?? throw new InvalidOperationException("LLM API returned an empty response.");
-
-        var content = result.Choices?.FirstOrDefault()?.Message?.Content;
-        if (string.IsNullOrWhiteSpace(content))
-            throw new InvalidOperationException("LLM API returned a response with empty content.");
-
-        return content;
+        catch (OperationCanceledException oce)
+        {
+            AppLogger.Warn($"[LLM] CallLlm cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}. HttpClient timeout={Http.Timeout}");
+            throw;
+        }
     }
 
     private static async Task<string> WriteSummaryFileAsync(
@@ -378,6 +433,9 @@ public static class LlmSummaryService
     {
         [JsonPropertyName("message")]
         public ChatMessage? Message { get; set; }
+
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
     }
 
     private sealed class ModelsResponse
