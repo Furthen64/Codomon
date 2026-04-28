@@ -60,7 +60,7 @@ public partial class DevConsoleWindow : Window
                 !entry.Formatted.ToLowerInvariant().Contains(filterLower))
                 continue;
 
-            var tb = new TextBlock
+            var tb = new SelectableTextBlock
             {
                 Text = entry.Formatted,
                 FontFamily = new FontFamily("Monospace"),
