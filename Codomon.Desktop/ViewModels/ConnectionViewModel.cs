@@ -6,26 +6,29 @@ namespace Codomon.Desktop.ViewModels;
 
 public class ConnectionViewModel : INotifyPropertyChanged
 {
-    private readonly NodeViewModel _sourceNode;
-    private readonly NodeViewModel _targetNode;
+    private readonly ConnectorViewModel _source;
+    private readonly ConnectorViewModel _target;
 
-    public ConnectionViewModel(NodeViewModel source, NodeViewModel target)
+    public ConnectionViewModel(ConnectorViewModel source, ConnectorViewModel target)
     {
-        _sourceNode = source;
-        _targetNode = target;
+        _source = source;
+        _target = target;
 
-        _sourceNode.PropertyChanged += OnNodePropertyChanged;
-        _targetNode.PropertyChanged += OnNodePropertyChanged;
+        _source.PropertyChanged += OnConnectorPropertyChanged;
+        _target.PropertyChanged += OnConnectorPropertyChanged;
     }
 
-    public Point Source => _sourceNode.Location;
-    public Point Target => _targetNode.Location;
+    /// <summary>Canvas position of the source (output) connector.</summary>
+    public Point Source => _source.Anchor;
 
-    private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    /// <summary>Canvas position of the target (input) connector.</summary>
+    public Point Target => _target.Anchor;
+
+    private void OnConnectorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(NodeViewModel.Location))
+        if (e.PropertyName == nameof(ConnectorViewModel.Anchor))
         {
-            if (ReferenceEquals(sender, _sourceNode))
+            if (ReferenceEquals(sender, _source))
                 OnPropertyChanged(nameof(Source));
             else
                 OnPropertyChanged(nameof(Target));
