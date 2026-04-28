@@ -125,6 +125,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
     {
         if (IsTestingConnection) return;
 
+        AppLogger.Debug($"[LLM] TestConnection starting: endpoint={ApiEndpoint}  model={ModelName}");
         IsTestingConnection = true;
         ConnectionStatus = "Testing…";
         ConnectionOk = false;
@@ -135,6 +136,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                 ApiEndpoint, ModelName, CancellationToken.None);
             ConnectionOk = ok;
             ConnectionStatus = msg;
+            AppLogger.Debug($"[LLM] TestConnection result: ok={ok}  msg={msg}");
         }
         finally
         {
@@ -244,6 +246,8 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
         SaveSettings();
 
+        AppLogger.Info($"[LLM] GenerateSummaries starting: {selected.Count} file(s)  endpoint={ApiEndpoint}  model={ModelName}");
+
         IsGenerating = true;
         ProgressMessages.Clear();
         StatusMessage = "Generating summaries…";
@@ -267,6 +271,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
             {
                 ct.ThrowIfCancellationRequested();
 
+                AppLogger.Debug($"[LLM] Processing [{done + 1}/{selected.Count}]: {file.RelativePath}");
                 ReportProgress($"[{done + 1}/{selected.Count}] {file.RelativePath}");
 
                 try
@@ -277,6 +282,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                         file.FullPath, searchRoot, ct);
 
                     done++;
+                    AppLogger.Debug($"[LLM] Done [{done}/{selected.Count}]: {file.RelativePath}");
                     ReportProgress($"  ✔ Done");
                 }
                 catch (OperationCanceledException)
@@ -287,21 +293,23 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                 {
                     var msg = $"  ✖ Failed: {ex.Message}";
                     ReportProgress(msg);
-                    Models.AppLogger.Error($"LLM summary failed for {file.RelativePath}: {ex.Message}");
+                    AppLogger.Error($"[LLM] GenerateSummaries file failed: {file.RelativePath}  {ex.GetType().Name}: {ex.Message}");
                     // Requirement: stop batching on failure.
                     StatusMessage = $"Generation stopped after failure on {file.RelativePath}.";
                     return;
                 }
             }
 
+            AppLogger.Info($"[LLM] GenerateSummaries completed: {done} file(s) summarised.");
             StatusMessage = $"Done — {done} summary(s) generated.";
             ReportProgress($"Completed: {done} file(s) summarised.");
 
             // Refresh the browse list.
             RefreshSummaries();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce)
         {
+            AppLogger.Warn($"[LLM] GenerateSummaries cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
             ReportProgress("Generation cancelled.");
             StatusMessage = "Cancelled.";
         }
