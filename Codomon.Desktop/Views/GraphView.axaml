@@ -18,14 +18,16 @@
           <!-- Each input connector rendered as a NodeInput on the left -->
           <nodify:Node.InputConnectorTemplate>
             <DataTemplate x:DataType="vm:ConnectorViewModel">
-              <nodify:NodeInput Anchor="{Binding Anchor, Mode=OneWayToSource}" />
+              <nodify:NodeInput Anchor="{Binding Anchor, Mode=OneWayToSource}"
+                                IsConnected="{Binding IsConnected}" />
             </DataTemplate>
           </nodify:Node.InputConnectorTemplate>
 
           <!-- Each output connector rendered as a NodeOutput on the right -->
           <nodify:Node.OutputConnectorTemplate>
             <DataTemplate x:DataType="vm:ConnectorViewModel">
-              <nodify:NodeOutput Anchor="{Binding Anchor, Mode=OneWayToSource}" />
+              <nodify:NodeOutput Anchor="{Binding Anchor, Mode=OneWayToSource}"
+                                 IsConnected="{Binding IsConnected}" />
             </DataTemplate>
           </nodify:Node.OutputConnectorTemplate>
 
