@@ -297,6 +297,10 @@ public static class LlmSummaryService
         var safeName = RelativePathToSafeName(relativeSourcePath) + ".md";
         var filePath = Path.Combine(batchFolder, safeName);
 
+        // Ensure the batch folder exists — DeleteExistingSummary may have removed it if it was
+        // still empty (no previous summaries had been written to it yet).
+        Directory.CreateDirectory(batchFolder);
+
         // Prepend a hidden metadata comment so the original path can be recovered when browsing.
         var fileContent = $"<!-- codomon-source: {relativeSourcePath} -->{Environment.NewLine}{Environment.NewLine}{content}";
         await File.WriteAllTextAsync(filePath, fileContent);
