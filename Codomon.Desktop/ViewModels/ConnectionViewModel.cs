@@ -6,19 +6,30 @@ namespace Codomon.Desktop.ViewModels;
 
 public class ConnectionViewModel : INotifyPropertyChanged
 {
-    private Point _source;
-    private Point _target;
+    private readonly NodeViewModel _sourceNode;
+    private readonly NodeViewModel _targetNode;
 
-    public Point Source
+    public ConnectionViewModel(NodeViewModel source, NodeViewModel target)
     {
-        get => _source;
-        set { _source = value; OnPropertyChanged(); }
+        _sourceNode = source;
+        _targetNode = target;
+
+        _sourceNode.PropertyChanged += OnNodePropertyChanged;
+        _targetNode.PropertyChanged += OnNodePropertyChanged;
     }
 
-    public Point Target
+    public Point Source => _sourceNode.Location;
+    public Point Target => _targetNode.Location;
+
+    private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        get => _target;
-        set { _target = value; OnPropertyChanged(); }
+        if (e.PropertyName == nameof(NodeViewModel.Location))
+        {
+            if (ReferenceEquals(sender, _sourceNode))
+                OnPropertyChanged(nameof(Source));
+            else
+                OnPropertyChanged(nameof(Target));
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
