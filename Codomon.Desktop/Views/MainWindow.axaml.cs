@@ -124,7 +124,7 @@ public partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.ActiveProfileId))
         {
             SyncProfileComboBoxSelection();
-            _canvas?.InvalidateVisual();
+            // TODO (Phase 02): notify the Nodify graph to refresh when the profile changes.
             RebuildTimeline();
         }
     }
@@ -1410,9 +1410,9 @@ public partial class MainWindow : Window
 
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
-            host.Content = _canvas;
+            host.Content = _canvas.CreatePlaceholderView();
 
-        AppLogger.Debug("Canvas initialized");
+        AppLogger.Debug("Canvas placeholder initialized");
     }
 
     // ── Timeline ──────────────────────────────────────────────────────────────
