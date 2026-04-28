@@ -24,7 +24,7 @@ public static class LlmSummaryService
     // Shared HttpClient — intentionally not disposed (static lifetime).
     private static readonly HttpClient Http = new()
     {
-        Timeout = TimeSpan.FromSeconds(120)
+        Timeout = TimeSpan.FromMinutes(30)
     };
 
     // ── Connection test ───────────────────────────────────────────────────────
