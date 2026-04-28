@@ -29,8 +29,18 @@ public class GraphViewModel
         // ConnectorViewModel.Anchor is updated by the NodeOutput/NodeInput Connector controls
         // in the view (via OneWayToSource binding), then ConnectionViewModel reacts to those
         // anchor changes so the bezier curves track nodes as they are dragged.
-        Connections.Add(new ConnectionViewModel(app.OutputConnector,                 mainWindowViewModel.InputConnector));
-        Connections.Add(new ConnectionViewModel(mainWindowViewModel.OutputConnector, roslynScanner.InputConnector));
-        Connections.Add(new ConnectionViewModel(roslynScanner.OutputConnector,       workspaceService.InputConnector));
+        //
+        // IsConnected must be true on each connector so that Nodify's UpdateAnchorOptimized
+        // recalculates the anchor when the parent node is moved (it is a no-op when false).
+        Connect(app.OutputConnector,                 mainWindowViewModel.InputConnector);
+        Connect(mainWindowViewModel.OutputConnector, roslynScanner.InputConnector);
+        Connect(roslynScanner.OutputConnector,       workspaceService.InputConnector);
+    }
+
+    private void Connect(ConnectorViewModel source, ConnectorViewModel target)
+    {
+        source.IsConnected = true;
+        target.IsConnected = true;
+        Connections.Add(new ConnectionViewModel(source, target));
     }
 }

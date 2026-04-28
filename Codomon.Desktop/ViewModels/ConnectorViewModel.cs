@@ -7,6 +7,7 @@ namespace Codomon.Desktop.ViewModels;
 public class ConnectorViewModel : INotifyPropertyChanged
 {
     private Point _anchor;
+    private bool _isConnected;
 
     /// <summary>
     /// The canvas position of this connector.
@@ -17,6 +18,18 @@ public class ConnectorViewModel : INotifyPropertyChanged
     {
         get => _anchor;
         set { _anchor = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Whether this connector is part of an active connection.
+    /// Must be <c>true</c> so Nodify's <see cref="Nodify.Connector.UpdateAnchorOptimized"/>
+    /// recalculates the anchor when the parent node is moved.
+    /// Bind to <see cref="Nodify.Connector.IsConnected"/>.
+    /// </summary>
+    public bool IsConnected
+    {
+        get => _isConnected;
+        set { _isConnected = value; OnPropertyChanged(); }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
