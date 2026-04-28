@@ -1408,11 +1408,16 @@ public partial class MainWindow : Window
         _canvas = new MainCanvasControl(_vm.Workspace, _vm.Selection);
         _canvas.OnLayoutChanged = () => _vm.IsDirty = true;
 
+        var graphView = new GraphView
+        {
+            DataContext = new GraphViewModel()
+        };
+
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
-            host.Content = _canvas.CreatePlaceholderView();
+            host.Content = graphView;
 
-        AppLogger.Debug("Canvas placeholder initialized");
+        AppLogger.Debug("Graph canvas (Nodify) initialized");
     }
 
     // ── Timeline ──────────────────────────────────────────────────────────────

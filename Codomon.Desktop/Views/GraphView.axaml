@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:nodify="https://miroiu.github.io/nodify"
+             xmlns:vm="clr-namespace:Codomon.Desktop.ViewModels"
+             x:Class="Codomon.Desktop.Views.GraphView"
+             x:DataType="vm:GraphViewModel">
+
+  <nodify:NodifyEditor ItemsSource="{Binding Nodes}"
+                       Connections="{Binding Connections}">
+
+    <!-- Node template -->
+    <nodify:NodifyEditor.ItemTemplate>
+      <DataTemplate x:DataType="vm:NodeViewModel">
+        <nodify:Node Header="{Binding Title}" />
+      </DataTemplate>
+    </nodify:NodifyEditor.ItemTemplate>
+
+    <!-- Position each ItemContainer at the node's Location.
+         ReflectionBinding is used because ControlTheme bindings cannot resolve
+         the DataContext type statically when compiled bindings are enabled globally. -->
+    <nodify:NodifyEditor.ItemContainerTheme>
+      <ControlTheme TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
+        <Setter Property="Location" Value="{ReflectionBinding Location}" />
+      </ControlTheme>
+    </nodify:NodifyEditor.ItemContainerTheme>
+
+    <!-- Connection template -->
+    <nodify:NodifyEditor.ConnectionTemplate>
+      <DataTemplate x:DataType="vm:ConnectionViewModel">
+        <nodify:LineConnection Source="{Binding Source}"
+                               Target="{Binding Target}" />
+      </DataTemplate>
+    </nodify:NodifyEditor.ConnectionTemplate>
+
+  </nodify:NodifyEditor>
+
+</UserControl>
