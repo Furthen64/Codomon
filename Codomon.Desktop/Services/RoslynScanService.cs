@@ -214,16 +214,12 @@ public static class RoslynScanService
         var simpleToFull = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var cls in files.SelectMany(f => f.Classes))
         {
-            if (!simpleToFull.TryGetValue(cls.SimpleName, out var list))
-            {
-                list = new List<string>();
-                simpleToFull[cls.SimpleName] = list;
-            }
-            list.Add(cls.FullName);
+            simpleToFull.TryAdd(cls.SimpleName, new List<string>());
+            simpleToFull[cls.SimpleName].Add(cls.FullName);
         }
 
         // Aggregate call counts: (callerClass, calleeClass) → (count, callSites)
-        var callMap = new Dictionary<(string, string), (int Count, List<string> Sites)>(
+        var callMap = new Dictionary<(string, string), (int Count, HashSet<string> Sites)>(
             EqualityComparer<(string, string)>.Default);
 
         foreach (var file in files)
@@ -245,11 +241,10 @@ public static class RoslynScanService
                             var callSite = $"{cls.FullName}.{method.Name}";
                             if (!callMap.TryGetValue(key, out var entry))
                             {
-                                callMap[key] = (1, new List<string> { callSite });
+                                callMap[key] = (1, new HashSet<string>(StringComparer.Ordinal) { callSite });
                             }
-                            else if (entry.Sites.Count < 10 && !entry.Sites.Contains(callSite))
+                            else if (entry.Sites.Count < 10 && entry.Sites.Add(callSite))
                             {
-                                entry.Sites.Add(callSite);
                                 callMap[key] = (entry.Count + 1, entry.Sites);
                             }
                             // When the call site is a duplicate or the sites list is full,
@@ -268,7 +263,7 @@ public static class RoslynScanService
                 FromClass = kvp.Key.Item1,
                 ToClass = kvp.Key.Item2,
                 CallCount = kvp.Value.Count,
-                CallSites = kvp.Value.Sites
+                CallSites = kvp.Value.Sites.ToList()
             })
             .OrderByDescending(c => c.CallCount)
             .ToList();
