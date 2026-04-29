@@ -1138,22 +1138,32 @@ public partial class MainWindow : Window
         var result = await dialog.ShowDialog<ViewModels.RoslynScanViewModel?>(this);
 
         AppLogger.Debug($"[Roslyn] Dialog closed. result={(result == null ? "null (unexpected — dialog may have been cancelled before the X-button fix applied)" : "RoslynScanViewModel")}  " +
-                        $"PromotedConnections={(result?.PromotedConnections.Count.ToString() ?? "n/a")}");
+                        $"PromotedConnections={(result?.PromotedConnections.Count.ToString() ?? "n/a")}  " +
+                        $"WasAddedToCanvas={(result?.WasAddedToCanvas.ToString() ?? "n/a")}");
 
-        if (result == null || result.PromotedConnections.Count == 0)
+        if (result == null || (result.PromotedConnections.Count == 0 && !result.WasAddedToCanvas))
         {
-            AppLogger.Debug("[Roslyn] No promoted connections — canvas not updated.");
+            AppLogger.Debug("[Roslyn] No promoted connections and canvas was not modified — canvas not updated.");
             return;
         }
 
         await ExecuteSafeAsync(() =>
         {
-            AppLogger.Debug($"[Roslyn] Calling AddRoslynConnections with {result.PromotedConnections.Count} connection(s).");
-            _vm.AddRoslynConnections(result.PromotedConnections);
-            RefreshRoslynConnectionsPanel();
+            if (result.PromotedConnections.Count > 0)
+            {
+                AppLogger.Debug($"[Roslyn] Calling AddRoslynConnections with {result.PromotedConnections.Count} connection(s).");
+                _vm.AddRoslynConnections(result.PromotedConnections);
+                RefreshRoslynConnectionsPanel();
+            }
+            else
+            {
+                // Systems were added via "Add all to Canvas" but no connections were promoted
+                // (e.g. scan found no inter-class relationships). Still mark dirty.
+                _vm.IsDirty = true;
+            }
             AppLogger.Debug($"[Roslyn] Calling GraphViewModel.Refresh. _graphVm is {(_graphVm == null ? "null — canvas will NOT update!" : "set")}.");
             _graphVm?.Refresh(_vm.Workspace);
-            AppLogger.Debug("[Roslyn] GraphViewModel.Refresh complete. Canvas should now reflect promoted connections.");
+            AppLogger.Debug("[Roslyn] GraphViewModel.Refresh complete. Canvas should now reflect all added entities.");
             return Task.CompletedTask;
         });
     }

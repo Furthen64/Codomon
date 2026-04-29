@@ -46,6 +46,11 @@
           <Button x:Name="ViewResultsButton" Content="Browse Results →"
                   Click="OnViewResultsClick"
                   Padding="16,6" IsVisible="False"/>
+          <Button x:Name="AddAllToCanvasButton" Content="🗺 Add all to Canvas"
+                  Click="OnAddAllToCanvasClick"
+                  Padding="20,8" FontSize="14" FontWeight="SemiBold"
+                  Background="#1E6A3E" Foreground="White"
+                  IsVisible="False"/>
         </StackPanel>
       </DockPanel>
     </Border>
