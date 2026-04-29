@@ -96,22 +96,26 @@ public class GraphViewModel
     }
 
     /// <summary>
-    /// Arranges all nodes in a left-to-right row using a topological order derived from
-    /// the graph edges. Nodes in cycles or with no edges appear after the ordered nodes.
+    /// Arranges all nodes using a layered (hierarchical) layout: nodes are grouped into
+    /// columns by their longest-path depth in the DAG, and stacked vertically within each
+    /// column. Nodes in cycles or with no edges are placed in a final column.
     /// </summary>
     public void AutoAlign()
     {
-        const double startX     = 80;
-        const double startY     = 200;
-        const double columnGap  = 220;
+        const double startX    = 80;
+        const double startY    = 80;
+        const double columnGap = 220;
+        const double rowGap    = 120;
 
-        var order = TopologicalOrder();
+        var layers = ComputeLayers();
 
-        double x = startX;
-        foreach (var node in order)
+        for (int col = 0; col < layers.Count; col++)
         {
-            node.Location = new Point(x, startY);
-            x += columnGap;
+            var layer = layers[col];
+            double x = startX + col * columnGap;
+
+            for (int row = 0; row < layer.Count; row++)
+                layer[row].Location = new Point(x, startY + row * rowGap);
         }
     }
 
@@ -136,8 +140,12 @@ public class GraphViewModel
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    /// <summary>Returns nodes in topological (Kahn's BFS) order; remaining cycle nodes appended last.</summary>
-    private List<NodeViewModel> TopologicalOrder()
+    /// <summary>
+    /// Groups nodes into layers by their longest-path depth in the DAG (Kahn's BFS).
+    /// Nodes at depth 0 are roots; each subsequent layer is one step further from the roots.
+    /// Nodes that are part of cycles are collected into a final layer.
+    /// </summary>
+    private List<List<NodeViewModel>> ComputeLayers()
     {
         var successors = Nodes.ToDictionary(n => n, _ => new List<NodeViewModel>());
         var inDegree   = Nodes.ToDictionary(n => n, _ => 0);
@@ -151,25 +159,44 @@ public class GraphViewModel
             }
         }
 
-        var queue  = new Queue<NodeViewModel>(Nodes.Where(n => inDegree[n] == 0));
-        var result  = new List<NodeViewModel>(Nodes.Count);
-        var inResult = new HashSet<NodeViewModel>(Nodes.Count);
+        // Assign each node its depth = longest path from any root.
+        var depth   = Nodes.ToDictionary(n => n, _ => 0);
+        var queue   = new Queue<NodeViewModel>(Nodes.Where(n => inDegree[n] == 0));
+        var visited = new HashSet<NodeViewModel>(Nodes.Count);
 
         while (queue.Count > 0)
         {
             var node = queue.Dequeue();
-            result.Add(node);
-            inResult.Add(node);
+            if (!visited.Add(node)) continue;
+
             foreach (var succ in successors[node])
+            {
+                if (depth[succ] < depth[node] + 1)
+                    depth[succ] = depth[node] + 1;
                 if (--inDegree[succ] == 0)
                     queue.Enqueue(succ);
+            }
         }
 
-        // Append any remaining nodes that are part of cycles.
+        // Collect cycle nodes (never dequeued) into a layer after all acyclic nodes.
+        int maxDepth   = visited.Count > 0 ? visited.Max(n => depth[n]) : 0;
+        int cycleDepth = maxDepth + 1;
+        bool hasCycles = false;
         foreach (var node in Nodes)
-            if (!inResult.Contains(node))
-                result.Add(node);
+        {
+            if (!visited.Contains(node))
+            {
+                depth[node] = cycleDepth;
+                hasCycles   = true;
+            }
+        }
 
-        return result;
+        int numLayers = (hasCycles ? cycleDepth : maxDepth) + 1;
+        var layers    = Enumerable.Range(0, numLayers).Select(_ => new List<NodeViewModel>()).ToList();
+
+        foreach (var node in Nodes)
+            layers[depth[node]].Add(node);
+
+        return layers;
     }
 }
