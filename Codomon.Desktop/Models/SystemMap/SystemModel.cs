@@ -13,13 +13,29 @@ public class SystemModel
     public string Name { get; set; } = string.Empty;
 
     /// <summary>The kind of deployable unit this system represents.</summary>
-    public SystemKind Kind { get; set; } = SystemKind.Other;
+    public SystemKind Kind { get; set; } = SystemKind.Unknown;
 
     /// <summary>Optional human-provided notes.</summary>
     public string Notes { get; set; } = string.Empty;
 
     /// <summary>Confidence that this system has been correctly identified and scoped.</summary>
     public ConfidenceLevel Confidence { get; set; } = ConfidenceLevel.Unknown;
+
+    /// <summary>
+    /// How this system starts, e.g. "ASP.NET Core", "Generic Host", "Windows Service",
+    /// "WPF Application", "Avalonia Application", or "Class Library".
+    /// Empty when the startup mechanism has not been determined.
+    /// </summary>
+    public string StartupMechanism { get; set; } = string.Empty;
+
+    /// <summary>Relative paths to known entry-point files (Program.cs, App.xaml, etc.).</summary>
+    public List<string> EntryPointCandidates { get; set; } = new();
+
+    /// <summary>Relative paths to configuration files (appsettings.json, etc.).</summary>
+    public List<string> ConfigFileCandidates { get; set; } = new();
+
+    /// <summary>Relative paths to logging configuration files (NLog.config, etc.).</summary>
+    public List<string> LogFileCandidates { get; set; } = new();
 
     /// <summary>Functional modules that belong to this system.</summary>
     public List<ModuleModel> Modules { get; set; } = new();
