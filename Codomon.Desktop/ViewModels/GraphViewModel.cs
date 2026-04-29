@@ -86,12 +86,14 @@ public class GraphViewModel
         }
 
         var queue  = new Queue<NodeViewModel>(Nodes.Where(n => inDegree[n] == 0));
-        var result = new List<NodeViewModel>(Nodes.Count);
+        var result  = new List<NodeViewModel>(Nodes.Count);
+        var inResult = new HashSet<NodeViewModel>(Nodes.Count);
 
         while (queue.Count > 0)
         {
             var node = queue.Dequeue();
             result.Add(node);
+            inResult.Add(node);
             foreach (var succ in successors[node])
                 if (--inDegree[succ] == 0)
                     queue.Enqueue(succ);
@@ -99,7 +101,7 @@ public class GraphViewModel
 
         // Append any remaining nodes that are part of cycles.
         foreach (var node in Nodes)
-            if (!result.Contains(node))
+            if (!inResult.Contains(node))
                 result.Add(node);
 
         return result;
