@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Codomon.Desktop.Models.SystemMap;
 
 namespace Codomon.Desktop.Models;
 
@@ -25,6 +26,12 @@ public class WorkspaceModel
 
     /// <summary>LLM API configuration for summary generation.</summary>
     public LlmSettingsModel LlmSettings { get; set; } = new();
+
+    /// <summary>
+    /// Codomon's interpreted model of the whole codebase hierarchy: Systems, Modules,
+    /// Code Nodes, External Systems, Relationships, and Manual Overrides.
+    /// </summary>
+    public SystemMapModel SystemMap { get; set; } = new();
 
     /// <summary>The currently active profile, or null if no profiles exist.</summary>
     public ProfileModel? ActiveProfile =>
