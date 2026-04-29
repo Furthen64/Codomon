@@ -99,15 +99,19 @@ public class GraphViewModel
     /// Arranges all nodes using a layered (hierarchical) layout: nodes are grouped into
     /// columns by their longest-path depth in the DAG, and stacked vertically within each
     /// column. Nodes in cycles or with no edges are placed in a final column.
+    /// A second pass then promotes hub nodes (many incoming connections) and their
+    /// dedicated callers to new columns on the right to reduce visual clutter.
     /// </summary>
     public void AutoAlign()
     {
-        const double startX    = 80;
-        const double startY    = 80;
-        const double columnGap = 220;
-        const double rowGap    = 120;
+        const double startX       = 80;
+        const double startY       = 80;
+        const double columnGap    = 220;
+        const double rowGap       = 120;
+        const int    hubThreshold = 3;
 
         var layers = ComputeLayers();
+        PromoteHubs(layers, hubThreshold);
 
         for (int col = 0; col < layers.Count; col++)
         {
@@ -117,6 +121,47 @@ public class GraphViewModel
             for (int row = 0; row < layer.Count; row++)
                 layer[row].Location = new Point(x, startY + row * rowGap);
         }
+    }
+
+    /// <summary>
+    /// Second-pass heuristic: hub nodes (in-degree &gt;= <paramref name="hubThreshold"/>)
+    /// are moved to a new rightmost column, and any node whose every successor is a hub
+    /// ("dedicated callers") is moved to the column just before the hub column.
+    /// This reduces clutter when many nodes all converge on a single target.
+    /// </summary>
+    private void PromoteHubs(List<List<NodeViewModel>> layers, int hubThreshold)
+    {
+        var inDegree   = Nodes.ToDictionary(n => n, _ => 0);
+        var successors = Nodes.ToDictionary(n => n, _ => new List<NodeViewModel>());
+
+        foreach (var (from, to) in _nodeEdges)
+        {
+            if (inDegree.ContainsKey(to) && successors.ContainsKey(from))
+            {
+                inDegree[to]++;
+                successors[from].Add(to);
+            }
+        }
+
+        var hubs = new HashSet<NodeViewModel>(Nodes.Where(n => inDegree[n] >= hubThreshold));
+        if (hubs.Count == 0) return;
+
+        // Dedicated callers: nodes outside the hub set whose every outgoing edge leads to a hub.
+        var dedicatedCallers = Nodes
+            .Where(n => !hubs.Contains(n)
+                     && successors[n].Count > 0
+                     && successors[n].All(s => hubs.Contains(s)))
+            .ToList();
+
+        // Remove promoted nodes from their original layers.
+        var promoted = new HashSet<NodeViewModel>(hubs.Concat(dedicatedCallers));
+        foreach (var layer in layers)
+            layer.RemoveAll(promoted.Contains);
+
+        // Append: dedicated callers layer (if any), then the hub layer.
+        if (dedicatedCallers.Count > 0)
+            layers.Add(dedicatedCallers);
+        layers.Add(hubs.ToList());
     }
 
     /// <summary>
