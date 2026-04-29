@@ -1,0 +1,28 @@
+namespace Codomon.Desktop.Models.SystemMap;
+
+/// <summary>
+/// A meaningful functional building block used by one or more Systems.
+/// </summary>
+public class ModuleModel
+{
+    /// <summary>Unique identifier for this module.</summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    /// <summary>Display name.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The functional role this module fulfils.</summary>
+    public ModuleKind Kind { get; set; } = ModuleKind.Other;
+
+    /// <summary>Optional human-provided notes.</summary>
+    public string Notes { get; set; } = string.Empty;
+
+    /// <summary>Confidence that this module has been correctly identified and scoped.</summary>
+    public ConfidenceLevel Confidence { get; set; } = ConfidenceLevel.Unknown;
+
+    /// <summary>Code nodes that belong to this module.</summary>
+    public List<CodeNodeModel> CodeNodes { get; set; } = new();
+
+    /// <summary>Evidence that supports this module's definition.</summary>
+    public List<EvidenceModel> Evidence { get; set; } = new();
+}

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.Persistence.Dto;
 
 namespace Codomon.Desktop.Persistence;
@@ -17,6 +18,7 @@ public static class WorkspaceSerializer
     private const string ModulesFile = "modules.json";
     private const string ConnectionsFile = "connections.json";
     private const string RulesFile = "rules.json";
+    private const string SystemMapFile = "systemmap.json";
     private const string ProfilesFolder = "profiles";
     private const string VersionFile = ".wsversion";
 
@@ -133,6 +135,9 @@ public static class WorkspaceSerializer
         };
         await WriteJsonAsync(Path.Combine(folderPath, RulesFile), rulesDto);
 
+        var systemMapDto = SystemMapToDto(workspace.SystemMap);
+        await WriteJsonAsync(Path.Combine(folderPath, SystemMapFile), systemMapDto);
+
         // Capture live layout into the active profile before saving.
         var activeProfile = workspace.ActiveProfile;
         if (activeProfile != null)
@@ -171,6 +176,12 @@ public static class WorkspaceSerializer
         var rulesDto = File.Exists(rulesPath)
             ? await ReadJsonAsync<MappingRulesFileDto>(rulesPath)
             : new MappingRulesFileDto();
+
+        // systemmap.json is optional (backward-compatible with pre-Phase-01 workspaces).
+        var systemMapPath = Path.Combine(folderPath, SystemMapFile);
+        var systemMapDto = File.Exists(systemMapPath)
+            ? await ReadJsonAsync<SystemMapFileDto>(systemMapPath)
+            : new SystemMapFileDto();
 
         // Load all profiles from profiles/*.json
         var profiles = new List<ProfileModel>();
@@ -280,6 +291,8 @@ public static class WorkspaceSerializer
             ApiEndpoint = workspaceDto.LlmSettings?.ApiEndpoint ?? "http://localhost:8080/v1",
             ModelName = workspaceDto.LlmSettings?.ModelName ?? string.Empty
         };
+
+        workspace.SystemMap = DtoToSystemMap(systemMapDto);
 
         return workspace;
     }
@@ -458,4 +471,172 @@ public static class WorkspaceSerializer
         return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions)
             ?? throw new InvalidOperationException($"Failed to deserialize '{path}': file is empty or contains null.");
     }
+
+    // ── System Map Dto conversion helpers ────────────────────────────────────
+
+    private static SystemMapFileDto SystemMapToDto(SystemMapModel map) => new()
+    {
+        Id = map.Id,
+        CreatedAt = map.CreatedAt,
+        UpdatedAt = map.UpdatedAt,
+        Systems = map.Systems.Select(SystemToDto).ToList(),
+        ExternalSystems = map.ExternalSystems.Select(ExternalSystemToDto).ToList(),
+        Relationships = map.Relationships.Select(RelationshipToDto).ToList(),
+        ManualOverrides = map.ManualOverrides.Select(OverrideToDto).ToList()
+    };
+
+    private static SystemMapModel DtoToSystemMap(SystemMapFileDto dto) => new()
+    {
+        Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid().ToString() : dto.Id,
+        CreatedAt = dto.CreatedAt,
+        UpdatedAt = dto.UpdatedAt,
+        Systems = dto.Systems.Select(DtoToSystem).ToList(),
+        ExternalSystems = dto.ExternalSystems.Select(DtoToExternalSystem).ToList(),
+        Relationships = dto.Relationships.Select(DtoToRelationship).ToList(),
+        ManualOverrides = dto.ManualOverrides.Select(DtoToOverride).ToList()
+    };
+
+    private static SystemDto SystemToDto(SystemModel s) => new()
+    {
+        Id = s.Id,
+        Name = s.Name,
+        Kind = s.Kind.ToString(),
+        Notes = s.Notes,
+        Confidence = s.Confidence.ToString(),
+        Modules = s.Modules.Select(ModuleToDto).ToList(),
+        Evidence = s.Evidence.Select(EvidenceToDto).ToList()
+    };
+
+    private static SystemModel DtoToSystem(SystemDto dto) => new()
+    {
+        Id = dto.Id,
+        Name = dto.Name,
+        Kind = Enum.TryParse<SystemKind>(dto.Kind, out var sk) ? sk : SystemKind.Other,
+        Notes = dto.Notes,
+        Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var sc) ? sc : ConfidenceLevel.Unknown,
+        Modules = dto.Modules.Select(DtoToModule).ToList(),
+        Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
+    };
+
+    private static ModuleDto ModuleToDto(ModuleModel m) => new()
+    {
+        Id = m.Id,
+        Name = m.Name,
+        Kind = m.Kind.ToString(),
+        Notes = m.Notes,
+        Confidence = m.Confidence.ToString(),
+        CodeNodes = m.CodeNodes.Select(CodeNodeToDto).ToList(),
+        Evidence = m.Evidence.Select(EvidenceToDto).ToList()
+    };
+
+    private static ModuleModel DtoToModule(ModuleDto dto) => new()
+    {
+        Id = dto.Id,
+        Name = dto.Name,
+        Kind = Enum.TryParse<ModuleKind>(dto.Kind, out var mk) ? mk : ModuleKind.Other,
+        Notes = dto.Notes,
+        Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var mc) ? mc : ConfidenceLevel.Unknown,
+        CodeNodes = dto.CodeNodes.Select(DtoToCodeNode).ToList(),
+        Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
+    };
+
+    private static CodeNodeDto CodeNodeToDto(CodeNodeModel n) => new()
+    {
+        Id = n.Id,
+        Name = n.Name,
+        Kind = n.Kind.ToString(),
+        FullName = n.FullName,
+        FilePath = n.FilePath,
+        Notes = n.Notes,
+        Confidence = n.Confidence.ToString(),
+        Evidence = n.Evidence.Select(EvidenceToDto).ToList()
+    };
+
+    private static CodeNodeModel DtoToCodeNode(CodeNodeDto dto) => new()
+    {
+        Id = dto.Id,
+        Name = dto.Name,
+        Kind = Enum.TryParse<CodeNodeKind>(dto.Kind, out var nk) ? nk : CodeNodeKind.Other,
+        FullName = dto.FullName,
+        FilePath = dto.FilePath,
+        Notes = dto.Notes,
+        Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var nc) ? nc : ConfidenceLevel.Unknown,
+        Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
+    };
+
+    private static ExternalSystemDto ExternalSystemToDto(ExternalSystemModel e) => new()
+    {
+        Id = e.Id,
+        Name = e.Name,
+        Kind = e.Kind,
+        Notes = e.Notes,
+        Confidence = e.Confidence.ToString(),
+        Evidence = e.Evidence.Select(EvidenceToDto).ToList()
+    };
+
+    private static ExternalSystemModel DtoToExternalSystem(ExternalSystemDto dto) => new()
+    {
+        Id = dto.Id,
+        Name = dto.Name,
+        Kind = dto.Kind,
+        Notes = dto.Notes,
+        Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var ec) ? ec : ConfidenceLevel.Unknown,
+        Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
+    };
+
+    private static RelationshipDto RelationshipToDto(RelationshipModel r) => new()
+    {
+        Id = r.Id,
+        Kind = r.Kind.ToString(),
+        FromId = r.FromId,
+        ToId = r.ToId,
+        Notes = r.Notes,
+        Confidence = r.Confidence.ToString(),
+        Evidence = r.Evidence.Select(EvidenceToDto).ToList()
+    };
+
+    private static RelationshipModel DtoToRelationship(RelationshipDto dto) => new()
+    {
+        Id = dto.Id,
+        Kind = Enum.TryParse<RelationshipKind>(dto.Kind, out var rk) ? rk : RelationshipKind.Other,
+        FromId = dto.FromId,
+        ToId = dto.ToId,
+        Notes = dto.Notes,
+        Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var rc) ? rc : ConfidenceLevel.Unknown,
+        Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
+    };
+
+    private static ManualOverrideDto OverrideToDto(ManualOverrideModel o) => new()
+    {
+        Id = o.Id,
+        TargetId = o.TargetId,
+        OverrideType = o.OverrideType,
+        Value = o.Value,
+        Notes = o.Notes,
+        CreatedAt = o.CreatedAt
+    };
+
+    private static ManualOverrideModel DtoToOverride(ManualOverrideDto dto) => new()
+    {
+        Id = dto.Id,
+        TargetId = dto.TargetId,
+        OverrideType = dto.OverrideType,
+        Value = dto.Value,
+        Notes = dto.Notes,
+        CreatedAt = dto.CreatedAt
+    };
+
+    private static EvidenceDto EvidenceToDto(EvidenceModel e) => new()
+    {
+        Source = e.Source,
+        Description = e.Description,
+        SourceRef = e.SourceRef
+    };
+
+    private static EvidenceModel DtoToEvidence(EvidenceDto dto) => new()
+    {
+        Source = dto.Source,
+        Description = dto.Description,
+        SourceRef = dto.SourceRef
+    };
 }
