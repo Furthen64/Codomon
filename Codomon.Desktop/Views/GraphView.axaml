@@ -5,55 +5,124 @@
              x:Class="Codomon.Desktop.Views.GraphView"
              x:DataType="vm:GraphViewModel">
 
-  <nodify:NodifyEditor ItemsSource="{Binding Nodes}"
-                       Connections="{Binding Connections}">
+  <DockPanel>
 
-    <!-- Node template: explicit left-side inputs and right-side outputs -->
-    <nodify:NodifyEditor.ItemTemplate>
-      <DataTemplate x:DataType="vm:NodeViewModel">
-        <nodify:Node Header="{Binding Title}"
-                     Input="{Binding Inputs}"
-                     Output="{Binding Outputs}">
+    <!-- ── Canvas Alignment Toolbar ──────────────────────────────────────── -->
+    <Border DockPanel.Dock="Top"
+            Background="#1A2435"
+            BorderThickness="0,0,0,1"
+            BorderBrush="#2A3F5A"
+            Padding="6,4">
+      <StackPanel Orientation="Horizontal" Spacing="8">
 
-          <!-- Each input connector rendered as a NodeInput on the left -->
-          <nodify:Node.InputConnectorTemplate>
-            <DataTemplate x:DataType="vm:ConnectorViewModel">
-              <nodify:NodeInput Anchor="{Binding Anchor, Mode=OneWayToSource}"
-                                IsConnected="{Binding IsConnected}" />
-            </DataTemplate>
-          </nodify:Node.InputConnectorTemplate>
+        <!-- VIEW group: fit / zoom -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="6,3">
+          <StackPanel Spacing="3">
+            <TextBlock Text="VIEW" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="3">
+              <Button x:Name="FitToViewButton" Content="⊡ Fit"  Padding="7,2"
+                      ToolTip.Tip="Fit all nodes into view"/>
+              <Button x:Name="ZoomInButton"    Content="+"       Padding="7,2"
+                      ToolTip.Tip="Zoom in"/>
+              <Button x:Name="ZoomOutButton"   Content="−"       Padding="7,2"
+                      ToolTip.Tip="Zoom out"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
 
-          <!-- Each output connector rendered as a NodeOutput on the right -->
-          <nodify:Node.OutputConnectorTemplate>
-            <DataTemplate x:DataType="vm:ConnectorViewModel">
-              <nodify:NodeOutput Anchor="{Binding Anchor, Mode=OneWayToSource}"
-                                 IsConnected="{Binding IsConnected}" />
-            </DataTemplate>
-          </nodify:Node.OutputConnectorTemplate>
+        <!-- ALIGN group: align edges / centers of selected nodes -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="6,3">
+          <StackPanel Spacing="3">
+            <TextBlock Text="ALIGN SELECTED" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="3">
+              <Button x:Name="AlignLeftButton"   Content="◀ Left"   Padding="7,2"
+                      ToolTip.Tip="Align left edges of selected nodes"/>
+              <Button x:Name="AlignRightButton"  Content="Right ▶"  Padding="7,2"
+                      ToolTip.Tip="Align right edges of selected nodes"/>
+              <Button x:Name="AlignTopButton"    Content="▲ Top"    Padding="7,2"
+                      ToolTip.Tip="Align top edges of selected nodes"/>
+              <Button x:Name="AlignBottomButton" Content="▼ Bot"    Padding="7,2"
+                      ToolTip.Tip="Align bottom edges of selected nodes"/>
+              <Button x:Name="CenterHButton"     Content="↕ Ctr H"  Padding="7,2"
+                      ToolTip.Tip="Center selected nodes on a shared horizontal axis"/>
+              <Button x:Name="CenterVButton"     Content="↔ Ctr V"  Padding="7,2"
+                      ToolTip.Tip="Center selected nodes on a shared vertical axis"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
 
-        </nodify:Node>
-      </DataTemplate>
-    </nodify:NodifyEditor.ItemTemplate>
+        <!-- ARRANGE group: automatic layout / distribution -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="6,3">
+          <StackPanel Spacing="3">
+            <TextBlock Text="ARRANGE" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="3">
+              <Button x:Name="AutoAlignButton"   Content="⊞ Auto-Align"  Padding="7,2"
+                      ToolTip.Tip="Arrange all nodes left-to-right in connection order, then fit to view"/>
+              <Button x:Name="DistributeHButton" Content="⇔ Space H"     Padding="7,2"
+                      ToolTip.Tip="Evenly distribute selected nodes along the horizontal axis (select 3 or more)"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
 
-    <!-- Position each ItemContainer at the node's Location.
-         ReflectionBinding is used because ControlTheme bindings cannot resolve
-         the DataContext type statically when compiled bindings are enabled globally. -->
-    <nodify:NodifyEditor.ItemContainerTheme>
-      <ControlTheme TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
-        <Setter Property="Location" Value="{ReflectionBinding Location}" />
-      </ControlTheme>
-    </nodify:NodifyEditor.ItemContainerTheme>
+      </StackPanel>
+    </Border>
 
-    <!-- Connection template: cubic bezier curve, slightly thicker, soft light-blue stroke -->
-    <nodify:NodifyEditor.ConnectionTemplate>
-      <DataTemplate x:DataType="vm:ConnectionViewModel">
-        <nodify:Connection Source="{Binding Source}"
-                           Target="{Binding Target}"
-                           Stroke="#80B4D4"
-                           StrokeThickness="2" />
-      </DataTemplate>
-    </nodify:NodifyEditor.ConnectionTemplate>
+    <!-- ── Graph Canvas ───────────────────────────────────────────────────── -->
+    <nodify:NodifyEditor x:Name="Editor"
+                         ItemsSource="{Binding Nodes}"
+                         Connections="{Binding Connections}">
 
-  </nodify:NodifyEditor>
+      <!-- Node template: explicit left-side inputs and right-side outputs -->
+      <nodify:NodifyEditor.ItemTemplate>
+        <DataTemplate x:DataType="vm:NodeViewModel">
+          <nodify:Node Header="{Binding Title}"
+                       Input="{Binding Inputs}"
+                       Output="{Binding Outputs}">
+
+            <!-- Each input connector rendered as a NodeInput on the left -->
+            <nodify:Node.InputConnectorTemplate>
+              <DataTemplate x:DataType="vm:ConnectorViewModel">
+                <nodify:NodeInput Anchor="{Binding Anchor, Mode=OneWayToSource}"
+                                  IsConnected="{Binding IsConnected}" />
+              </DataTemplate>
+            </nodify:Node.InputConnectorTemplate>
+
+            <!-- Each output connector rendered as a NodeOutput on the right -->
+            <nodify:Node.OutputConnectorTemplate>
+              <DataTemplate x:DataType="vm:ConnectorViewModel">
+                <nodify:NodeOutput Anchor="{Binding Anchor, Mode=OneWayToSource}"
+                                   IsConnected="{Binding IsConnected}" />
+              </DataTemplate>
+            </nodify:Node.OutputConnectorTemplate>
+
+          </nodify:Node>
+        </DataTemplate>
+      </nodify:NodifyEditor.ItemTemplate>
+
+      <!-- Position each ItemContainer at the node's Location.
+           ReflectionBinding is used because ControlTheme bindings cannot resolve
+           the DataContext type statically when compiled bindings are enabled globally. -->
+      <nodify:NodifyEditor.ItemContainerTheme>
+        <ControlTheme TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
+          <Setter Property="Location" Value="{ReflectionBinding Location}" />
+        </ControlTheme>
+      </nodify:NodifyEditor.ItemContainerTheme>
+
+      <!-- Connection template: cubic bezier curve, slightly thicker, soft light-blue stroke -->
+      <nodify:NodifyEditor.ConnectionTemplate>
+        <DataTemplate x:DataType="vm:ConnectionViewModel">
+          <nodify:Connection Source="{Binding Source}"
+                             Target="{Binding Target}"
+                             Stroke="#80B4D4"
+                             StrokeThickness="2" />
+        </DataTemplate>
+      </nodify:NodifyEditor.ConnectionTemplate>
+
+    </nodify:NodifyEditor>
+
+  </DockPanel>
 
 </UserControl>
