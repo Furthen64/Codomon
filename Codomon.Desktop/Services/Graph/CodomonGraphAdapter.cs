@@ -6,7 +6,9 @@ namespace Codomon.Desktop.Services.Graph;
 
 public static class CodomonGraphAdapter
 {
-    public static (IReadOnlyList<NodeViewModel> Nodes, IReadOnlyList<ConnectionViewModel> Connections)
+    public static (IReadOnlyList<NodeViewModel> Nodes,
+                   IReadOnlyList<ConnectionViewModel> Connections,
+                   IReadOnlyList<(NodeViewModel From, NodeViewModel To)> Edges)
         ToViewModel(CodomonGraphModel model)
     {
         // Build node view-models, keyed by domain node ID
@@ -25,6 +27,7 @@ public static class CodomonGraphAdapter
 
         // Build connection view-models from domain edges; skip edges with unknown IDs
         var connections = new List<ConnectionViewModel>();
+        var edges = new List<(NodeViewModel From, NodeViewModel To)>();
 
         foreach (var edge in model.Edges)
         {
@@ -38,8 +41,9 @@ public static class CodomonGraphAdapter
             toNode.InputConnector.IsConnected    = true;
 
             connections.Add(new ConnectionViewModel(fromNode.OutputConnector, toNode.InputConnector));
+            edges.Add((fromNode, toNode));
         }
 
-        return (nodeMap.Values.ToList(), connections);
+        return (nodeMap.Values.ToList(), connections, edges);
     }
 }
