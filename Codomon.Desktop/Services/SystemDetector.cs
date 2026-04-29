@@ -161,18 +161,22 @@ public static class SystemDetector
 
             foreach (var cls in scannedFile.Classes)
             {
-                if (!hasHostedService &&
-                    cls.BaseTypes.Any(bt => BackgroundServiceBaseTypes.Contains(bt)))
+                if (!hasHostedService)
                 {
-                    hasHostedService = true;
-                    var baseTypeName = cls.BaseTypes.First(bt => BackgroundServiceBaseTypes.Contains(bt));
-                    evidence.Add(new EvidenceModel
+                    var matchedBaseType = cls.BaseTypes.FirstOrDefault(bt =>
+                        BackgroundServiceBaseTypes.Contains(bt));
+
+                    if (matchedBaseType != null)
                     {
-                        Source = SrcRoslyn,
-                        Description =
-                            $"Class '{cls.SimpleName}' inherits from / implements '{baseTypeName}' — hosted/background service.",
-                        SourceRef = filePath
-                    });
+                        hasHostedService = true;
+                        evidence.Add(new EvidenceModel
+                        {
+                            Source = SrcRoslyn,
+                            Description =
+                                $"Class '{cls.SimpleName}' inherits from / implements '{matchedBaseType}' — hosted/background service.",
+                            SourceRef = filePath
+                        });
+                    }
                 }
 
                 if (!hasScheduledJob &&
