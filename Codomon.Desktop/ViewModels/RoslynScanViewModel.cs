@@ -209,6 +209,20 @@ public class RoslynScanViewModel : INotifyPropertyChanged
 
         suggestion.IsPromoted = true;
 
+        var fromId = ResolveWorkspaceId(suggestion.FromClass) ?? string.Empty;
+        var toId   = ResolveWorkspaceId(suggestion.ToClass)   ?? string.Empty;
+
+        AppLogger.Debug($"[Promote] '{ShortName(suggestion.FromClass)}' → '{ShortName(suggestion.ToClass)}'  " +
+                        $"FromId='{(string.IsNullOrEmpty(fromId) ? "<unresolved>" : fromId)}'  " +
+                        $"ToId='{(string.IsNullOrEmpty(toId) ? "<unresolved>" : toId)}'");
+
+        if (string.IsNullOrEmpty(fromId))
+            AppLogger.Warn($"[Promote] Could not resolve workspace node for FromClass='{suggestion.FromClass}'. " +
+                           $"Connection will be saved but won't appear on canvas until both ends are linked to a workspace system.");
+        if (string.IsNullOrEmpty(toId))
+            AppLogger.Warn($"[Promote] Could not resolve workspace node for ToClass='{suggestion.ToClass}'. " +
+                           $"Connection will be saved but won't appear on canvas until both ends are linked to a workspace system.");
+
         var connection = new ConnectionModel
         {
             Id = Guid.NewGuid().ToString(),
@@ -216,13 +230,14 @@ public class RoslynScanViewModel : INotifyPropertyChanged
             Type = "Roslyn",
             Notes = $"Auto-generated from Roslyn scan. {suggestion.CallCount} call site(s).\n" +
                     $"From: {suggestion.FromClass}\nTo: {suggestion.ToClass}",
-            FromId = ResolveWorkspaceId(suggestion.FromClass) ?? string.Empty,
-            ToId   = ResolveWorkspaceId(suggestion.ToClass)   ?? string.Empty,
+            FromId = fromId,
+            ToId   = toId,
             Origin = ConnectionOrigin.Roslyn,
             IsReadOnly = true
         };
 
         PromotedConnections.Add(connection);
+        AppLogger.Debug($"[Promote] PromotedConnections count is now {PromotedConnections.Count}. Close the dialog to apply to the canvas.");
 
         if (ScanResult != null)
             ScanResult.PromotedConnectionIds.Add(connection.Id);
