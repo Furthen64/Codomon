@@ -1,9 +1,9 @@
 using Avalonia;
+using Codomon.Desktop.Models;
+using Codomon.Desktop.Services.Graph;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using Codomon.Desktop.Models;
-using Codomon.Desktop.Services.Graph;
 
 namespace Codomon.Desktop.ViewModels;
 
@@ -73,8 +73,16 @@ public class GraphViewModel
         // Build connections from workspace connection models.
         foreach (var conn in workspace.Connections)
         {
-            if (!nodeMap.TryGetValue(conn.FromId, out var fromNode)) continue;
-            if (!nodeMap.TryGetValue(conn.ToId,   out var toNode))   continue;
+            if (!nodeMap.TryGetValue(conn.FromId, out var fromNode))
+            {
+                AppLogger.Debug($"[Graph] Skipping connection '{conn.Name}' — FromId='{conn.FromId}' not found in node map (Origin={conn.Origin}).");
+                continue;
+            }
+            if (!nodeMap.TryGetValue(conn.ToId, out var toNode))
+            {
+                AppLogger.Debug($"[Graph] Skipping connection '{conn.Name}' — ToId='{conn.ToId}' not found in node map (Origin={conn.Origin}).");
+                continue;
+            }
 
             fromNode.OutputConnector.IsConnected = true;
             toNode.InputConnector.IsConnected    = true;
@@ -82,6 +90,9 @@ public class GraphViewModel
             Connections.Add(new ConnectionViewModel(fromNode.OutputConnector, toNode.InputConnector));
             _nodeEdges.Add((fromNode, toNode));
         }
+
+        AppLogger.Debug($"[Graph] Refresh complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
+                        $"(workspace had {workspace.Connections.Count} connection(s) total).");
     }
 
     /// <summary>

@@ -1137,13 +1137,23 @@ public partial class MainWindow : Window
         var dialog = new RoslynScanDialog(scanVm);
         var result = await dialog.ShowDialog<ViewModels.RoslynScanViewModel?>(this);
 
-        if (result == null || result.PromotedConnections.Count == 0) return;
+        AppLogger.Debug($"[Roslyn] Dialog closed. result={(result == null ? "null (unexpected — dialog may have been cancelled before the X-button fix applied)" : "RoslynScanViewModel")}  " +
+                        $"PromotedConnections={(result?.PromotedConnections.Count.ToString() ?? "n/a")}");
+
+        if (result == null || result.PromotedConnections.Count == 0)
+        {
+            AppLogger.Debug("[Roslyn] No promoted connections — canvas not updated.");
+            return;
+        }
 
         await ExecuteSafeAsync(() =>
         {
+            AppLogger.Debug($"[Roslyn] Calling AddRoslynConnections with {result.PromotedConnections.Count} connection(s).");
             _vm.AddRoslynConnections(result.PromotedConnections);
             RefreshRoslynConnectionsPanel();
+            AppLogger.Debug($"[Roslyn] Calling GraphViewModel.Refresh. _graphVm is {(_graphVm == null ? "null — canvas will NOT update!" : "set")}.");
             _graphVm?.Refresh(_vm.Workspace);
+            AppLogger.Debug("[Roslyn] GraphViewModel.Refresh complete. Canvas should now reflect promoted connections.");
             return Task.CompletedTask;
         });
     }

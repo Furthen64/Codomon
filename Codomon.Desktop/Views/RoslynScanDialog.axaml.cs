@@ -17,6 +17,7 @@ namespace Codomon.Desktop.Views;
 public partial class RoslynScanDialog : Window
 {
     private readonly RoslynScanViewModel _vm;
+    private bool _dialogResultSet;
 
     public RoslynScanDialog(RoslynScanViewModel vm)
     {
@@ -40,6 +41,25 @@ public partial class RoslynScanDialog : Window
             Dispatcher.UIThread.Post(ScrollProgressToBottom);
 
         Opened += async (_, _) => await RunPreflightAsync();
+
+        // When the dialog is closed via the title-bar X button, Avalonia returns null from
+        // ShowDialog<T> unless we supply the result explicitly here.
+        // NOTE: _dialogResultSet is only set to true once (either here or in OnCloseClick).
+        // Both handlers run on the UI thread so there is no actual race, but the flag
+        // prevents the Closing event from calling Close(_vm) a second time after OnCloseClick
+        // has already done so.
+        Closing += (_, args) =>
+        {
+            if (_dialogResultSet) return;  // Already closed via the Close button — proceed normally.
+
+            // Title-bar X was used: cancel this close and re-issue it with the VM as the result
+            // so that ShowDialog<RoslynScanViewModel?> receives the promoted connections.
+            if (_vm.IsRunning)
+                _vm.CancelScan();
+            _dialogResultSet = true;
+            args.Cancel = true;
+            Dispatcher.UIThread.Post(() => Close(_vm));
+        };
     }
 
     // ── Preflight ─────────────────────────────────────────────────────────────
@@ -103,6 +123,7 @@ public partial class RoslynScanDialog : Window
     {
         if (_vm.IsRunning)
             _vm.CancelScan();
+        _dialogResultSet = true;
         Close(_vm);
     }
 
