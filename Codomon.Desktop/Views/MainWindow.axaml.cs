@@ -18,6 +18,9 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm;
     private MainCanvasControl? _canvas;
 
+    // Graph view-model for the Nodify canvas; kept so Refresh can be called on demand.
+    private ViewModels.GraphViewModel? _graphVm;
+
     // Keep at most one Dev Console open at a time.
     private DevConsoleWindow? _devConsole;
 
@@ -1140,6 +1143,7 @@ public partial class MainWindow : Window
         {
             _vm.AddRoslynConnections(result.PromotedConnections);
             RefreshRoslynConnectionsPanel();
+            _graphVm?.Refresh(_vm.Workspace);
             return Task.CompletedTask;
         });
     }
@@ -1408,9 +1412,13 @@ public partial class MainWindow : Window
         _canvas = new MainCanvasControl(_vm.Workspace, _vm.Selection);
         _canvas.OnLayoutChanged = () => _vm.IsDirty = true;
 
+        _graphVm = new ViewModels.GraphViewModel();
+        if (_vm.HasWorkspace)
+            _graphVm.Refresh(_vm.Workspace);
+
         var graphView = new GraphView
         {
-            DataContext = new GraphViewModel()
+            DataContext = _graphVm
         };
 
         var host = this.FindControl<ContentControl>("CanvasHost");

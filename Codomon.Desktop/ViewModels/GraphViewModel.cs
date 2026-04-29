@@ -2,6 +2,7 @@ using Avalonia;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Codomon.Desktop.Models;
 using Codomon.Desktop.Services.Graph;
 
 namespace Codomon.Desktop.ViewModels;
@@ -14,6 +15,10 @@ public class GraphViewModel
     // Directed edges between node view-models, used by AutoAlign for topological layout.
     private readonly List<(NodeViewModel From, NodeViewModel To)> _nodeEdges = new();
 
+    /// <summary>
+    /// Parameterless constructor — loads the fake demo graph, useful for design-time previews.
+    /// Call <see cref="Refresh"/> immediately after construction to load real workspace data.
+    /// </summary>
     public GraphViewModel()
     {
         var graph   = FakeCodomonGraphFactory.Create();
@@ -27,6 +32,56 @@ public class GraphViewModel
 
         foreach (var edge in adapted.Edges)
             _nodeEdges.Add(edge);
+    }
+
+    /// <summary>
+    /// Clears all current nodes and connections, then rebuilds the graph from
+    /// <paramref name="workspace"/> data: one node per <see cref="SystemBoxModel"/>,
+    /// one connection per <see cref="ConnectionModel"/> whose FromId/ToId resolve
+    /// to known system nodes.
+    /// </summary>
+    public void Refresh(WorkspaceModel workspace)
+    {
+        Nodes.Clear();
+        Connections.Clear();
+        _nodeEdges.Clear();
+
+        // Build a node per system box.
+        var nodeMap = new Dictionary<string, NodeViewModel>(workspace.Systems.Count, StringComparer.Ordinal);
+        double autoX = 80;
+        const double autoY   = 200;
+        const double autoGap = 220;
+
+        foreach (var sys in workspace.Systems)
+        {
+            // Use the saved position when either coordinate is non-zero, otherwise auto-layout.
+            bool hasSavedPosition = sys.X != 0 || sys.Y != 0;
+            double x = hasSavedPosition ? sys.X : autoX;
+            double y = hasSavedPosition ? sys.Y : autoY;
+
+            var node = new NodeViewModel
+            {
+                Title    = sys.Name,
+                Location = new Point(x, y),
+            };
+
+            nodeMap[sys.Id] = node;
+            Nodes.Add(node);
+            autoX += autoGap;
+        }
+
+        // Build connections from workspace connection models.
+        foreach (var conn in workspace.Connections)
+        {
+            if (!nodeMap.TryGetValue(conn.FromId, out var fromNode)) continue;
+            if (!nodeMap.TryGetValue(conn.ToId,   out var toNode))   continue;
+
+            fromNode.OutputConnector.IsConnected = true;
+            toNode.InputConnector.IsConnected    = true;
+
+            Connections.Add(new ConnectionViewModel(fromNode.OutputConnector, toNode.InputConnector));
+            _nodeEdges.Add((fromNode, toNode));
+        }
     }
 
     /// <summary>
