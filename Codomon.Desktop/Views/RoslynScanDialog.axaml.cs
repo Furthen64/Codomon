@@ -127,6 +127,13 @@ public partial class RoslynScanDialog : Window
         Close(_vm);
     }
 
+    private void OnAddAllToCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _vm.AddAllToCanvas();
+        _dialogResultSet = true;
+        Close(_vm);
+    }
+
     private void OnPromoteClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_vm.SelectedSuggestedConnection == null) return;
@@ -224,6 +231,7 @@ public partial class RoslynScanDialog : Window
         var startBtn       = this.FindControl<Button>("StartScanButton");
         var cancelScanBtn  = this.FindControl<Button>("CancelScanButton");
         var viewResultsBtn = this.FindControl<Button>("ViewResultsButton");
+        var addAllBtn      = this.FindControl<Button>("AddAllToCanvasButton");
         var progressBar    = this.FindControl<ProgressBar>("ScanProgressBar");
 
         switch (_vm.Step)
@@ -232,12 +240,14 @@ public partial class RoslynScanDialog : Window
                 if (startBtn      != null) { startBtn.IsVisible      = true;  startBtn.IsEnabled = _vm.PreflightOk; }
                 if (cancelScanBtn != null)   cancelScanBtn.IsVisible  = false;
                 if (viewResultsBtn!= null)   viewResultsBtn.IsVisible = false;
+                if (addAllBtn     != null)   addAllBtn.IsVisible      = false;
                 break;
 
             case ScanDialogStep.Scanning:
                 if (startBtn      != null) startBtn.IsVisible       = false;
                 if (cancelScanBtn != null) cancelScanBtn.IsVisible  = _vm.IsRunning;
                 if (viewResultsBtn!= null) viewResultsBtn.IsVisible = _vm.ScanFinished;
+                if (addAllBtn     != null) addAllBtn.IsVisible      = false;
                 if (progressBar   != null) progressBar.IsIndeterminate = _vm.IsRunning;
                 break;
 
@@ -245,6 +255,11 @@ public partial class RoslynScanDialog : Window
                 if (startBtn      != null) startBtn.IsVisible       = false;
                 if (cancelScanBtn != null) cancelScanBtn.IsVisible  = false;
                 if (viewResultsBtn!= null) viewResultsBtn.IsVisible = false;
+                if (addAllBtn     != null)
+                {
+                    addAllBtn.IsVisible = true;
+                    addAllBtn.IsEnabled = _vm.ScanResult?.SuggestedConnections.Count > 0;
+                }
                 break;
         }
     }

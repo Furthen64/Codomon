@@ -28,6 +28,8 @@ public class RoslynScanViewModel : INotifyPropertyChanged
     private ScannedFile? _selectedFile;
     private ScannedClass? _selectedClass;
 
+    private bool _wasAddedToCanvas;
+
     private CancellationTokenSource? _cts;
 
     public RoslynScanViewModel(string sourcePath, string workspaceFolderPath, WorkspaceModel? workspace = null)
@@ -115,6 +117,15 @@ public class RoslynScanViewModel : INotifyPropertyChanged
 
     /// <summary>Connections that have already been promoted to the workspace.</summary>
     public ObservableCollection<ConnectionModel> PromotedConnections { get; } = new();
+
+    // ── Add all to canvas ─────────────────────────────────────────────────────
+
+    /// <summary>True after <see cref="AddAllToCanvas"/> has been called successfully.</summary>
+    public bool WasAddedToCanvas
+    {
+        get => _wasAddedToCanvas;
+        private set { _wasAddedToCanvas = value; OnPropertyChanged(); }
+    }
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
@@ -244,6 +255,56 @@ public class RoslynScanViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(CanPromote));
         return connection;
+    }
+
+    /// <summary>
+    /// Creates a <see cref="SystemBoxModel"/> in the workspace for every unique class that
+    /// appears in <see cref="RoslynScanResult.SuggestedConnections"/>, then promotes all
+    /// not-yet-promoted connections so they resolve to those new nodes.
+    /// Sets <see cref="WasAddedToCanvas"/> to <c>true</c> once complete.
+    /// </summary>
+    public void AddAllToCanvas()
+    {
+        if (_scanResult == null || _workspace == null) return;
+
+        // Collect unique short class names from all suggested connections.
+        var classShortNames = _scanResult.SuggestedConnections
+            .SelectMany(c => new[] { ShortName(c.FromClass), ShortName(c.ToClass) })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Position new nodes to the right of any existing systems.
+        double x = 80;
+        const double y   = 200;
+        const double gap = 240;
+        if (_workspace.Systems.Count > 0)
+            x = _workspace.Systems.Max(s => s.X) + gap;
+
+        int addedSystems = 0;
+        foreach (var name in classShortNames)
+        {
+            // Skip classes that already exist as a workspace system.
+            if (_workspace.Systems.Any(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            _workspace.Systems.Add(new SystemBoxModel
+            {
+                Id   = Guid.NewGuid().ToString(),
+                Name = name,
+                X    = x,
+                Y    = y
+            });
+            addedSystems++;
+            x += gap;
+        }
+
+        // Promote all unpromoted suggested connections (IDs will now resolve).
+        var toPromote = _scanResult.SuggestedConnections.Where(c => !c.IsPromoted).ToList();
+        foreach (var conn in toPromote)
+            PromoteConnection(conn);
+
+        WasAddedToCanvas = true;
+        AppLogger.Debug($"[AddAllToCanvas] Created {addedSystems} system node(s) and promoted {toPromote.Count} connection(s).");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
