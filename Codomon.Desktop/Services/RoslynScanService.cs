@@ -208,11 +208,19 @@ public static class RoslynScanService
 
     private static List<SuggestedConnection> BuildSuggestedConnections(List<ScannedFile> files)
     {
-        // Build a lookup of all known class full names.
-        var allClasses = files
-            .SelectMany(f => f.Classes)
-            .Select(c => c.FullName)
-            .ToHashSet(StringComparer.Ordinal);
+        // Build a lookup of simple name → full names.
+        // ExtractCalledClasses returns simple names (e.g. "MyService"), not qualified names,
+        // so we need this map to match them against the known classes.
+        var simpleToFull = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var cls in files.SelectMany(f => f.Classes))
+        {
+            if (!simpleToFull.TryGetValue(cls.SimpleName, out var list))
+            {
+                list = new List<string>();
+                simpleToFull[cls.SimpleName] = list;
+            }
+            list.Add(cls.FullName);
+        }
 
         // Aggregate call counts: (callerClass, calleeClass) → (count, callSites)
         var callMap = new Dictionary<(string, string), (int Count, List<string> Sites)>(
@@ -226,22 +234,27 @@ public static class RoslynScanService
                 {
                     foreach (var callee in method.CalledClasses)
                     {
-                        if (!allClasses.Contains(callee)) continue;
-                        if (callee == cls.FullName) continue;   // ignore self-calls
+                        // callee is a simple name; resolve to all matching full names.
+                        if (!simpleToFull.TryGetValue(callee, out var calleeFullNames)) continue;
 
-                        var key = (cls.FullName, callee);
-                        var callSite = $"{cls.FullName}.{method.Name}";
-                        if (!callMap.TryGetValue(key, out var entry))
+                        foreach (var calleeFullName in calleeFullNames)
                         {
-                            callMap[key] = (1, new List<string> { callSite });
+                            if (calleeFullName == cls.FullName) continue;   // ignore self-calls
+
+                            var key = (cls.FullName, calleeFullName);
+                            var callSite = $"{cls.FullName}.{method.Name}";
+                            if (!callMap.TryGetValue(key, out var entry))
+                            {
+                                callMap[key] = (1, new List<string> { callSite });
+                            }
+                            else if (entry.Sites.Count < 10 && !entry.Sites.Contains(callSite))
+                            {
+                                entry.Sites.Add(callSite);
+                                callMap[key] = (entry.Count + 1, entry.Sites);
+                            }
+                            // When the call site is a duplicate or the sites list is full,
+                            // do not increment Count so it accurately reflects distinct call sites.
                         }
-                        else if (entry.Sites.Count < 10 && !entry.Sites.Contains(callSite))
-                        {
-                            entry.Sites.Add(callSite);
-                            callMap[key] = (entry.Count + 1, entry.Sites);
-                        }
-                        // When the call site is a duplicate or the sites list is full,
-                        // do not increment Count so it accurately reflects distinct call sites.
                     }
                 }
             }
@@ -367,10 +380,10 @@ public static class RoslynScanService
 
         private static List<string> ExtractCalledClasses(SyntaxNode body)
         {
-            // Collect member-access expressions like "SomeClass.Method()" or "someField.Method()".
-            // We capture the left-hand side identifier as a potential class name.
             var names = new HashSet<string>(StringComparer.Ordinal);
 
+            // Capture "SomeClass.Method()" and "someField.Method()" invocations.
+            // We take the left-hand side identifier as a potential class name.
             foreach (var invoc in body.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
                 if (invoc.Expression is MemberAccessExpressionSyntax memberAccess)
@@ -386,6 +399,21 @@ public static class RoslynScanService
                     if (candidate != null && candidate.Length > 0 && char.IsUpper(candidate[0]))
                         names.Add(candidate);
                 }
+            }
+
+            // Also capture "new SomeClass()" object-creation expressions.
+            foreach (var creation in body.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+            {
+                string? typeName = creation.Type switch
+                {
+                    IdentifierNameSyntax id => id.Identifier.Text,
+                    QualifiedNameSyntax q => q.Right.Identifier.Text,
+                    GenericNameSyntax g => g.Identifier.Text,
+                    _ => null
+                };
+
+                if (typeName != null && typeName.Length > 0 && char.IsUpper(typeName[0]))
+                    names.Add(typeName);
             }
 
             return names.ToList();
