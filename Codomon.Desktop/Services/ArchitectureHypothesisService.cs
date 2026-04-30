@@ -388,6 +388,19 @@ public static class ArchitectureHypothesisService
         return true;
     }
 
+    // Compiled once for efficiency — used in SanitizeLlmJson on every failed parse.
+    // Pattern anatomy:
+    //   "((?:[^"\\]|\\.)*)"   — matches a complete JSON string value (group 1):
+    //                           [^"\\]  any char that is not " or \
+    //                           \\.     an escape sequence such as \" or \\
+    //   \s+                   — one or more whitespace characters between the stray closer and the bare text
+    //   ([^"\[\]{},:\r\n]+)   — the stray bare text (group 2): stops at any JSON structural
+    //                           character or newline so we never cross token boundaries
+    //   "                     — the unintended second closing quote
+    private static readonly Regex SanitizePattern = new(
+        @"""((?:[^""\\]|\\.)*)""\s+([^""\[\]{},:\r\n]+)""",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// Applies lightweight heuristic fixes for common LLM JSON string-quoting mistakes.
     /// Specifically, it collapses the pattern where a string's closing quote appears too
@@ -397,18 +410,12 @@ public static class ArchitectureHypothesisService
     /// </summary>
     private static string SanitizeLlmJson(string json)
     {
-        // Match: a complete JSON string followed by unquoted text (no commas, brackets,
-        // colons, or newlines — i.e. not a JSON structural character) and then a closing ".
-        // Group 1: content already inside quotes
-        // Group 2: the stray bare text that should be part of the same string
-        const string pattern = @"""((?:[^""\\]|\\.)*)""\s+([^""\[\]{},:\r\n]+)""";
-
         string current = json;
         string previous;
         do
         {
             previous = current;
-            current = Regex.Replace(previous, pattern,
+            current = SanitizePattern.Replace(previous,
                 m => $"\"{m.Groups[1].Value} {m.Groups[2].Value.TrimEnd()}\"");
         }
         while (current != previous);
