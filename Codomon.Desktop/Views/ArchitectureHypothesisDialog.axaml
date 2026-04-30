@@ -1,0 +1,206 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.ArchitectureHypothesisDialog"
+        Title="Architecture Hypothesis"
+        Width="820" Height="640"
+        MinWidth="640" MinHeight="480"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <StackPanel Spacing="2">
+        <TextBlock Text="Architecture Hypothesis" FontSize="16" FontWeight="Bold" Foreground="White"/>
+        <TextBlock Text="Run an LLM synthesis pass over Markdown summaries to infer Systems, Modules, and high-value Nodes."
+                   FontSize="12" Foreground="#88AABB" TextWrapping="Wrap"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button Content="Close" Click="OnCloseClick" Padding="16,6" DockPanel.Dock="Left"/>
+        <TextBlock x:Name="StatusText" Text="" Foreground="#88AABB" FontSize="11"
+                   VerticalAlignment="Center" HorizontalAlignment="Right"/>
+      </DockPanel>
+    </Border>
+
+    <!-- Tab content -->
+    <TabControl Background="#111820">
+
+      <!-- ── Tab 1: Setup ───────────────────────────────────────────────── -->
+      <TabItem Header="Setup">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="24,18" Spacing="16">
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="LLM Settings" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <TextBlock Text="Uses the same endpoint and model configured in the LLM Summaries dialog."
+                         Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+              <TextBlock x:Name="LlmSettingsInfoText" Text="" Foreground="#88AABB" FontSize="11"/>
+            </StackPanel>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <!-- Hypothesis Prompt Editor -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="Synthesis Prompt (hypothesis_prompt.md)" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <TextBlock Text="This prompt is sent to the LLM with all summaries appended. Use {Summaries} as the placeholder for the combined summary text. The LLM must return structured JSON."
+                         Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+              <TextBox x:Name="PromptBox"
+                       AcceptsReturn="True"
+                       MinHeight="200"
+                       MaxHeight="340"
+                       FontFamily="Monospace"
+                       FontSize="11"
+                       Background="#0F141E"
+                       Foreground="#CCDDEE"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       TextWrapping="Wrap"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Save Prompt" Click="OnSavePromptClick" Padding="12,4"/>
+              </StackPanel>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ── Tab 2: Run ─────────────────────────────────────────────────── -->
+      <TabItem Header="Run">
+        <DockPanel Margin="0">
+
+          <!-- Toolbar -->
+          <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button x:Name="RunButton" Content="▶ Run Synthesis"
+                      Click="OnRunSynthesisClick" Padding="10,4"
+                      Background="#1A3A2A" Foreground="White"/>
+              <Button x:Name="CancelButton" Content="⏹ Cancel"
+                      Click="OnCancelClick" Padding="10,4" IsEnabled="False"/>
+              <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
+              <Button Content="↺ Refresh History" Click="OnRefreshHistoryClick" Padding="10,4"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Split: progress log (left) | history (right) -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="260" MinWidth="160"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Progress log -->
+            <DockPanel Grid.Column="0">
+              <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+                <TextBlock Text="Progress" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+              </Border>
+              <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" Margin="8">
+                <ListBox x:Name="ProgressListBox"
+                         Background="Transparent"
+                         FontFamily="Monospace"
+                         FontSize="11"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+              </Border>
+            </DockPanel>
+
+            <!-- Hypothesis history -->
+            <Border Grid.Column="1" BorderBrush="#2A3F5A" BorderThickness="1,0,0,0">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+                  <TextBlock Text="History" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+                </Border>
+                <ListBox x:Name="HistoryListBox"
+                         Background="Transparent"
+                         DoubleTapped="OnHistoryDoubleTapped"/>
+              </DockPanel>
+            </Border>
+
+          </Grid>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ── Tab 3: Systems ─────────────────────────────────────────────── -->
+      <TabItem Header="Systems" x:Name="SystemsTab">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <TextBlock x:Name="SystemsHeaderText"
+                       Text="Suggested Systems — run or load a hypothesis first."
+                       Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
+          </Border>
+          <ListBox x:Name="SystemsListBox" Background="Transparent"/>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ── Tab 4: High-Value Nodes ────────────────────────────────────── -->
+      <TabItem Header="High-Value Nodes" x:Name="HvnTab">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <TextBlock x:Name="HvnHeaderText"
+                       Text="High-Value Node suggestions — run or load a hypothesis first."
+                       Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
+          </Border>
+          <ListBox x:Name="HvnListBox" Background="Transparent"/>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ── Tab 5: Accept ──────────────────────────────────────────────── -->
+      <TabItem Header="Accept">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="20,16" Spacing="16">
+
+            <TextBlock Text="Accept Suggestions into System Map"
+                       Foreground="#AABBCC" FontWeight="SemiBold" FontSize="13"/>
+            <TextBlock Text="Accepted items are added to your workspace System Map. They remain editable and are not overwritten on subsequent synthesis passes."
+                       Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <!-- Accept Systems -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Systems" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <ListBox x:Name="AcceptSystemsListBox" Background="Transparent" MinHeight="60"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Accept Selected System"
+                        Click="OnAcceptSystemClick" Padding="12,4"
+                        Background="#1A3A5A" Foreground="White"/>
+              </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <!-- Accept High-Value Nodes -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="High-Value Nodes" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <ListBox x:Name="AcceptHvnListBox" Background="Transparent" MinHeight="60"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Accept Selected Node"
+                        Click="OnAcceptNodeClick" Padding="12,4"
+                        Background="#1A3A5A" Foreground="White"/>
+              </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <!-- Uncertain Areas -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="Uncertain / Ambiguous Areas" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <ListBox x:Name="UncertainListBox" Background="Transparent" MinHeight="40"/>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+
+  </DockPanel>
+</Window>

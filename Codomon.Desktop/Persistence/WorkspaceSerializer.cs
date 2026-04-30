@@ -22,6 +22,53 @@ public static class WorkspaceSerializer
     private const string ProfilesFolder = "profiles";
     private const string VersionFile = ".wsversion";
 
+    private const string DefaultHypothesisPrompt =
+        """
+        You are an expert software architect. Below are Markdown summaries of C# source files from a codebase.
+
+        Analyze these summaries and produce a JSON architecture hypothesis following the exact schema below.
+        Only output the JSON object — no prose, no markdown fences.
+
+        Schema:
+        {
+          "systems": [
+            {
+              "name": "string",
+              "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
+              "confidence": "Likely|Possible|Unknown",
+              "evidence": ["string"],
+              "modules": [
+                {
+                  "name": "string",
+                  "confidence": "Likely|Possible|Unknown",
+                  "highValueNodes": ["string"]
+                }
+              ]
+            }
+          ],
+          "highValueNodes": [
+            {
+              "name": "string",
+              "reason": "string",
+              "signal": "EntryPoint|Orchestrator|CentralStateModel|ServiceBoundary|SerializationBoundary|IntegrationBoundary|RuntimeHeavy|ErrorProne|BridgeBetweenClusters|Other",
+              "confidence": "Likely|Possible|Unknown"
+            }
+          ],
+          "startup": [
+            {
+              "system": "string",
+              "mechanism": "string",
+              "entryPointCandidates": ["string"],
+              "confidence": "Likely|Possible|Unknown"
+            }
+          ],
+          "uncertainAreas": ["string"]
+        }
+
+        --- SUMMARIES ---
+        {Summaries}
+        """;
+
     private const string DefaultSummaryPrompt =
         """
         Please analyze the following C# source file and write a concise Markdown summary covering:
@@ -52,6 +99,7 @@ public static class WorkspaceSerializer
         Directory.CreateDirectory(Path.Combine(folderPath, "logs", "imported"));
         Directory.CreateDirectory(Path.Combine(folderPath, "autosaves"));
         Directory.CreateDirectory(Path.Combine(folderPath, "summaries"));
+        Directory.CreateDirectory(Path.Combine(folderPath, "hypotheses"));
 
         // Write workspace version file so we can detect incompatible workspaces later.
         var versionContent = $"codomon-version={BuildInfo.AppVersion}{Environment.NewLine}build-date={BuildInfo.BuildDate}{Environment.NewLine}";
@@ -61,6 +109,11 @@ public static class WorkspaceSerializer
         var promptPath = Path.Combine(folderPath, "summary_prompt.md");
         if (!File.Exists(promptPath))
             await File.WriteAllTextAsync(promptPath, DefaultSummaryPrompt);
+
+        // Create the default hypothesis prompt file if it does not already exist.
+        var hypothesisPromptPath = Path.Combine(folderPath, "hypothesis_prompt.md");
+        if (!File.Exists(hypothesisPromptPath))
+            await File.WriteAllTextAsync(hypothesisPromptPath, DefaultHypothesisPrompt);
 
         var workspaceDto = new WorkspaceFileDto
         {
