@@ -1211,12 +1211,9 @@ public partial class MainWindow : Window
         var dialog = new ArchitectureHypothesisDialog(hypothesisVm);
         await dialog.ShowDialog(this);
 
-        // If any suggestions were accepted into the System Map mark the workspace dirty.
-        if (_vm.Workspace.SystemMap.Systems.Count > 0 ||
-            _vm.Workspace.SystemMap.AllModules.Any())
-        {
+        // Mark workspace dirty only if the user actually accepted suggestions into the System Map.
+        if (hypothesisVm.AcceptedCount > 0)
             _vm.IsDirty = true;
-        }
     }
 
     // ── Connections panel (Roslyn-origin connections) ─────────────────────────

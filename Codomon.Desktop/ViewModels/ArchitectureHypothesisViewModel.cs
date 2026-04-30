@@ -23,6 +23,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     private string _statusMessage = string.Empty;
     private ArchitectureHypothesisModel? _currentHypothesis;
     private CancellationTokenSource? _cts;
+    private int _acceptedCount;
 
     public ArchitectureHypothesisViewModel(WorkspaceModel workspace, string workspaceFolderPath)
     {
@@ -48,6 +49,16 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     {
         get => _statusMessage;
         set { _statusMessage = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Count of suggestions that have been accepted into the System Map during this session.
+    /// Used by the caller to decide whether to mark the workspace dirty.
+    /// </summary>
+    public int AcceptedCount
+    {
+        get => _acceptedCount;
+        private set { _acceptedCount = value; OnPropertyChanged(); }
     }
 
     /// <summary>The hypothesis most recently loaded or generated.</summary>
@@ -202,6 +213,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 
         _workspace.SystemMap.Systems.Add(system);
         suggestion.IsAccepted = true;
+        AcceptedCount++;
         AppLogger.Info($"[Hypothesis] Accepted system: {system.Name}");
         return system;
     }
@@ -220,13 +232,14 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         };
 
         targetSystem.Modules.Add(module);
+        AcceptedCount++;
         AppLogger.Info($"[Hypothesis] Accepted module: {module.Name} → {targetSystem.Name}");
         return module;
     }
 
     /// <summary>
     /// Accepts a high-value node suggestion as a <see cref="CodeNodeModel"/> appended to
-    /// the first available module in the System Map, or creates a detached node on the
+    /// the first available module in the System Map, or creates a holding module on the
     /// first system if no modules exist.
     /// </summary>
     public CodeNodeModel AcceptHighValueNode(HypothesisHighValueNodeModel suggestion)
@@ -256,7 +269,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
             {
                 var holdingModule = new ModuleModel
                 {
-                    Name = "Unclassified",
+                    Name = "UnassignedHighValueNodes",
                     Confidence = ConfidenceLevel.Unknown
                 };
                 holdingModule.CodeNodes.Add(node);
@@ -266,6 +279,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         }
 
         suggestion.IsAccepted = true;
+        AcceptedCount++;
         AppLogger.Info($"[Hypothesis] Accepted high-value node: {node.Name}");
         return node;
     }

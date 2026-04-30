@@ -46,11 +46,7 @@ public partial class ArchitectureHypothesisDialog : Window
         // Show current LLM settings (read-only info).
         var infoText = this.FindControl<TextBlock>("LlmSettingsInfoText");
         if (infoText != null)
-        {
-            var vm = _vm;
-            // Access workspace settings via the ViewModel's workspace.
-            infoText.Text = string.Empty; // will be populated via reflection-safe path below
-        }
+            infoText.Text = string.Empty;
 
         await _vm.LoadPromptAsync();
         var promptBox = this.FindControl<TextBox>("PromptBox");
