@@ -54,6 +54,20 @@ public enum CodeNodeKind
     ConfigFile,
     EntryPoint,
     Script,
+    /// <summary>An MVVM ViewModel (name ends with <c>ViewModel</c>).</summary>
+    ViewModel,
+    /// <summary>A dialog window (name ends with <c>Dialog</c>).</summary>
+    Dialog,
+    /// <summary>A view / window (name ends with <c>Window</c>).</summary>
+    View,
+    /// <summary>A service class (name ends with <c>Service</c>).</summary>
+    Service,
+    /// <summary>A domain model (name ends with <c>Model</c>).</summary>
+    Model,
+    /// <summary>A data-transfer object (name ends with <c>Dto</c>).</summary>
+    Dto,
+    /// <summary>A repository (name ends with <c>Repository</c>).</summary>
+    Repository,
     Other
 }
 

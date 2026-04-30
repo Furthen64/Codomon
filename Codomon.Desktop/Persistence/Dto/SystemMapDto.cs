@@ -30,6 +30,7 @@ public class ModuleDto
     public string Kind { get; set; } = "Other";
     public string Notes { get; set; } = string.Empty;
     public string Confidence { get; set; } = "Unknown";
+    public List<string> SystemIds { get; set; } = new();
     public List<CodeNodeDto> CodeNodes { get; set; } = new();
     public List<EvidenceDto> Evidence { get; set; } = new();
 }
@@ -87,6 +88,8 @@ public class SystemMapFileDto
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public List<SystemDto> Systems { get; set; } = new();
+    /// <summary>Top-level modules not embedded inside a system (may be shared across systems).</summary>
+    public List<ModuleDto> Modules { get; set; } = new();
     public List<ExternalSystemDto> ExternalSystems { get; set; } = new();
     public List<RelationshipDto> Relationships { get; set; } = new();
     public List<ManualOverrideDto> ManualOverrides { get; set; } = new();

@@ -23,6 +23,13 @@ public class ModuleModel
     /// <summary>Code nodes that belong to this module.</summary>
     public List<CodeNodeModel> CodeNodes { get; set; } = new();
 
+    /// <summary>
+    /// IDs of <see cref="SystemModel"/> entries that use this module.
+    /// A module may belong to more than one system; leave empty when the
+    /// assignment has not yet been determined.
+    /// </summary>
+    public List<string> SystemIds { get; set; } = new();
+
     /// <summary>Evidence that supports this module's definition.</summary>
     public List<EvidenceModel> Evidence { get; set; } = new();
 }

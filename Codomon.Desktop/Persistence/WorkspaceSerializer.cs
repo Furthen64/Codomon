@@ -480,6 +480,7 @@ public static class WorkspaceSerializer
         CreatedAt = map.CreatedAt,
         UpdatedAt = map.UpdatedAt,
         Systems = map.Systems.Select(SystemToDto).ToList(),
+        Modules = map.Modules.Select(ModuleToDto).ToList(),
         ExternalSystems = map.ExternalSystems.Select(ExternalSystemToDto).ToList(),
         Relationships = map.Relationships.Select(RelationshipToDto).ToList(),
         ManualOverrides = map.ManualOverrides.Select(OverrideToDto).ToList()
@@ -491,6 +492,7 @@ public static class WorkspaceSerializer
         CreatedAt = dto.CreatedAt,
         UpdatedAt = dto.UpdatedAt,
         Systems = dto.Systems.Select(DtoToSystem).ToList(),
+        Modules = dto.Modules.Select(DtoToModule).ToList(),
         ExternalSystems = dto.ExternalSystems.Select(DtoToExternalSystem).ToList(),
         Relationships = dto.Relationships.Select(DtoToRelationship).ToList(),
         ManualOverrides = dto.ManualOverrides.Select(DtoToOverride).ToList()
@@ -533,6 +535,7 @@ public static class WorkspaceSerializer
         Kind = m.Kind.ToString(),
         Notes = m.Notes,
         Confidence = m.Confidence.ToString(),
+        SystemIds = new List<string>(m.SystemIds),
         CodeNodes = m.CodeNodes.Select(CodeNodeToDto).ToList(),
         Evidence = m.Evidence.Select(EvidenceToDto).ToList()
     };
@@ -544,6 +547,7 @@ public static class WorkspaceSerializer
         Kind = Enum.TryParse<ModuleKind>(dto.Kind, out var mk) ? mk : ModuleKind.Other,
         Notes = dto.Notes,
         Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var mc) ? mc : ConfidenceLevel.Unknown,
+        SystemIds = new List<string>(dto.SystemIds),
         CodeNodes = dto.CodeNodes.Select(DtoToCodeNode).ToList(),
         Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
     };
