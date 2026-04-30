@@ -33,10 +33,9 @@ public class CodeNodeModel
     // ── Manual curation flags ─────────────────────────────────────────────────
 
     /// <summary>
-    /// True when a human has explicitly marked this node as high-value (architecturally
-    /// significant). Automatically true for node kinds in
-    /// <see cref="CodeNodeKind.EntryPoint"/>, <see cref="CodeNodeKind.Service"/>, etc.
-    /// when confirmed by a <see cref="ManualOverrideType.MarkHighValue"/> override.
+    /// True when this node is considered high-value (architecturally significant).
+    /// May be set automatically by analysis (e.g. based on <see cref="CodeNodeKind"/>)
+    /// or explicitly by a <see cref="ManualOverrideType.MarkHighValue"/> override.
     /// </summary>
     public bool IsHighValue { get; set; }
 

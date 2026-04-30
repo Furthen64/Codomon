@@ -12,7 +12,7 @@ public class ManualOverrideModel
     public string TargetId { get; set; } = string.Empty;
 
     /// <summary>The kind of correction being recorded.</summary>
-    public ManualOverrideType Type { get; set; } = ManualOverrideType.Rename;
+    public ManualOverrideType Type { get; set; } = ManualOverrideType.Unknown;
 
     /// <summary>
     /// The new value imposed by this override.

@@ -92,6 +92,9 @@ public enum RelationshipKind
 /// </summary>
 public enum ManualOverrideType
 {
+    /// <summary>Unrecognised or unset override type. Used as a safe fall-back during deserialisation.</summary>
+    Unknown = 0,
+
     /// <summary>Rename a System, Module, or Code Node. <c>Value</c> = new name.</summary>
     Rename,
 

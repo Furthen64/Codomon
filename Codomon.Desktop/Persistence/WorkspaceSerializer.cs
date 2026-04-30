@@ -692,17 +692,25 @@ public static class WorkspaceSerializer
         CreatedAt = o.CreatedAt
     };
 
-    private static ManualOverrideModel DtoToOverride(ManualOverrideDto dto) => new()
+    private static ManualOverrideModel DtoToOverride(ManualOverrideDto dto)
     {
-        Id = dto.Id,
-        TargetId = dto.TargetId,
-        Type = Enum.TryParse<ManualOverrideType>(dto.OverrideType, out var ot)
-            ? ot
-            : ManualOverrideType.Rename,
-        Value = dto.Value,
-        Notes = dto.Notes,
-        CreatedAt = dto.CreatedAt
-    };
+        if (!Enum.TryParse<ManualOverrideType>(dto.OverrideType, out var ot))
+        {
+            AppLogger.Warn($"[WorkspaceSerializer] Unrecognised ManualOverrideType '{dto.OverrideType}' " +
+                           $"on override id='{dto.Id}'. Defaulting to Unknown; override will be skipped during Apply.");
+            ot = ManualOverrideType.Unknown;
+        }
+
+        return new ManualOverrideModel
+        {
+            Id        = dto.Id,
+            TargetId  = dto.TargetId,
+            Type      = ot,
+            Value     = dto.Value,
+            Notes     = dto.Notes,
+            CreatedAt = dto.CreatedAt
+        };
+    }
 
     private static EvidenceDto EvidenceToDto(EvidenceModel e) => new()
     {

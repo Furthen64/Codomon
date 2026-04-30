@@ -98,6 +98,10 @@ public static class ManualOverrideService
                 // the resulting entities are already in the map.
                 return false;
 
+            case ManualOverrideType.Unknown:
+                // Unknown type — silently skip; a warning was already logged during deserialisation.
+                return false;
+
             default:
                 AppLogger.Warn($"[ManualOverride] Unknown override type '{o.Type}' (id={o.Id}). Skipped.");
                 return false;
@@ -215,7 +219,9 @@ public static class ManualOverrideService
             return false;
         }
 
-        bool value = !string.Equals(o.Value, "false", StringComparison.OrdinalIgnoreCase);
+        // Use bool.TryParse for strict parsing; default to true (the affirmative action)
+        // when the value is absent or not a recognised boolean literal.
+        bool value = !bool.TryParse(o.Value, out var parsed) || parsed;
         setter(entry.Node, value);
         entry.Node.Confidence = ConfidenceLevel.Manual;
         return true;
