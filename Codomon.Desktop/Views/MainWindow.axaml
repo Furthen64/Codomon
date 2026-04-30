@@ -60,6 +60,17 @@
           </StackPanel>
         </Border>
 
+        <!-- ── Settings group ───────────────────────────── -->
+        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
+          <StackPanel Spacing="4">
+            <TextBlock Text="APP" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
+                       LetterSpacing="1" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <Button Content="⚙ Settings" Click="OnSettingsClick" Padding="8,3"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
       </StackPanel>
     </Border>
 

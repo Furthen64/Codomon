@@ -1,0 +1,71 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.UserSettingsDialog"
+        Title="User Settings"
+        Width="520" Height="340"
+        MinWidth="440" MinHeight="280"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <StackPanel Spacing="2">
+        <TextBlock Text="User Settings" FontSize="16" FontWeight="Bold" Foreground="White"/>
+        <TextBlock Text="Application-wide preferences stored in %APPDATA%/Codomon/user_config.json."
+                   FontSize="12" Foreground="#88AABB"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button Content="Cancel" Click="OnCancelClick" Padding="16,6" DockPanel.Dock="Left"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <TextBlock x:Name="SaveStatusText" Text="" Foreground="#88AABB" FontSize="11"
+                     VerticalAlignment="Center"/>
+          <Button x:Name="SaveButton" Content="Save Settings" Click="OnSaveClick"
+                  Padding="16,6" Background="#1A3A5A" Foreground="White"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Content area -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="24,18" Spacing="20">
+
+        <!-- Section: Default LLM Settings -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="DEFAULT LLM SETTINGS" FontSize="9" FontWeight="Bold"
+                     Foreground="#4A6A8A" LetterSpacing="1"/>
+          <TextBlock Text="These values are used as defaults when a workspace has no LLM endpoint or model configured."
+                     Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- API Endpoint -->
+        <StackPanel Spacing="6">
+          <TextBlock Text="API Endpoint" Foreground="#AABBCC" FontWeight="SemiBold"/>
+          <TextBlock Text="Base URL of your OpenAI-compatible endpoint (e.g. http://localhost:8080/v1)"
+                     Foreground="#556677" FontSize="11"/>
+          <TextBox x:Name="ApiEndpointBox"
+                   Watermark="http://localhost:8080/v1"/>
+        </StackPanel>
+
+        <!-- Model Name -->
+        <StackPanel Spacing="6">
+          <TextBlock Text="Model Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
+          <TextBlock Text="Default model name passed to the API (e.g. llama3, gpt-4o)."
+                     Foreground="#556677" FontSize="11"/>
+          <TextBox x:Name="ModelNameBox"
+                   Watermark="model name…"/>
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+
+  </DockPanel>
+</Window>
