@@ -51,6 +51,8 @@ public class MainViewModel : INotifyPropertyChanged
             // Re-create the timeline VM; existing data is stale for the new workspace.
             _timeline = new TimelineViewModel();
             OnPropertyChanged(nameof(Timeline));
+            // Reload the System Map from the new workspace.
+            SystemMap.LoadFrom(value.SystemMap);
         }
     }
 
@@ -74,6 +76,14 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public SelectionStateModel Selection { get; } = new SelectionStateModel();
+
+    // ── System Map ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// View-model for the System Map views (System Overview, Module View,
+    /// Code Detail View, Startup View).  Reloaded whenever the workspace changes.
+    /// </summary>
+    public SystemMapViewModel SystemMap { get; } = new SystemMapViewModel();
 
     // ── Log Replay ────────────────────────────────────────────────────────────
 

@@ -1,0 +1,226 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Codomon.Desktop.Views.SystemMapView">
+
+  <DockPanel>
+
+    <!-- ── Toolbar: view selector + filters ──────────────────────────────── -->
+    <Border DockPanel.Dock="Top"
+            Background="#1A2435"
+            BorderThickness="0,0,0,1"
+            BorderBrush="#2A3F5A"
+            Padding="6,4">
+      <DockPanel>
+
+        <!-- View buttons -->
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock Text="VIEW:" VerticalAlignment="Center"
+                     Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
+                     LetterSpacing="1" Margin="0,0,4,0"/>
+          <Button x:Name="BtnSystemOverview"  Content="System Overview" Padding="8,3"/>
+          <Button x:Name="BtnModuleView"      Content="Modules"         Padding="8,3"/>
+          <Button x:Name="BtnCodeDetailView"  Content="Code Detail"     Padding="8,3"/>
+          <Button x:Name="BtnStartupView"     Content="Startup"         Padding="8,3"/>
+        </StackPanel>
+
+        <!-- Filters -->
+        <StackPanel Orientation="Horizontal" Spacing="10"
+                    HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="FILTERS:" VerticalAlignment="Center"
+                     Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
+                     LetterSpacing="1" Margin="0,0,4,0"/>
+          <CheckBox x:Name="CbShowExternal"     Content="External Systems" IsChecked="True"/>
+          <CheckBox x:Name="CbShowLowConf"      Content="Low Confidence"   IsChecked="True"/>
+          <CheckBox x:Name="CbHighValueOnly"    Content="High Value Only"  IsChecked="False"/>
+          <CheckBox x:Name="CbShowStartupEdges" Content="Startup Edges"    IsChecked="False"/>
+        </StackPanel>
+
+      </DockPanel>
+    </Border>
+
+    <!-- ── Main: content area + inspector panel ───────────────────────────── -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="5"/>
+        <ColumnDefinition Width="260" MinWidth="180"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- Column splitter -->
+      <GridSplitter Grid.Column="1"
+                    HorizontalAlignment="Stretch"
+                    Background="#2A3F5A"
+                    ResizeDirection="Columns"/>
+
+      <!-- ── Content area (all 4 views stacked; only one visible at a time) ── -->
+      <Border Grid.Column="0" Background="#0F141E" ClipToBounds="True">
+        <Grid>
+
+          <!-- System Overview panel -->
+          <ScrollViewer x:Name="PanelSystemOverview" IsVisible="True"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="16,12" Spacing="16">
+
+              <TextBlock x:Name="EmptySystemOverviewText"
+                         Text="No Systems found. Use Architecture Hypothesis to detect systems from your codebase."
+                         Foreground="#556677" FontSize="13" TextWrapping="Wrap"
+                         IsVisible="False"/>
+
+              <StackPanel x:Name="SystemsSection" Spacing="10">
+                <TextBlock Text="SYSTEMS" FontSize="9" FontWeight="Bold"
+                           Foreground="#4A6A8A" LetterSpacing="1"/>
+                <ItemsControl x:Name="SystemsItemsControl">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+              </StackPanel>
+
+              <StackPanel x:Name="ExternalSystemsSection" Spacing="10">
+                <TextBlock Text="EXTERNAL SYSTEMS" FontSize="9" FontWeight="Bold"
+                           Foreground="#4A6A8A" LetterSpacing="1"/>
+                <ItemsControl x:Name="ExternalSystemsItemsControl">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <TextBlock x:Name="NoExternalSystemsText"
+                           Text="No external systems defined."
+                           Foreground="#445566" FontSize="11" IsVisible="False"/>
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- Module View panel -->
+          <DockPanel x:Name="PanelModuleView" IsVisible="False">
+            <Border DockPanel.Dock="Top" Background="#141C28"
+                    Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+              <TextBlock x:Name="ModuleViewHeader" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            </Border>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="16,12" Spacing="12">
+                <TextBlock x:Name="NoModulesText"
+                           Text="No modules found for the selected system."
+                           Foreground="#445566" FontSize="11" IsVisible="False"/>
+                <ItemsControl x:Name="ModulesItemsControl">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
+
+          <!-- Code Detail View panel -->
+          <DockPanel x:Name="PanelCodeDetail" IsVisible="False">
+            <Border DockPanel.Dock="Top" Background="#141C28"
+                    Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+              <TextBlock x:Name="CodeDetailHeader" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            </Border>
+            <TextBlock x:Name="NoCodeNodesText"
+                       Text="No code nodes found for the selected scope."
+                       Foreground="#445566" FontSize="11"
+                       IsVisible="False" Margin="16,12"/>
+            <ListBox x:Name="CodeNodesListBox"
+                     Background="Transparent"
+                     SelectionChanged="OnCodeNodeSelected"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+          </DockPanel>
+
+          <!-- Startup View panel -->
+          <ScrollViewer x:Name="PanelStartup" IsVisible="False"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="16,12" Spacing="16">
+
+              <TextBlock x:Name="EmptyStartupText"
+                         Text="No startup information available. Systems with startup mechanisms will appear here."
+                         Foreground="#556677" FontSize="13" TextWrapping="Wrap"
+                         IsVisible="False"/>
+
+              <StackPanel x:Name="StartupItemsSection" Spacing="10">
+                <TextBlock Text="STARTUP ORDER" FontSize="9" FontWeight="Bold"
+                           Foreground="#4A6A8A" LetterSpacing="1"/>
+                <TextBlock Text="Systems are listed roughly in dependency order (dependencies start first)."
+                           Foreground="#445566" FontSize="11" TextWrapping="Wrap"/>
+                <ItemsControl x:Name="StartupItemsControl"/>
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+
+        </Grid>
+      </Border>
+
+      <!-- ── Inspector panel ──────────────────────────────────────────────── -->
+      <Border Grid.Column="2" Background="#141C28"
+              BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
+        <DockPanel>
+
+          <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <TextBlock Text="Inspector" FontWeight="Bold" Foreground="#AABBCC"/>
+          </Border>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12" Spacing="6">
+
+              <TextBlock x:Name="InspNameText"
+                         Text="Nothing selected"
+                         Foreground="White" FontWeight="SemiBold"
+                         FontSize="14" TextWrapping="Wrap"/>
+
+              <!-- Type row -->
+              <StackPanel x:Name="InspTypePanel" IsVisible="False" Spacing="2">
+                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                <TextBlock Text="Type" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                <TextBlock x:Name="InspTypeText" Foreground="#AABBCC" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <!-- Kind row -->
+              <StackPanel x:Name="InspKindPanel" IsVisible="False" Spacing="2">
+                <TextBlock Text="Kind" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                <TextBlock x:Name="InspKindText" Foreground="#AABBCC" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <!-- Confidence row -->
+              <StackPanel x:Name="InspConfPanel" IsVisible="False" Spacing="2">
+                <TextBlock Text="Confidence" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                <TextBlock x:Name="InspConfText" Foreground="#AABBCC"/>
+              </StackPanel>
+
+              <!-- Notes row -->
+              <StackPanel x:Name="InspNotesPanel" IsVisible="False" Spacing="2">
+                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                <TextBlock Text="Notes" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                <TextBlock x:Name="InspNotesText" Foreground="#88AABB"
+                           TextWrapping="Wrap" FontSize="11"/>
+              </StackPanel>
+
+              <!-- Details row -->
+              <StackPanel x:Name="InspDetailsPanel" IsVisible="False" Spacing="4">
+                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                <TextBlock Text="Details" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                <ItemsControl x:Name="InspDetailsItemsControl"/>
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+
+        </DockPanel>
+      </Border>
+
+    </Grid>
+
+  </DockPanel>
+
+</UserControl>

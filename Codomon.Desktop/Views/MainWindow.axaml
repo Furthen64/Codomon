@@ -165,14 +165,23 @@
           </DockPanel>
         </Border>
 
-        <!-- Center Panel: Canvas -->
+        <!-- Center Panel: Graph / System Map tabs -->
         <Border Grid.Column="1" Background="#0F141E" ClipToBounds="True">
-          <DockPanel>
-            <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-              <TextBlock Text="Canvas" FontWeight="Bold" Foreground="#AABBCC"/>
-            </Border>
-            <ContentControl x:Name="CanvasHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
-          </DockPanel>
+          <TabControl x:Name="CenterTabControl"
+                      Background="Transparent"
+                      BorderThickness="0,0,0,1"
+                      BorderBrush="#2A3F5A">
+            <TabItem Header="Graph">
+              <ContentControl x:Name="CanvasHost"
+                              HorizontalContentAlignment="Stretch"
+                              VerticalContentAlignment="Stretch"/>
+            </TabItem>
+            <TabItem Header="System Map">
+              <ContentControl x:Name="SystemMapHost"
+                              HorizontalContentAlignment="Stretch"
+                              VerticalContentAlignment="Stretch"/>
+            </TabItem>
+          </TabControl>
         </Border>
 
         <!-- Right Panel: Properties -->
