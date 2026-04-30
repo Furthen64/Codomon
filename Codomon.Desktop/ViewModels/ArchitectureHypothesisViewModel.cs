@@ -215,6 +215,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         suggestion.IsAccepted = true;
         AcceptedCount++;
         AppLogger.Info($"[Hypothesis] Accepted system: {system.Name}");
+        ReapplyManualOverrides();
         return system;
     }
 
@@ -234,6 +235,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         targetSystem.Modules.Add(module);
         AcceptedCount++;
         AppLogger.Info($"[Hypothesis] Accepted module: {module.Name} → {targetSystem.Name}");
+        ReapplyManualOverrides();
         return module;
     }
 
@@ -281,6 +283,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         suggestion.IsAccepted = true;
         AcceptedCount++;
         AppLogger.Info($"[Hypothesis] Accepted high-value node: {node.Name}");
+        ReapplyManualOverrides();
         return node;
     }
 
@@ -299,6 +302,16 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         foreach (var n in _currentHypothesis.HighValueNodes)   HighValueNodes.Add(n);
         foreach (var u in _currentHypothesis.Startup)          Startup.Add(u);
         foreach (var a in _currentHypothesis.UncertainAreas)   UncertainAreas.Add(a);
+    }
+
+    /// <summary>
+    /// Re-applies all stored manual overrides after any analysis pass that may have
+    /// added or modified entities in the System Map.
+    /// </summary>
+    private void ReapplyManualOverrides()
+    {
+        if (_workspace.SystemMap.ManualOverrides.Count == 0) return;
+        ManualOverrideService.Apply(_workspace.SystemMap, _workspace.SystemMap.ManualOverrides);
     }
 
     private void ReportProgress(string message)
