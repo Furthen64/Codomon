@@ -1,4 +1,5 @@
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -31,8 +32,14 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         _workspaceFolderPath = workspaceFolderPath;
 
         // Copy settings from model so edits are buffered until user saves.
-        _apiEndpoint = workspace.LlmSettings.ApiEndpoint;
-        _modelName = workspace.LlmSettings.ModelName;
+        // Fall back to the user-wide default LLM settings when the workspace has none configured.
+        var userConfig = UserConfigService.Load();
+        _apiEndpoint = !string.IsNullOrEmpty(workspace.LlmSettings.ApiEndpoint)
+            ? workspace.LlmSettings.ApiEndpoint
+            : userConfig.DefaultLlmSettings.ApiEndpoint;
+        _modelName = !string.IsNullOrEmpty(workspace.LlmSettings.ModelName)
+            ? workspace.LlmSettings.ModelName
+            : userConfig.DefaultLlmSettings.ModelName;
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────

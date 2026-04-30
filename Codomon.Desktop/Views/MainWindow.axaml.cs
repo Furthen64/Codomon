@@ -1337,6 +1337,12 @@ public partial class MainWindow : Window
         _devConsole.Show(this);
     }
 
+    private async void OnSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var dialog = new UserSettingsDialog();
+        await dialog.ShowDialog(this);
+    }
+
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (!_vm.IsDirty) return;
