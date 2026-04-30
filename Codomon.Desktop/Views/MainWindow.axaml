@@ -53,6 +53,7 @@
               <Button Content="Scan"         Click="OnScanClick"    Padding="8,3"/>
               <Button Content="Run"          Padding="8,3"/>
               <Button Content="Summaries"    Click="OnSummariesClick" Padding="8,3"/>
+              <Button Content="Hypothesis"   Click="OnHypothesisClick" Padding="8,3"/>
               <Button Content="Replay Logs"  Click="OnImportLogClick" Padding="8,3"/>
               <Button Content="Dev Console"  Click="OnDevConsoleClick" Padding="8,3"/>
             </StackPanel>

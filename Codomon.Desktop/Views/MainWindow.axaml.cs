@@ -1194,6 +1194,31 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Architecture Hypothesis ───────────────────────────────────────────────
+
+    private async void OnHypothesisClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before using Architecture Hypothesis.");
+            return;
+        }
+
+        var hypothesisVm = new ViewModels.ArchitectureHypothesisViewModel(
+            _vm.Workspace,
+            _vm.WorkspaceFolderPath);
+
+        var dialog = new ArchitectureHypothesisDialog(hypothesisVm);
+        await dialog.ShowDialog(this);
+
+        // If any suggestions were accepted into the System Map mark the workspace dirty.
+        if (_vm.Workspace.SystemMap.Systems.Count > 0 ||
+            _vm.Workspace.SystemMap.AllModules.Any())
+        {
+            _vm.IsDirty = true;
+        }
+    }
+
     // ── Connections panel (Roslyn-origin connections) ─────────────────────────
 
     /// <summary>
