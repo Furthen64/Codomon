@@ -287,6 +287,21 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         return node;
     }
 
+    /// <summary>
+    /// Clears all Systems, Modules, ExternalSystems, and Relationships from the
+    /// workspace System Map, leaving ManualOverrides intact.
+    /// Call this before applying new hypothesis results when the user wants a fresh canvas.
+    /// </summary>
+    public void ClearSystemMap()
+    {
+        _workspace.SystemMap.Systems.Clear();
+        _workspace.SystemMap.Modules.Clear();
+        _workspace.SystemMap.ExternalSystems.Clear();
+        _workspace.SystemMap.Relationships.Clear();
+        StatusMessage = "Canvas cleared.";
+        AppLogger.Info("[Hypothesis] System Map cleared by user.");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void RebuildCollections()

@@ -1211,6 +1211,9 @@ public partial class MainWindow : Window
         var dialog = new ArchitectureHypothesisDialog(hypothesisVm);
         await dialog.ShowDialog(this);
 
+        // Always sync the System Map view model so canvas reflects any accepted or cleared data.
+        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap);
+
         // Mark workspace dirty only if the user actually accepted suggestions into the System Map.
         if (hypothesisVm.AcceptedCount > 0)
             _vm.IsDirty = true;

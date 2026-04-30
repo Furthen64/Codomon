@@ -200,6 +200,44 @@
         </ScrollViewer>
       </TabItem>
 
+      <!-- ── Tab 6: Finish ──────────────────────────────────────────────────── -->
+      <TabItem Header="Finish">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="20,16" Spacing="16">
+
+            <TextBlock Text="Finish &amp; Apply to Canvas"
+                       Foreground="#AABBCC" FontWeight="SemiBold" FontSize="13"/>
+            <TextBlock Text="Apply accepted items to the System Map canvas. Optionally clear the current canvas first to start from a clean slate."
+                       Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <TextBlock x:Name="FinishSummaryText"
+                       Foreground="#88AABB" FontSize="12" TextWrapping="Wrap"
+                       Text="No items accepted yet. Go to the Accept tab to accept suggestions."/>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Canvas Actions" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Clear current canvas"
+                        Click="OnClearCanvasClick" Padding="12,6"
+                        Background="#3A1A1A" Foreground="#FFAAAA"/>
+                <Button Content="Apply to Canvas"
+                        Click="OnApplyToCanvasClick" Padding="12,6"
+                        Background="#1A3A2A" Foreground="#AAFFAA"/>
+              </StackPanel>
+              <TextBlock Text="'Apply to Canvas' closes this dialog and refreshes the System Map view."
+                         Foreground="#445566" FontSize="10" TextWrapping="Wrap"/>
+              <TextBlock Text="'Clear current canvas' removes all existing Systems, Modules, External Systems and Relationships from the canvas (Manual Overrides are preserved)."
+                         Foreground="#445566" FontSize="10" TextWrapping="Wrap"/>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
     </TabControl>
 
   </DockPanel>
