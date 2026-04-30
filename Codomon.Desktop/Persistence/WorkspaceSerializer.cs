@@ -3,6 +3,7 @@ using System.Text.Json;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.Persistence.Dto;
+using Codomon.Desktop.Services;
 
 namespace Codomon.Desktop.Persistence;
 
@@ -347,6 +348,10 @@ public static class WorkspaceSerializer
 
         workspace.SystemMap = DtoToSystemMap(systemMapDto);
 
+        // Re-apply any stored manual overrides so that human curation is always
+        // the final authority, regardless of which analysis pass last ran.
+        ManualOverrideService.Apply(workspace.SystemMap, workspace.SystemMap.ManualOverrides);
+
         return workspace;
     }
 
@@ -614,7 +619,10 @@ public static class WorkspaceSerializer
         FilePath = n.FilePath,
         Notes = n.Notes,
         Confidence = n.Confidence.ToString(),
-        Evidence = n.Evidence.Select(EvidenceToDto).ToList()
+        Evidence = n.Evidence.Select(EvidenceToDto).ToList(),
+        IsHighValue = n.IsHighValue,
+        IsNoisy = n.IsNoisy,
+        HideFromOverview = n.HideFromOverview
     };
 
     private static CodeNodeModel DtoToCodeNode(CodeNodeDto dto) => new()
@@ -626,7 +634,10 @@ public static class WorkspaceSerializer
         FilePath = dto.FilePath,
         Notes = dto.Notes,
         Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var nc) ? nc : ConfidenceLevel.Unknown,
-        Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
+        Evidence = dto.Evidence.Select(DtoToEvidence).ToList(),
+        IsHighValue = dto.IsHighValue,
+        IsNoisy = dto.IsNoisy,
+        HideFromOverview = dto.HideFromOverview
     };
 
     private static ExternalSystemDto ExternalSystemToDto(ExternalSystemModel e) => new()
@@ -675,7 +686,7 @@ public static class WorkspaceSerializer
     {
         Id = o.Id,
         TargetId = o.TargetId,
-        OverrideType = o.OverrideType,
+        OverrideType = o.Type.ToString(),
         Value = o.Value,
         Notes = o.Notes,
         CreatedAt = o.CreatedAt
@@ -685,7 +696,9 @@ public static class WorkspaceSerializer
     {
         Id = dto.Id,
         TargetId = dto.TargetId,
-        OverrideType = dto.OverrideType,
+        Type = Enum.TryParse<ManualOverrideType>(dto.OverrideType, out var ot)
+            ? ot
+            : ManualOverrideType.Rename,
         Value = dto.Value,
         Notes = dto.Notes,
         CreatedAt = dto.CreatedAt

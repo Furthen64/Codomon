@@ -29,4 +29,26 @@ public class CodeNodeModel
 
     /// <summary>Evidence that supports this node's placement.</summary>
     public List<EvidenceModel> Evidence { get; set; } = new();
+
+    // ── Manual curation flags ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// True when a human has explicitly marked this node as high-value (architecturally
+    /// significant). Automatically true for node kinds in
+    /// <see cref="CodeNodeKind.EntryPoint"/>, <see cref="CodeNodeKind.Service"/>, etc.
+    /// when confirmed by a <see cref="ManualOverrideType.MarkHighValue"/> override.
+    /// </summary>
+    public bool IsHighValue { get; set; }
+
+    /// <summary>
+    /// True when a human has marked this node as noisy/supporting — it is low-signal
+    /// boilerplate and should be de-emphasised in views.
+    /// </summary>
+    public bool IsNoisy { get; set; }
+
+    /// <summary>
+    /// True when a human has requested this node be hidden from the high-level overview.
+    /// The node still exists in the model and detail views.
+    /// </summary>
+    public bool HideFromOverview { get; set; }
 }

@@ -86,3 +86,51 @@ public enum RelationshipKind
     Hosts,
     Other
 }
+
+/// <summary>
+/// The kind of manual correction recorded in a <see cref="ManualOverrideModel"/>.
+/// </summary>
+public enum ManualOverrideType
+{
+    /// <summary>Rename a System, Module, or Code Node. <c>Value</c> = new name.</summary>
+    Rename,
+
+    /// <summary>Assign a Module or Code Node to a System. <c>Value</c> = target system ID.</summary>
+    AssignToSystem,
+
+    /// <summary>Move a Code Node to a different Module. <c>Value</c> = target module ID.</summary>
+    AssignToModule,
+
+    /// <summary>Mark a Code Node as high-value. <c>Value</c> = "true" or "false".</summary>
+    MarkHighValue,
+
+    /// <summary>Mark a Code Node as noisy/supporting (low signal). <c>Value</c> = "true" or "false".</summary>
+    MarkNoisy,
+
+    /// <summary>Exclude a Code Node from the overview. <c>Value</c> = "true" or "false".</summary>
+    HideFromOverview,
+
+    /// <summary>Set the startup mechanism on a System. <c>Value</c> = mechanism string.</summary>
+    SetStartupMechanism,
+
+    /// <summary>
+    /// Add a typed relationship between two entities.
+    /// <c>TargetId</c> = from-entity ID; <c>Value</c> = "to-entity-id|RelationshipKind".
+    /// </summary>
+    AddRelationship,
+
+    /// <summary>Remove a relationship from the System Map. <c>TargetId</c> = relationship ID.</summary>
+    RemoveRelationship,
+
+    /// <summary>
+    /// Pin the canvas position of an entity.
+    /// <c>TargetId</c> = entity ID; <c>Value</c> = "x,y".
+    /// </summary>
+    PinPosition,
+
+    /// <summary>Accept an LLM-generated suggestion. <c>TargetId</c> = suggestion reference.</summary>
+    AcceptSuggestion,
+
+    /// <summary>Reject an LLM-generated suggestion. <c>TargetId</c> = suggestion reference.</summary>
+    RejectSuggestion,
+}

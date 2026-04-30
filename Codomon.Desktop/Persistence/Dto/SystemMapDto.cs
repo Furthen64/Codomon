@@ -21,6 +21,9 @@ public class CodeNodeDto
     public string Notes { get; set; } = string.Empty;
     public string Confidence { get; set; } = "Unknown";
     public List<EvidenceDto> Evidence { get; set; } = new();
+    public bool IsHighValue { get; set; }
+    public bool IsNoisy { get; set; }
+    public bool HideFromOverview { get; set; }
 }
 
 public class ModuleDto
@@ -75,6 +78,7 @@ public class ManualOverrideDto
 {
     public string Id { get; set; } = string.Empty;
     public string TargetId { get; set; } = string.Empty;
+    /// <summary>String representation of <see cref="ManualOverrideType"/> for JSON stability.</summary>
     public string OverrideType { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;

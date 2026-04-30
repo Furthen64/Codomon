@@ -11,13 +11,13 @@ public class ManualOverrideModel
     /// <summary>The ID of the System Map entity this override applies to.</summary>
     public string TargetId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The kind of override (e.g. "AssignToModule", "RemoveFromSystem", "Rename",
-    /// "SetKind", "SetConfidence").
-    /// </summary>
-    public string OverrideType { get; set; } = string.Empty;
+    /// <summary>The kind of correction being recorded.</summary>
+    public ManualOverrideType Type { get; set; } = ManualOverrideType.Rename;
 
-    /// <summary>The new value imposed by this override (interpretation depends on <see cref="OverrideType"/>).</summary>
+    /// <summary>
+    /// The new value imposed by this override.
+    /// Interpretation depends on <see cref="Type"/>; see <see cref="ManualOverrideType"/> for details.
+    /// </summary>
     public string Value { get; set; } = string.Empty;
 
     /// <summary>Optional human notes explaining why this override was applied.</summary>

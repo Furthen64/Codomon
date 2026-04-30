@@ -56,6 +56,8 @@ public class CodeNodeItemVm
     public string FilePath       { get; init; } = string.Empty;
     public string ModuleName     { get; init; } = string.Empty;
     public bool IsHighValue      { get; init; }
+    public bool IsNoisy          { get; init; }
+    public bool HideFromOverview { get; init; }
     public string SourceModuleId { get; init; } = string.Empty;
 }
 
@@ -299,7 +301,9 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 FullName       = cn.FullName,
                 FilePath       = cn.FilePath,
                 ModuleName     = ownerModule?.Name ?? string.Empty,
-                IsHighValue    = HighValueKinds.Contains(cn.Kind),
+                IsHighValue    = cn.IsHighValue || HighValueKinds.Contains(cn.Kind),
+                IsNoisy        = cn.IsNoisy,
+                HideFromOverview = cn.HideFromOverview,
                 SourceModuleId = ownerModule?.Id ?? string.Empty
             };
         }).ToList();
