@@ -1,8 +1,8 @@
 using Avalonia.Controls;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Codomon.Desktop.Models;
 using System.Collections.Specialized;
+using System.Text;
 
 namespace Codomon.Desktop.Views;
 
@@ -47,12 +47,11 @@ public partial class DevConsoleWindow : Window
 
     private void RefreshList()
     {
-        var list = this.FindControl<ItemsControl>("LogItems");
-        if (list == null) return;
-
-        list.Items.Clear();
+        var logBox = this.FindControl<TextBox>("LogBox");
+        if (logBox == null) return;
 
         var filterLower = _filter.ToLowerInvariant();
+        var sb = new StringBuilder();
 
         foreach (var entry in AppLogger.Entries)
         {
@@ -60,23 +59,13 @@ public partial class DevConsoleWindow : Window
                 !entry.Formatted.ToLowerInvariant().Contains(filterLower))
                 continue;
 
-            var tb = new SelectableTextBlock
-            {
-                Text = entry.Formatted,
-                FontFamily = new FontFamily("Monospace"),
-                FontSize = 12,
-                Foreground = new SolidColorBrush(Avalonia.Media.Color.Parse(entry.LevelColor)),
-                Padding = new Avalonia.Thickness(8, 2),
-                TextWrapping = TextWrapping.NoWrap
-            };
-            list.Items.Add(tb);
+            sb.AppendLine(entry.Formatted);
         }
+
+        logBox.Text = sb.ToString();
 
         // Auto-scroll to bottom when no filter is active.
         if (string.IsNullOrEmpty(_filter))
-        {
-            var scroller = this.FindControl<ScrollViewer>("LogScroller");
-            scroller?.ScrollToEnd();
-        }
+            logBox.CaretIndex = logBox.Text?.Length ?? 0;
     }
 }
