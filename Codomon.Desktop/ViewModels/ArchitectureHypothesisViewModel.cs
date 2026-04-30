@@ -16,6 +16,8 @@ namespace Codomon.Desktop.ViewModels;
 /// </summary>
 public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 {
+    private const string DefaultWorkspaceEndpoint = "http://localhost:8080/v1";
+
     private readonly WorkspaceModel _workspace;
     private readonly string _workspaceFolderPath;
     private readonly string _apiEndpoint;
@@ -35,7 +37,11 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 
         // Fall back to user-level defaults when workspace LLM settings are not configured yet.
         var userConfig = UserConfigService.Load();
-        _apiEndpoint = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ApiEndpoint)
+        var hasExplicitWorkspaceEndpoint = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ApiEndpoint)
+            && (!string.Equals(workspace.LlmSettings.ApiEndpoint, DefaultWorkspaceEndpoint, StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName));
+
+        _apiEndpoint = hasExplicitWorkspaceEndpoint
             ? workspace.LlmSettings.ApiEndpoint
             : userConfig.DefaultLlmSettings.ApiEndpoint;
         _modelName = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName)

@@ -13,6 +13,8 @@ namespace Codomon.Desktop.ViewModels;
 /// </summary>
 public class LlmSummaryViewModel : INotifyPropertyChanged
 {
+    private const string DefaultWorkspaceEndpoint = "http://localhost:8080/v1";
+
     private readonly WorkspaceModel _workspace;
     private readonly string _workspaceFolderPath;
 
@@ -34,7 +36,11 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         // Copy settings from model so edits are buffered until user saves.
         // Fall back to the user-wide default LLM settings when the workspace has none configured.
         var userConfig = UserConfigService.Load();
-        _apiEndpoint = !string.IsNullOrEmpty(workspace.LlmSettings.ApiEndpoint)
+        var hasExplicitWorkspaceEndpoint = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ApiEndpoint)
+            && (!string.Equals(workspace.LlmSettings.ApiEndpoint, DefaultWorkspaceEndpoint, StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName));
+
+        _apiEndpoint = hasExplicitWorkspaceEndpoint
             ? workspace.LlmSettings.ApiEndpoint
             : userConfig.DefaultLlmSettings.ApiEndpoint;
         _modelName = !string.IsNullOrEmpty(workspace.LlmSettings.ModelName)

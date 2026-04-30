@@ -27,6 +27,7 @@ public partial class ImportWizardDialog : Window
         PopulateKnownFormatComboBox();
         PopulateTimestampFormatComboBox();
         PopulateTimeZoneComboBox();
+        ApplyImportDefaults();
         SyncStepUi();
     }
 
@@ -126,7 +127,7 @@ public partial class ImportWizardDialog : Window
         combo.Items.Clear();
         foreach (var opt in ImportWizardViewModel.DelimiterOptions)
             combo.Items.Add(new ComboBoxItem { Content = opt.Label, Tag = opt.Key });
-        combo.SelectedIndex = 0; // Tab by default
+        combo.SelectedIndex = 0; // default overridden by ApplyImportDefaults()
     }
 
     private void PopulateTimestampFormatComboBox()
@@ -135,7 +136,7 @@ public partial class ImportWizardDialog : Window
         combo.Items.Clear();
         foreach (var opt in ImportWizardViewModel.TimestampFormatOptions)
             combo.Items.Add(new ComboBoxItem { Content = opt.Label, Tag = opt.Key });
-        combo.SelectedIndex = 0; // Auto-detect by default
+        combo.SelectedIndex = 0; // default overridden by ApplyImportDefaults()
     }
 
     private void PopulateTimeZoneComboBox()
@@ -144,7 +145,7 @@ public partial class ImportWizardDialog : Window
         combo.Items.Clear();
         foreach (var opt in ImportWizardViewModel.TimeZoneOptions)
             combo.Items.Add(new ComboBoxItem { Content = opt.Label, Tag = opt.Id });
-        combo.SelectedIndex = 0; // UTC by default
+        combo.SelectedIndex = 0; // default overridden by ApplyImportDefaults()
     }
 
     private void PopulateKnownFormatComboBox()
@@ -153,7 +154,19 @@ public partial class ImportWizardDialog : Window
         combo.Items.Clear();
         foreach (var fmt in ImportWizardViewModel.KnownAppLogFormats)
             combo.Items.Add(new ComboBoxItem { Content = fmt.Label, Tag = fmt.Key });
-        combo.SelectedIndex = 0; // "None" by default
+        combo.SelectedIndex = 0; // default overridden by ApplyImportDefaults()
+    }
+
+    /// <summary>
+    /// Applies user-configured import defaults to the combo boxes after they have been populated.
+    /// </summary>
+    private void ApplyImportDefaults()
+    {
+        var cfg = Codomon.Desktop.Persistence.UserConfigService.Load();
+        SelectComboByTag(this.FindControl<ComboBox>("DelimiterComboBox")!,       cfg.DefaultImportDelimiterKey);
+        SelectComboByTag(this.FindControl<ComboBox>("TimestampFormatComboBox")!, cfg.DefaultImportTimestampFormatKey);
+        SelectComboByTag(this.FindControl<ComboBox>("TimeZoneComboBox")!,        cfg.DefaultImportTimeZoneId);
+        SelectComboByTag(this.FindControl<ComboBox>("KnownFormatComboBox")!,     cfg.DefaultImportKnownFormatKey);
     }
 
     /// <summary>

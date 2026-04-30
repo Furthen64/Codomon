@@ -33,10 +33,11 @@ public static class AutosaveService
 
     /// <summary>
     /// Creates a timestamped autosave snapshot inside <paramref name="workspaceFolderPath"/>/autosaves/,
-    /// writes a .wshash integrity file, and prunes autosaves beyond <see cref="MaxAutosaves"/>.
+    /// writes a .wshash integrity file, and prunes autosaves beyond <paramref name="maxAutosaves"/>.
     /// </summary>
+    /// <param name="maxAutosaves">Maximum snapshots to retain; defaults to the built-in constant.</param>
     /// <returns>The path of the newly created autosave folder.</returns>
-    public static async Task<string> CreateAutosaveAsync(string workspaceFolderPath)
+    public static async Task<string> CreateAutosaveAsync(string workspaceFolderPath, int maxAutosaves = MaxAutosaves)
     {
         var timestamp = DateTime.Now.ToString(TimestampFormat, CultureInfo.InvariantCulture);
         var autosaveName = $"{AutosavePrefix}{timestamp}";
@@ -62,7 +63,7 @@ public static class AutosaveService
         var hash = await ComputeHashAsync(autosavePath);
         await File.WriteAllTextAsync(System.IO.Path.Combine(autosavePath, HashFileName), hash);
 
-        PruneAutosaves(workspaceFolderPath);
+        PruneAutosaves(workspaceFolderPath, maxAutosaves);
 
         return autosavePath;
     }
@@ -140,10 +141,10 @@ public static class AutosaveService
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private static void PruneAutosaves(string workspaceFolderPath)
+    private static void PruneAutosaves(string workspaceFolderPath, int maxAutosaves = MaxAutosaves)
     {
         var entries = GetAutosaveEntries(workspaceFolderPath);
-        foreach (var old in entries.Skip(MaxAutosaves))
+        foreach (var old in entries.Skip(maxAutosaves))
             Directory.Delete(old.Path, recursive: true);
     }
 

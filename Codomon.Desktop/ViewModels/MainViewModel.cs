@@ -338,7 +338,7 @@ public class MainViewModel : INotifyPropertyChanged
         HasWorkspace = true;
         ClearSelection();
         StatusMessage = $"New workspace created: {folderPath}";
-        RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName);
+        RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName, Math.Max(1, UserConfigService.Load().MaxRecentWorkspaces));
         StartAutosaveTimer();
         await TryCreateAutosaveAsync();
     }
@@ -352,7 +352,7 @@ public class MainViewModel : INotifyPropertyChanged
         HasWorkspace = true;
         ClearSelection();
         StatusMessage = $"Opened: {folderPath}";
-        RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName);
+        RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName, Math.Max(1, UserConfigService.Load().MaxRecentWorkspaces));
         StartAutosaveTimer();
     }
 
@@ -410,7 +410,8 @@ public class MainViewModel : INotifyPropertyChanged
         _autosaveTimer?.Dispose();
         if (string.IsNullOrEmpty(WorkspaceFolderPath)) return;
 
-        _autosaveTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds)
+        var intervalMinutes = Math.Max(1, UserConfigService.Load().AutosaveIntervalMinutes);
+        _autosaveTimer = new System.Timers.Timer(TimeSpan.FromMinutes(intervalMinutes).TotalMilliseconds)
         {
             AutoReset = true
         };
@@ -427,7 +428,8 @@ public class MainViewModel : INotifyPropertyChanged
         if (string.IsNullOrEmpty(WorkspaceFolderPath)) return;
         try
         {
-            await AutosaveService.CreateAutosaveAsync(WorkspaceFolderPath);
+            var maxAutosaves = Math.Max(1, UserConfigService.Load().MaxAutosaves);
+            await AutosaveService.CreateAutosaveAsync(WorkspaceFolderPath, maxAutosaves);
         }
         catch (Exception ex)
         {

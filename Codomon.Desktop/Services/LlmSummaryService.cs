@@ -335,7 +335,7 @@ public static class LlmSummaryService
 
     private static string BuildChatCompletionsUrl(string apiEndpoint)
     {
-        var base_ = apiEndpoint.TrimEnd('/');
+        var base_ = NormalizeApiEndpoint(apiEndpoint);
         // Avoid appending twice when the caller already includes the path.
         if (base_.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
             return base_;
@@ -344,13 +344,21 @@ public static class LlmSummaryService
 
     private static string BuildModelsUrl(string apiEndpoint)
     {
-        var base_ = apiEndpoint.TrimEnd('/');
+        var base_ = NormalizeApiEndpoint(apiEndpoint);
         if (base_.EndsWith("/models", StringComparison.OrdinalIgnoreCase))
             return base_;
         // Strip any trailing API path so we always append to the base URL.
         if (base_.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
             base_ = base_[..^"/chat/completions".Length];
         return base_ + "/models";
+    }
+
+    private static string NormalizeApiEndpoint(string apiEndpoint)
+    {
+        var base_ = (apiEndpoint ?? string.Empty).Trim();
+        if (!base_.Contains("://", StringComparison.Ordinal))
+            base_ = "http://" + base_;
+        return base_.TrimEnd('/');
     }
 
     /// <summary>

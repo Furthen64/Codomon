@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
+using Codomon.Desktop.ViewModels;
 
 namespace Codomon.Desktop.Views;
 
@@ -31,7 +32,78 @@ public partial class UserSettingsDialog : Window
         if (endpointBox != null) endpointBox.Text = _config.DefaultLlmSettings.ApiEndpoint;
         if (modelBox    != null) modelBox.Text    = _config.DefaultLlmSettings.ModelName;
         if (pathText    != null) pathText.Text    = $"Path: {UserConfigService.GetConfigFilePath()}";
+
+        // Autosave
+        var autosaveInterval = this.FindControl<NumericUpDown>("AutosaveIntervalBox");
+        var maxAutosaves     = this.FindControl<NumericUpDown>("MaxAutosavesBox");
+        if (autosaveInterval != null) autosaveInterval.Value = _config.AutosaveIntervalMinutes;
+        if (maxAutosaves     != null) maxAutosaves.Value     = _config.MaxAutosaves;
+
+        // Recent workspaces
+        var maxRecent = this.FindControl<NumericUpDown>("MaxRecentWorkspacesBox");
+        if (maxRecent != null) maxRecent.Value = _config.MaxRecentWorkspaces;
+
+        // Replay speed
+        PopulateReplaySpeedComboBox();
+
+        // Import defaults
+        PopulateImportDefaultComboBox("DefaultDelimiterComboBox",
+            ImportWizardViewModel.DelimiterOptions.Select(o => (o.Label, o.Key)),
+            _config.DefaultImportDelimiterKey);
+        PopulateImportDefaultComboBox("DefaultKnownFormatComboBox",
+            ImportWizardViewModel.KnownAppLogFormats.Select(o => (o.Label, o.Key)),
+            _config.DefaultImportKnownFormatKey);
+        PopulateImportDefaultComboBox("DefaultTimestampFormatComboBox",
+            ImportWizardViewModel.TimestampFormatOptions.Select(o => (o.Label, o.Key)),
+            _config.DefaultImportTimestampFormatKey);
+        PopulateImportDefaultComboBox("DefaultTimeZoneComboBox",
+            ImportWizardViewModel.TimeZoneOptions.Select(o => (o.Label, o.Id)),
+            _config.DefaultImportTimeZoneId);
     }
+
+    private void PopulateReplaySpeedComboBox()
+    {
+        var combo = this.FindControl<ComboBox>("DefaultReplaySpeedComboBox");
+        if (combo == null) return;
+
+        var speeds = new[] { ("0.5×", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0), ("8×", 8.0) };
+        combo.Items.Clear();
+        foreach (var (label, value) in speeds)
+            combo.Items.Add(new ComboBoxItem
+            {
+                Content = label,
+                Tag = value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
+
+        int bestIndex = 1;
+        double bestDiff = double.MaxValue;
+        for (int i = 0; i < speeds.Length; i++)
+        {
+            var diff = Math.Abs(speeds[i].Item2 - _config.DefaultReplaySpeed);
+            if (diff < bestDiff) { bestDiff = diff; bestIndex = i; }
+        }
+        combo.SelectedIndex = bestIndex;
+    }
+
+    private void PopulateImportDefaultComboBox(string controlName,
+        IEnumerable<(string Label, string Key)> options, string selectedKey)
+    {
+        var combo = this.FindControl<ComboBox>(controlName);
+        if (combo == null) return;
+
+        combo.Items.Clear();
+        int selectIndex = 0, i = 0;
+        foreach (var (label, key) in options)
+        {
+            combo.Items.Add(new ComboBoxItem { Content = label, Tag = key });
+            if (key == selectedKey) selectIndex = i;
+            i++;
+        }
+        combo.SelectedIndex = selectIndex;
+    }
+
+    private static string? GetSelectedTag(ComboBox? combo)
+        => combo?.SelectedItem is ComboBoxItem item ? item.Tag?.ToString() : null;
 
     // ── Button handlers ───────────────────────────────────────────────────────
 
@@ -43,6 +115,31 @@ public partial class UserSettingsDialog : Window
 
         _config.DefaultLlmSettings.ApiEndpoint = endpointBox?.Text?.Trim() ?? string.Empty;
         _config.DefaultLlmSettings.ModelName   = modelBox?.Text?.Trim()    ?? string.Empty;
+
+        // Autosave
+        var autosaveInterval = this.FindControl<NumericUpDown>("AutosaveIntervalBox");
+        var maxAutosaves     = this.FindControl<NumericUpDown>("MaxAutosavesBox");
+        if (autosaveInterval?.Value is decimal iv) _config.AutosaveIntervalMinutes = Math.Max(1, (int)iv);
+        if (maxAutosaves?.Value     is decimal mv) _config.MaxAutosaves            = Math.Max(1, (int)mv);
+
+        // Recent workspaces
+        var maxRecent = this.FindControl<NumericUpDown>("MaxRecentWorkspacesBox");
+        if (maxRecent?.Value is decimal rv) _config.MaxRecentWorkspaces = Math.Max(1, (int)rv);
+
+        // Replay speed
+        var replayCombo = this.FindControl<ComboBox>("DefaultReplaySpeedComboBox");
+        if (replayCombo?.SelectedItem is ComboBoxItem replayItem &&
+            double.TryParse(replayItem.Tag?.ToString(),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var speed))
+            _config.DefaultReplaySpeed = speed;
+
+        // Import defaults
+        _config.DefaultImportDelimiterKey       = GetSelectedTag(this.FindControl<ComboBox>("DefaultDelimiterComboBox"))       ?? _config.DefaultImportDelimiterKey;
+        _config.DefaultImportKnownFormatKey     = GetSelectedTag(this.FindControl<ComboBox>("DefaultKnownFormatComboBox"))     ?? _config.DefaultImportKnownFormatKey;
+        _config.DefaultImportTimestampFormatKey = GetSelectedTag(this.FindControl<ComboBox>("DefaultTimestampFormatComboBox")) ?? _config.DefaultImportTimestampFormatKey;
+        _config.DefaultImportTimeZoneId         = GetSelectedTag(this.FindControl<ComboBox>("DefaultTimeZoneComboBox"))        ?? _config.DefaultImportTimeZoneId;
 
         UserConfigService.Save(_config);
 

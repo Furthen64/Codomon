@@ -457,10 +457,18 @@ public static class ArchitectureHypothesisService
 
     private static string BuildChatCompletionsUrl(string apiEndpoint)
     {
-        var base_ = apiEndpoint.TrimEnd('/');
+        var base_ = NormalizeApiEndpoint(apiEndpoint);
         if (base_.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
             return base_;
         return base_ + "/chat/completions";
+    }
+
+    private static string NormalizeApiEndpoint(string apiEndpoint)
+    {
+        var base_ = (apiEndpoint ?? string.Empty).Trim();
+        if (!base_.Contains("://", StringComparison.Ordinal))
+            base_ = "http://" + base_;
+        return base_.TrimEnd('/');
     }
 
     // ── OpenAI-compatible JSON DTOs ───────────────────────────────────────────

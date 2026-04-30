@@ -67,7 +67,8 @@ public static class RecentWorkspacesService
     /// Records <paramref name="folderPath"/> as recently opened (or updates its entry if it
     /// already exists) and saves the updated list to disk.
     /// </summary>
-    public static void AddOrUpdate(string folderPath, string workspaceName)
+    /// <param name="maxEntries">Maximum entries to retain; defaults to the built-in constant.</param>
+    public static void AddOrUpdate(string folderPath, string workspaceName, int maxEntries = MaxEntries)
     {
         if (string.IsNullOrWhiteSpace(folderPath)) return;
 
@@ -85,8 +86,8 @@ public static class RecentWorkspacesService
         });
 
         // Keep list bounded.
-        if (entries.Count > MaxEntries)
-            entries = entries.Take(MaxEntries).ToList();
+        if (entries.Count > maxEntries)
+            entries = entries.Take(maxEntries).ToList();
 
         Save(entries);
     }

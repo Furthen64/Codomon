@@ -998,7 +998,17 @@ public partial class MainWindow : Window
                 Tag = value.ToString(System.Globalization.CultureInfo.InvariantCulture)
             });
         }
-        combo.SelectedIndex = 1;  // 1× default
+
+        // Select the speed closest to the user's default preference.
+        var defaultSpeed = UserConfigService.Load().DefaultReplaySpeed;
+        int bestIndex = 1; // fallback: 1×
+        double bestDiff = double.MaxValue;
+        for (int i = 0; i < speeds.Length; i++)
+        {
+            var diff = Math.Abs(speeds[i].Item2 - defaultSpeed);
+            if (diff < bestDiff) { bestDiff = diff; bestIndex = i; }
+        }
+        combo.SelectedIndex = bestIndex;
     }
 
     // ── Live log monitoring handlers ──────────────────────────────────────────

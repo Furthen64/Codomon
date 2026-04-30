@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Codomon.Desktop.Views.UserSettingsDialog"
         Title="User Settings"
-        Width="700" Height="520"
-        MinWidth="560" MinHeight="420"
+        Width="700" Height="800"
+        MinWidth="560" MinHeight="520"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="#111820">
@@ -88,6 +88,103 @@
                        Foreground="#AABBCC" FontSize="12" TextWrapping="Wrap"/>
           </StackPanel>
         </StackPanel>
+
+        <!-- Divider -->
+        <Border Height="1" Background="#1E2A3A" Margin="0,4"/>
+
+        <!-- Section: Autosave Settings -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="AUTOSAVE SETTINGS" FontSize="9" FontWeight="Bold"
+                     Foreground="#4A6A8A" LetterSpacing="1"/>
+          <TextBlock Text="Controls how often workspaces are auto-saved and how many snapshots are kept."
+                     Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,24,*">
+          <StackPanel Grid.Column="0" Spacing="6">
+            <TextBlock Text="Autosave interval (minutes)" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <TextBlock Text="How often a snapshot is created while a workspace is open. Minimum 1."
+                       Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+            <NumericUpDown x:Name="AutosaveIntervalBox"
+                           Minimum="1" Maximum="120" Increment="1" FormatString="0"
+                           Watermark="5"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Text="Maximum autosave snapshots" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <TextBlock Text="Oldest snapshots beyond this limit are deleted automatically. Minimum 1."
+                       Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+            <NumericUpDown x:Name="MaxAutosavesBox"
+                           Minimum="1" Maximum="100" Increment="1" FormatString="0"
+                           Watermark="10"/>
+          </StackPanel>
+        </Grid>
+
+        <!-- Divider -->
+        <Border Height="1" Background="#1E2A3A" Margin="0,4"/>
+
+        <!-- Section: Recent Workspaces -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="RECENT WORKSPACES" FontSize="9" FontWeight="Bold"
+                     Foreground="#4A6A8A" LetterSpacing="1"/>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Maximum recent workspace entries" Foreground="#AABBCC" FontWeight="SemiBold"/>
+          <TextBlock Text="Number of workspaces shown in the recent-workspaces list on the welcome screen."
+                     Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+          <NumericUpDown x:Name="MaxRecentWorkspacesBox"
+                         Minimum="1" Maximum="200" Increment="1" FormatString="0"
+                         Watermark="20" HorizontalAlignment="Left" MinWidth="120"/>
+        </StackPanel>
+
+        <!-- Divider -->
+        <Border Height="1" Background="#1E2A3A" Margin="0,4"/>
+
+        <!-- Section: Log Replay -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="LOG REPLAY" FontSize="9" FontWeight="Bold"
+                     Foreground="#4A6A8A" LetterSpacing="1"/>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Default replay speed" Foreground="#AABBCC" FontWeight="SemiBold"/>
+          <TextBlock Text="Playback speed pre-selected when the replay toolbar is opened."
+                     Foreground="#556677" FontSize="11"/>
+          <ComboBox x:Name="DefaultReplaySpeedComboBox" HorizontalAlignment="Left" MinWidth="120"/>
+        </StackPanel>
+
+        <!-- Divider -->
+        <Border Height="1" Background="#1E2A3A" Margin="0,4"/>
+
+        <!-- Section: Log Import Defaults -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="LOG IMPORT DEFAULTS" FontSize="9" FontWeight="Bold"
+                     Foreground="#4A6A8A" LetterSpacing="1"/>
+          <TextBlock Text="These options are pre-selected when opening the Import Wizard."
+                     Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,16,*">
+          <StackPanel Grid.Column="0" Spacing="6">
+            <TextBlock Text="Default delimiter" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <ComboBox x:Name="DefaultDelimiterComboBox" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Text="Default known format" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <ComboBox x:Name="DefaultKnownFormatComboBox" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+        </Grid>
+
+        <Grid ColumnDefinitions="*,16,*" Margin="0,10,0,0">
+          <StackPanel Grid.Column="0" Spacing="6">
+            <TextBlock Text="Default timestamp format" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <ComboBox x:Name="DefaultTimestampFormatComboBox" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Text="Default time zone" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <ComboBox x:Name="DefaultTimeZoneComboBox" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+        </Grid>
 
       </StackPanel>
     </ScrollViewer>
