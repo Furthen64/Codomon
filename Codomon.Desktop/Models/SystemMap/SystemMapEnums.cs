@@ -20,11 +20,13 @@ public enum SystemKind
 {
     DesktopApp,
     WebApp,
-    Service,
-    Worker,
+    BackendService,
+    WorkerService,
     ScheduledJob,
-    MaintenanceProcess,
-    Other
+    CliTool,
+    DatabaseProcess,
+    LibraryOnly,
+    Unknown
 }
 
 /// <summary>The functional role of a <see cref="ModuleModel"/>.</summary>

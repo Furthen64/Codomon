@@ -38,9 +38,13 @@ public class SystemDto
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Kind { get; set; } = "Other";
+    public string Kind { get; set; } = "Unknown";
     public string Notes { get; set; } = string.Empty;
     public string Confidence { get; set; } = "Unknown";
+    public string StartupMechanism { get; set; } = string.Empty;
+    public List<string> EntryPointCandidates { get; set; } = new();
+    public List<string> ConfigFileCandidates { get; set; } = new();
+    public List<string> LogFileCandidates { get; set; } = new();
     public List<ModuleDto> Modules { get; set; } = new();
     public List<EvidenceDto> Evidence { get; set; } = new();
 }

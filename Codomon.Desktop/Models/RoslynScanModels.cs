@@ -28,6 +28,8 @@ public class ScannedClass
     public string FullName { get; set; } = string.Empty;
     public string Namespace { get; set; } = string.Empty;
     public string Kind { get; set; } = "class";
+    /// <summary>Base class and interface names as they appear in the declaration.</summary>
+    public List<string> BaseTypes { get; set; } = new();
     public List<ScannedMethod> Methods { get; set; } = new();
 }
 

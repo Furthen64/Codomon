@@ -503,6 +503,10 @@ public static class WorkspaceSerializer
         Kind = s.Kind.ToString(),
         Notes = s.Notes,
         Confidence = s.Confidence.ToString(),
+        StartupMechanism = s.StartupMechanism,
+        EntryPointCandidates = new List<string>(s.EntryPointCandidates),
+        ConfigFileCandidates = new List<string>(s.ConfigFileCandidates),
+        LogFileCandidates = new List<string>(s.LogFileCandidates),
         Modules = s.Modules.Select(ModuleToDto).ToList(),
         Evidence = s.Evidence.Select(EvidenceToDto).ToList()
     };
@@ -511,9 +515,13 @@ public static class WorkspaceSerializer
     {
         Id = dto.Id,
         Name = dto.Name,
-        Kind = Enum.TryParse<SystemKind>(dto.Kind, out var sk) ? sk : SystemKind.Other,
+        Kind = Enum.TryParse<SystemKind>(dto.Kind, out var sk) ? sk : SystemKind.Unknown,
         Notes = dto.Notes,
         Confidence = Enum.TryParse<ConfidenceLevel>(dto.Confidence, out var sc) ? sc : ConfidenceLevel.Unknown,
+        StartupMechanism = dto.StartupMechanism,
+        EntryPointCandidates = new List<string>(dto.EntryPointCandidates),
+        ConfigFileCandidates = new List<string>(dto.ConfigFileCandidates),
+        LogFileCandidates = new List<string>(dto.LogFileCandidates),
         Modules = dto.Modules.Select(DtoToModule).ToList(),
         Evidence = dto.Evidence.Select(DtoToEvidence).ToList()
     };

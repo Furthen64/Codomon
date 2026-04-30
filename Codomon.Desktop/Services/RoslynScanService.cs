@@ -329,6 +329,7 @@ public static class RoslynScanService
                 FullName = fullName,
                 Namespace = ns,
                 Kind = kind,
+                BaseTypes = ExtractBaseTypes(node),
                 Methods = ExtractMethods(node, fullName)
             };
 
@@ -342,6 +343,22 @@ public static class RoslynScanService
                     nested.Accept(this);
             }
             _namespaceStack.Pop();
+        }
+
+        private static List<string> ExtractBaseTypes(TypeDeclarationSyntax typeNode)
+        {
+            if (typeNode.BaseList == null)
+                return new List<string>();
+
+            return typeNode.BaseList.Types
+                .Select(t => t.Type switch
+                {
+                    IdentifierNameSyntax id => id.Identifier.Text,
+                    GenericNameSyntax g => g.Identifier.Text,
+                    QualifiedNameSyntax q => q.Right.Identifier.Text,
+                    _ => t.Type.ToString()
+                })
+                .ToList();
         }
 
         private static List<ScannedMethod> ExtractMethods(TypeDeclarationSyntax typeNode, string ownerFullName)
