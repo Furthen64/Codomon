@@ -169,7 +169,7 @@
               <TextBlock Text="Systems" Foreground="#AABBCC" FontWeight="SemiBold"/>
               <ListBox x:Name="AcceptSystemsListBox" Background="Transparent" MinHeight="60"/>
               <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Accept Selected System"
+                <Button Content="Accept / Merge Selected System"
                         Click="OnAcceptSystemClick" Padding="12,4"
                         Background="#1A3A5A" Foreground="White"/>
               </StackPanel>
@@ -182,7 +182,7 @@
               <TextBlock Text="High-Value Nodes" Foreground="#AABBCC" FontWeight="SemiBold"/>
               <ListBox x:Name="AcceptHvnListBox" Background="Transparent" MinHeight="60"/>
               <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Accept Selected Node"
+                <Button Content="Accept / Merge Selected Node"
                         Click="OnAcceptNodeClick" Padding="12,4"
                         Background="#1A3A5A" Foreground="White"/>
               </StackPanel>

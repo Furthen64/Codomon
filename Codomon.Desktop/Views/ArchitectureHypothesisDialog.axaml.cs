@@ -296,13 +296,17 @@ public partial class ArchitectureHypothesisDialog : Window
 
         foreach (var sys in _vm.Systems)
         {
+            var label = sys.IsAccepted
+                ? $"✔ {sys.Name}  [{sys.Kind}]  — {sys.Confidence}  (Accepted)"
+                : $"{sys.Name}  [{sys.Kind}]  — {sys.Confidence}";
+
             listBox.Items.Add(new ListBoxItem
             {
                 Tag = sys,
                 Padding = new Avalonia.Thickness(8, 4),
                 Content = new TextBlock
                 {
-                    Text = $"{(sys.IsAccepted ? "✔ " : "")}{sys.Name}  [{sys.Kind}]  — {sys.Confidence}",
+                    Text = label,
                     FontSize = 12,
                     Foreground = sys.IsAccepted
                         ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88BB88"))
@@ -323,13 +327,17 @@ public partial class ArchitectureHypothesisDialog : Window
 
         foreach (var node in _vm.HighValueNodes)
         {
+            var label = node.IsAccepted
+                ? $"✔ {node.Name}  [{node.Signal}]  — {node.Confidence}  (Accepted)"
+                : $"{node.Name}  [{node.Signal}]  — {node.Confidence}";
+
             listBox.Items.Add(new ListBoxItem
             {
                 Tag = node,
                 Padding = new Avalonia.Thickness(8, 4),
                 Content = new TextBlock
                 {
-                    Text = $"{(node.IsAccepted ? "✔ " : "")}{node.Name}  [{node.Signal}]  — {node.Confidence}",
+                    Text = label,
                     FontSize = 12,
                     Foreground = node.IsAccepted
                         ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88BB88"))
@@ -373,10 +381,11 @@ public partial class ArchitectureHypothesisDialog : Window
         var listBox = this.FindControl<ListBox>("AcceptSystemsListBox");
         if (listBox?.SelectedItem is not ListBoxItem item) return;
         if (item.Tag is not HypothesisSystemModel sys) return;
-        if (sys.IsAccepted) return;
 
         _vm.AcceptSystem(sys);
-        _vm.StatusMessage = $"Accepted system: {sys.Name}";
+        _vm.StatusMessage = sys.IsAccepted
+            ? $"Merged system: {sys.Name}"
+            : $"Accepted system: {sys.Name}";
         RebuildAcceptSystemsList();
         RebuildSystemsList();
         UpdateFinishSummary();
@@ -387,10 +396,11 @@ public partial class ArchitectureHypothesisDialog : Window
         var listBox = this.FindControl<ListBox>("AcceptHvnListBox");
         if (listBox?.SelectedItem is not ListBoxItem item) return;
         if (item.Tag is not HypothesisHighValueNodeModel node) return;
-        if (node.IsAccepted) return;
 
         _vm.AcceptHighValueNode(node);
-        _vm.StatusMessage = $"Accepted high-value node: {node.Name}";
+        _vm.StatusMessage = node.IsAccepted
+            ? $"Merged high-value node: {node.Name}"
+            : $"Accepted high-value node: {node.Name}";
         RebuildAcceptHvnList();
         RebuildHvnList();
         UpdateFinishSummary();

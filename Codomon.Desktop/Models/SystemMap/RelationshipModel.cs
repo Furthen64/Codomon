@@ -9,6 +9,12 @@ public class RelationshipModel
     /// <summary>Unique identifier for this relationship.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    /// <summary>
+    /// Stable identity key used for duplicate detection and upsert/merge logic.
+    /// Computed from source key + target key + relationship kind.
+    /// </summary>
+    public string IdentityKey { get; set; } = string.Empty;
+
     /// <summary>The nature of this relationship.</summary>
     public RelationshipKind Kind { get; set; } = RelationshipKind.Depends;
 

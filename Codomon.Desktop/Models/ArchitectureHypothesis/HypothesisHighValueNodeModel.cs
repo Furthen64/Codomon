@@ -29,4 +29,15 @@ public class HypothesisHighValueNodeModel
     /// <summary>Whether the user has accepted this node into the System Map.</summary>
     [JsonIgnore]
     public bool IsAccepted { get; set; }
+
+    /// <summary>
+    /// ID of the <see cref="SystemMap.CodeNodeModel"/> this suggestion was accepted into.
+    /// Set on first acceptance and preserved across idempotent re-accepts.
+    /// </summary>
+    [JsonIgnore]
+    public string? AcceptedIntoId { get; set; }
+
+    /// <summary>UTC timestamp when this suggestion was first accepted.</summary>
+    [JsonIgnore]
+    public DateTimeOffset? AcceptedAt { get; set; }
 }
