@@ -6,7 +6,7 @@ namespace Codomon.Desktop.Persistence;
 
 /// <summary>
 /// Loads and saves the user-wide <see cref="UserConfigModel"/> to
-/// <c>%APPDATA%/Codomon/user_config.json</c>.
+/// the user's application data directory as <c>Codomon/config.json</c>.
 /// </summary>
 public static class UserConfigService
 {
@@ -14,14 +14,34 @@ public static class UserConfigService
     {
         get
         {
+            return Path.Combine(ConfigDirectoryPath, "config.json");
+        }
+    }
+
+    private static string ConfigDirectoryPath
+    {
+        get
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                return Path.Combine(home, ".config", "Codomon");
+            }
+
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return Path.Combine(appData, "Codomon", "user_config.json");
+            return Path.Combine(appData, "Codomon");
         }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>Gets the absolute path of the user config file for the current OS.</summary>
+    public static string GetConfigFilePath() => ConfigFilePath;
+
+    /// <summary>Returns whether the user config file currently exists on disk.</summary>
+    public static bool Exists() => File.Exists(ConfigFilePath);
 
     /// <summary>
     /// Loads the user configuration from disk.
@@ -58,7 +78,7 @@ public static class UserConfigService
         }
         catch
         {
-            // Non-critical — silently ignore persistence errors.
+            // Non-critical - silently ignore persistence errors.
         }
     }
 }

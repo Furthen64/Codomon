@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     // Throttles timeline rebuilds during live monitoring (max once per LiveTimelineRebuildThrottleSeconds).
     private const double LiveTimelineRebuildThrottleSeconds = 2.0;
     private DateTimeOffset _lastLiveTimelineRebuild = DateTimeOffset.MinValue;
+    private bool _firstRunConfigCheckDone;
 
     public MainWindow()
     {
@@ -68,8 +69,23 @@ public partial class MainWindow : Window
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
+        Opened += OnWindowOpened;
 
         AppLogger.Info("App started");
+    }
+
+    private async void OnWindowOpened(object? sender, EventArgs e)
+    {
+        if (_firstRunConfigCheckDone) return;
+        _firstRunConfigCheckDone = true;
+
+        if (UserConfigService.Exists()) return;
+
+        var openSettings = await ShowInitialUserConfigPromptAsync();
+        if (!openSettings) return;
+
+        var dialog = new UserSettingsDialog();
+        await dialog.ShowDialog(this);
     }
 
 
@@ -353,6 +369,59 @@ public partial class MainWindow : Window
     }
 
     // ── Input dialog ─────────────────────────────────────────────────────────
+
+    private async Task<bool> ShowInitialUserConfigPromptAsync()
+    {
+        bool openSettings = false;
+
+        var dialog = new Window
+        {
+            Title = "First Run Setup",
+            Width = 520,
+            Height = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var openBtn = new Button { Content = "Setup LLM", Padding = new Avalonia.Thickness(20, 4) };
+        var laterBtn = new Button { Content = "Later", Padding = new Avalonia.Thickness(20, 4) };
+
+        openBtn.Click += (_, _) => { openSettings = true; dialog.Close(); };
+        laterBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "No user settings file was found. Configure your default LLM endpoint and model now?",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Foreground = Avalonia.Media.Brushes.White
+                },
+                new TextBlock
+                {
+                    Text = $"Expected path: {UserConfigService.GetConfigFilePath()}",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88AABB")),
+                    FontSize = 11
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Children = { openBtn, laterBtn }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+        return openSettings;
+    }
 
     private async Task<string?> ShowInputDialogAsync(string title, string prompt, string defaultValue = "")
     {

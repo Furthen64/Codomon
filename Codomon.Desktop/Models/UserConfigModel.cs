@@ -2,7 +2,7 @@ namespace Codomon.Desktop.Models;
 
 /// <summary>
 /// Application-wide user preferences that are persisted independently of any workspace.
-/// Stored in %APPDATA%/Codomon/user_config.json.
+/// Stored in the user's application data directory as Codomon/config.json.
 /// </summary>
 public class UserConfigModel
 {

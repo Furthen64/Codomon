@@ -2,9 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Codomon.Desktop.Views.UserSettingsDialog"
         Title="User Settings"
-        Width="520" Height="340"
-        MinWidth="440" MinHeight="280"
-        CanResize="False"
+        Width="700" Height="520"
+        MinWidth="560" MinHeight="420"
+        CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="#111820">
 
@@ -15,8 +15,10 @@
             BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
       <StackPanel Spacing="2">
         <TextBlock Text="User Settings" FontSize="16" FontWeight="Bold" Foreground="White"/>
-        <TextBlock Text="Application-wide preferences stored in %APPDATA%/Codomon/user_config.json."
+        <TextBlock Text="Application-wide preferences stored in your user application data directory."
                    FontSize="12" Foreground="#88AABB"/>
+        <TextBlock x:Name="ConfigPathText" Text=""
+                   FontSize="11" Foreground="#6F8CA8"/>
       </StackPanel>
     </Border>
 
@@ -30,6 +32,8 @@
                      VerticalAlignment="Center"/>
           <Button x:Name="SaveButton" Content="Save Settings" Click="OnSaveClick"
                   Padding="16,6" Background="#1A3A5A" Foreground="White"/>
+          <Button x:Name="OkButton" Content="OK" Click="OnOkClick"
+                  Padding="16,6" IsEnabled="False"/>
         </StackPanel>
       </DockPanel>
     </Border>
@@ -58,10 +62,31 @@
         <!-- Model Name -->
         <StackPanel Spacing="6">
           <TextBlock Text="Model Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
-          <TextBlock Text="Default model name passed to the API (e.g. llama3, gpt-4o)."
-                     Foreground="#556677" FontSize="11"/>
-          <TextBox x:Name="ModelNameBox"
-                   Watermark="model name…"/>
+          <TextBlock Text="Type a model name, or click Probe Models to fetch available models from the host."
+                     Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox x:Name="ModelNameBox" Grid.Column="0"
+                     Watermark="model name…"/>
+            <Button x:Name="ProbeModelsButton" Content="Probe Models" Grid.Column="1"
+                    Click="OnProbeModelsClick" Padding="10,5" Margin="8,0,0,0"/>
+          </Grid>
+          <ComboBox x:Name="ModelPickerComboBox"
+                    PlaceholderText="- select from probed models -"
+                    HorizontalAlignment="Stretch"
+                    IsEnabled="False"
+                    SelectionChanged="OnModelPickerSelectionChanged"/>
+          <TextBlock x:Name="ProbeStatusText" Text="" Foreground="#AABBCC" FontSize="11"/>
+        </StackPanel>
+
+        <!-- Test Connection -->
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button x:Name="TestConnectionButton" Content="Test Connection"
+                    Click="OnTestConnectionClick" Padding="14,5"/>
+            <TextBlock x:Name="ConnectionStatusText"
+                       Text="" VerticalAlignment="Center"
+                       Foreground="#AABBCC" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
         </StackPanel>
 
       </StackPanel>

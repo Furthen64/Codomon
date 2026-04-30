@@ -1,6 +1,7 @@
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.ArchitectureHypothesis;
 using Codomon.Desktop.Models.SystemMap;
+using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -17,6 +18,8 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 {
     private readonly WorkspaceModel _workspace;
     private readonly string _workspaceFolderPath;
+    private readonly string _apiEndpoint;
+    private readonly string _modelName;
 
     private string _promptTemplate = string.Empty;
     private bool _isRunning;
@@ -29,6 +32,15 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     {
         _workspace = workspace;
         _workspaceFolderPath = workspaceFolderPath;
+
+        // Fall back to user-level defaults when workspace LLM settings are not configured yet.
+        var userConfig = UserConfigService.Load();
+        _apiEndpoint = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ApiEndpoint)
+            ? workspace.LlmSettings.ApiEndpoint
+            : userConfig.DefaultLlmSettings.ApiEndpoint;
+        _modelName = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName)
+            ? workspace.LlmSettings.ModelName
+            : userConfig.DefaultLlmSettings.ModelName;
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -113,10 +125,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     {
         if (IsRunning) return;
 
-        var apiEndpoint = _workspace.LlmSettings.ApiEndpoint;
-        var modelName   = _workspace.LlmSettings.ModelName;
-
-        if (string.IsNullOrWhiteSpace(apiEndpoint) || string.IsNullOrWhiteSpace(modelName))
+        if (string.IsNullOrWhiteSpace(_apiEndpoint) || string.IsNullOrWhiteSpace(_modelName))
         {
             StatusMessage = "Configure the LLM endpoint and model in the LLM Summaries dialog first.";
             return;
@@ -133,7 +142,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => ProgressMessages.Add(msg)));
 
             var hypothesis = await ArchitectureHypothesisService.RunSynthesisAsync(
-                apiEndpoint, modelName, _workspaceFolderPath, progress, _cts.Token);
+                _apiEndpoint, _modelName, _workspaceFolderPath, progress, _cts.Token);
 
             CurrentHypothesis = hypothesis;
             RefreshSavedHypotheses();
