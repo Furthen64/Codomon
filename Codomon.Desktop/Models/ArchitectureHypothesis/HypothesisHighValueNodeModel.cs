@@ -18,12 +18,12 @@ public class HypothesisHighValueNodeModel
 
     /// <summary>The primary architectural signal behind the suggestion.</summary>
     [JsonPropertyName("signal")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(LenientStringEnumConverter<HighValueNodeSignal>))]
     public HighValueNodeSignal Signal { get; set; } = HighValueNodeSignal.Other;
 
     /// <summary>Confidence level the LLM assigned to this suggestion.</summary>
     [JsonPropertyName("confidence")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(LenientStringEnumConverter<ConfidenceLevel>))]
     public ConfidenceLevel Confidence { get; set; } = ConfidenceLevel.Possible;
 
     /// <summary>Whether the user has accepted this node into the System Map.</summary>

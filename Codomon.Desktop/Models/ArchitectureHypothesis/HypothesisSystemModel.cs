@@ -14,12 +14,12 @@ public class HypothesisSystemModel
 
     /// <summary>The kind of system the LLM believes this to be.</summary>
     [JsonPropertyName("kind")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(LenientStringEnumConverter<SystemKind>))]
     public SystemKind Kind { get; set; } = SystemKind.Unknown;
 
     /// <summary>Confidence level the LLM assigned to this suggestion.</summary>
     [JsonPropertyName("confidence")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(LenientStringEnumConverter<ConfidenceLevel>))]
     public ConfidenceLevel Confidence { get; set; } = ConfidenceLevel.Possible;
 
     /// <summary>Pieces of evidence from the summaries that support this suggestion.</summary>

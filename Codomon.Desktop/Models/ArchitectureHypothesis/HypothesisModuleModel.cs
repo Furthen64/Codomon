@@ -14,7 +14,7 @@ public class HypothesisModuleModel
 
     /// <summary>Confidence level the LLM assigned to this suggestion.</summary>
     [JsonPropertyName("confidence")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(LenientStringEnumConverter<ConfidenceLevel>))]
     public ConfidenceLevel Confidence { get; set; } = ConfidenceLevel.Possible;
 
     /// <summary>Names of code nodes the LLM considers important for this module.</summary>
