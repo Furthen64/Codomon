@@ -22,6 +22,6 @@ public class HypothesisStartupModel
 
     /// <summary>Confidence level the LLM assigned to this suggestion.</summary>
     [JsonPropertyName("confidence")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(LenientStringEnumConverter<ConfidenceLevel>))]
     public ConfidenceLevel Confidence { get; set; } = ConfidenceLevel.Possible;
 }
