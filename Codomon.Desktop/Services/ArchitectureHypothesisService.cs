@@ -236,6 +236,14 @@ public static class ArchitectureHypothesisService
                 throw new InvalidOperationException("LLM API returned a response with empty content.");
             }
 
+            if (finishReason == "length")
+            {
+                AppLogger.Warn($"[Hypothesis] CallLlm: LLM response was cut off at the token limit (finish_reason=length, {content.Length} chars). The hypothesis JSON may be incomplete.");
+                throw new InvalidOperationException(
+                    "The LLM response was cut off because the model reached its token limit (finish_reason=length). " +
+                    "To fix this, try: reducing the number of summaries, shortening the prompt template, or using a model with a larger maximum output.");
+            }
+
             return content;
         }
         catch (OperationCanceledException oce)
@@ -248,6 +256,7 @@ public static class ArchitectureHypothesisService
     /// <summary>
     /// Extracts and parses the JSON block from the LLM response.
     /// Strips surrounding Markdown code-fence markers if present.
+    /// Falls back to bracket-repair when the initial parse fails.
     /// </summary>
     internal static ArchitectureHypothesisModel ParseHypothesis(string rawResponse)
     {
@@ -264,9 +273,94 @@ public static class ArchitectureHypothesisService
         catch (JsonException ex)
         {
             AppLogger.Error($"[Hypothesis] JSON parse error: {ex.Message}");
+
+            // Attempt to repair a truncated JSON response (e.g. when the LLM hit its token limit).
+            if (TryRepairTruncatedJson(json, out var repaired))
+            {
+                AppLogger.Warn($"[Hypothesis] Attempting repair of truncated JSON ({repaired.Length} chars after repair).");
+                try
+                {
+                    var model = JsonSerializer.Deserialize<ArchitectureHypothesisModel>(repaired, ParseOptions);
+                    if (model != null)
+                    {
+                        AppLogger.Warn("[Hypothesis] JSON repair succeeded — hypothesis may be incomplete due to LLM token limit.");
+                        return model;
+                    }
+                }
+                catch (JsonException repairEx)
+                {
+                    AppLogger.Error($"[Hypothesis] JSON repair also failed: {repairEx.Message}");
+                }
+            }
+
             throw new InvalidOperationException(
                 $"Failed to parse LLM response as valid hypothesis JSON: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Attempts to repair a truncated JSON string by closing any unclosed string literals,
+    /// arrays, and objects. Returns <c>true</c> when the string was modified; <c>false</c>
+    /// when the brackets were already balanced and no repair was needed.
+    /// </summary>
+    private static bool TryRepairTruncatedJson(string json, out string repaired)
+    {
+        var stack = new Stack<char>();
+        bool inString = false;
+        bool escaped = false;
+
+        foreach (char c in json)
+        {
+            if (escaped) { escaped = false; continue; }
+
+            if (inString)
+            {
+                if (c == '\\') escaped = true;
+                else if (c == '"') inString = false;
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"': inString = true; break;
+                case '{':
+                case '[': stack.Push(c); break;
+                case '}':
+                    if (stack.Count > 0 && stack.Peek() == '{') stack.Pop();
+                    else if (stack.Count > 0) { repaired = json; return false; } // mismatched — cannot repair
+                    break;
+                case ']':
+                    if (stack.Count > 0 && stack.Peek() == '[') stack.Pop();
+                    else if (stack.Count > 0) { repaired = json; return false; } // mismatched — cannot repair
+                    break;
+            }
+        }
+
+        if (stack.Count == 0 && !inString)
+        {
+            repaired = json;
+            return false;
+        }
+
+        var sb = new System.Text.StringBuilder(json.TrimEnd());
+
+        // Close any unclosed string literal.
+        if (inString)
+            sb.Append('"');
+
+        // Remove any trailing comma or whitespace that would make the closing bracket invalid.
+        int lastValid = sb.Length - 1;
+        while (lastValid >= 0 && (sb[lastValid] == ',' || char.IsWhiteSpace(sb[lastValid])))
+            lastValid--;
+        if (lastValid < sb.Length - 1)
+            sb.Length = lastValid + 1;
+
+        // Close all remaining open arrays and objects.
+        while (stack.Count > 0)
+            sb.Append(stack.Pop() == '{' ? '}' : ']');
+
+        repaired = sb.ToString();
+        return true;
     }
 
     /// <summary>
