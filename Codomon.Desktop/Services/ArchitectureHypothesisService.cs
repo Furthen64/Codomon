@@ -256,7 +256,8 @@ public static class ArchitectureHypothesisService
     /// <summary>
     /// Extracts and parses the JSON block from the LLM response.
     /// Strips surrounding Markdown code-fence markers if present.
-    /// Falls back to bracket-repair when the initial parse fails.
+    /// Falls back to sanitisation of common LLM string-quoting mistakes, then to
+    /// bracket-repair for truncated output, and finally combines both strategies.
     /// </summary>
     internal static ArchitectureHypothesisModel ParseHypothesis(string rawResponse)
     {
@@ -274,8 +275,32 @@ public static class ArchitectureHypothesisService
         {
             AppLogger.Error($"[Hypothesis] JSON parse error: {ex.Message}");
 
-            // Attempt to repair a truncated JSON response (e.g. when the LLM hit its token limit).
-            if (TryRepairTruncatedJson(json, out var repaired))
+            // Step 1 — sanitise common LLM string-quoting mistakes, e.g.
+            //   "Error" methods"  →  "Error methods"
+            var sanitized = SanitizeLlmJson(json);
+            if (sanitized != json)
+            {
+                AppLogger.Warn($"[Hypothesis] Attempting sanitized JSON parse ({sanitized.Length} chars after sanitization).");
+                try
+                {
+                    var model = JsonSerializer.Deserialize<ArchitectureHypothesisModel>(sanitized, ParseOptions);
+                    if (model != null)
+                    {
+                        AppLogger.Warn("[Hypothesis] Sanitized JSON parse succeeded.");
+                        return model;
+                    }
+                }
+                catch (JsonException sanitizeEx)
+                {
+                    AppLogger.Error($"[Hypothesis] Sanitized JSON parse failed: {sanitizeEx.Message}");
+                }
+            }
+
+            // Step 2 — attempt to repair a truncated JSON response by closing unclosed
+            // brackets/strings.  Apply to the sanitized version when it differs from the
+            // original so both fixes are combined.
+            var jsonToRepair = sanitized != json ? sanitized : json;
+            if (TryRepairTruncatedJson(jsonToRepair, out var repaired))
             {
                 AppLogger.Warn($"[Hypothesis] Attempting repair of truncated JSON ({repaired.Length} chars after repair).");
                 try
@@ -361,6 +386,34 @@ public static class ArchitectureHypothesisService
 
         repaired = sb.ToString();
         return true;
+    }
+
+    /// <summary>
+    /// Applies lightweight heuristic fixes for common LLM JSON string-quoting mistakes.
+    /// Specifically, it collapses the pattern where a string's closing quote appears too
+    /// early and bare text follows before the next <c>"</c>:
+    /// <code>"Error" methods"</code> → <code>"Error methods"</code>
+    /// The fix is applied repeatedly until no more occurrences remain.
+    /// </summary>
+    private static string SanitizeLlmJson(string json)
+    {
+        // Match: a complete JSON string followed by unquoted text (no commas, brackets,
+        // colons, or newlines — i.e. not a JSON structural character) and then a closing ".
+        // Group 1: content already inside quotes
+        // Group 2: the stray bare text that should be part of the same string
+        const string pattern = @"""((?:[^""\\]|\\.)*)""\s+([^""\[\]{},:\r\n]+)""";
+
+        string current = json;
+        string previous;
+        do
+        {
+            previous = current;
+            current = Regex.Replace(previous, pattern,
+                m => $"\"{m.Groups[1].Value} {m.Groups[2].Value.TrimEnd()}\"");
+        }
+        while (current != previous);
+
+        return current;
     }
 
     /// <summary>
