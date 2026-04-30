@@ -20,13 +20,19 @@
       </StackPanel>
     </Border>
 
-    <!-- Log list -->
-    <Border Background="#0D1117">
-      <ScrollViewer x:Name="LogScroller" HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto">
-        <ItemsControl x:Name="LogItems" Margin="0"/>
-      </ScrollViewer>
-    </Border>
+    <!-- Log list — single TextBox so the user can select and copy across multiple lines -->
+    <TextBox x:Name="LogBox"
+             Background="#0D1117"
+             Foreground="#88CCAA"
+             FontFamily="Monospace"
+             FontSize="12"
+             IsReadOnly="True"
+             AcceptsReturn="True"
+             TextWrapping="NoWrap"
+             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             Padding="8,4"
+             BorderThickness="0"/>
 
   </DockPanel>
 </Window>

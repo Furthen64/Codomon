@@ -104,6 +104,7 @@ public static class ArchitectureHypothesisService
         // Call the LLM.
         var rawResponse = await CallLlmAsync(apiEndpoint, modelName, prompt, cancellationToken);
         AppLogger.Debug($"[Hypothesis] LLM responded: {rawResponse.Length} chars");
+        AppLogger.Debug($"[Hypothesis] LLM raw output:\n{rawResponse}");
 
         progress?.Report("Parsing LLM response…");
 
@@ -251,7 +252,7 @@ public static class ArchitectureHypothesisService
     internal static ArchitectureHypothesisModel ParseHypothesis(string rawResponse)
     {
         var json = ExtractJson(rawResponse);
-        AppLogger.Debug($"[Hypothesis] Parsing JSON: {Math.Min(json.Length, 300)} chars (truncated)");
+        AppLogger.Debug($"[Hypothesis] Parsing JSON ({json.Length} chars):\n{json}");
 
         try
         {
