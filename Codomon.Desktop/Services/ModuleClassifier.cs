@@ -22,6 +22,18 @@ public static class ModuleClassifier
     private const string SrcSuffix = "SuffixFamily";
     private const string SrcLlmSummary = "LlmSummary";
 
+    /// <summary>
+    /// Modules with at least this many members are given <see cref="ConfidenceLevel.Likely"/>
+    /// confidence (rather than <see cref="ConfidenceLevel.Possible"/>).
+    /// </summary>
+    private const int MinMembersForLikelyConfidence = 3;
+
+    /// <summary>
+    /// How many trailing namespace segments are kept when forming the grouping key.
+    /// E.g. with value 2: <c>Acme.App.Services.Graph</c> → key <c>"Services.Graph"</c>.
+    /// </summary>
+    private const int NamespaceSegmentsToKeep = 2;
+
     // ── CodeNodeKind → ModuleKind heuristic ───────────────────────────────────
 
     private static readonly Dictionary<CodeNodeKind, ModuleKind> KindToModuleKind =
@@ -138,17 +150,17 @@ public static class ModuleClassifier
     }
 
     /// <summary>
-    /// Normalises a namespace to at most the last two meaningful segments so that
-    /// <c>Acme.App.Services.Graph</c> and <c>Acme.App.Services</c> do not collapse
-    /// into the same module unless they share the same two-segment suffix.
+    /// Normalises a namespace to at most the last <see cref="NamespaceSegmentsToKeep"/>
+    /// meaningful segments so that fine-grained sub-namespaces form their own modules
+    /// rather than all collapsing into one.
+    /// E.g. <c>Acme.App.Services.Graph</c> → <c>"Services.Graph"</c>.
     /// </summary>
     private static string NormaliseNamespaceKey(string ns)
     {
         var parts = ns.Split('.');
-        // Use the last two segments as the key (e.g. "Services.Graph"), or all if shorter.
-        return parts.Length <= 2
+        return parts.Length <= NamespaceSegmentsToKeep
             ? ns
-            : string.Join('.', parts[^2..]);
+            : string.Join('.', parts[^NamespaceSegmentsToKeep..]);
     }
 
     private static string FindProject(string filePath, IReadOnlyList<ScannedProject> projects)
@@ -176,7 +188,7 @@ public static class ModuleClassifier
         var moduleKind = DeriveModuleKind(members);
 
         // Confidence: more nodes in a coherent namespace → higher confidence.
-        var confidence = members.Count >= 3
+        var confidence = members.Count >= MinMembersForLikelyConfidence
             ? ConfidenceLevel.Likely
             : ConfidenceLevel.Possible;
 

@@ -100,8 +100,11 @@ public static class CodeNodeBuilder
                 foreach (var jsonPath in jsonFiles)
                 {
                     var jsonName = Path.GetFileName(jsonPath);
-                    var relPath = Path.GetRelativePath(
-                        Path.GetDirectoryName(scan.SourcePath) ?? scan.SourcePath, jsonPath);
+                    // Compute the relative path from the scan's source root.
+                    // GetDirectoryName returns null only for a root path (e.g. "C:\"),
+                    // in which case SourcePath itself is used as the base.
+                    var sourceRoot = Path.GetDirectoryName(scan.SourcePath) ?? scan.SourcePath;
+                    var relPath = Path.GetRelativePath(sourceRoot, jsonPath);
 
                     nodes.Add(new CodeNodeModel
                     {
