@@ -1467,7 +1467,19 @@ public partial class MainWindow : Window
         if (host != null)
             host.Content = graphView;
 
+        SetupSystemMapView();
+
         AppLogger.Debug("Graph canvas (Nodify) initialized");
+    }
+
+    private void SetupSystemMapView()
+    {
+        var host = this.FindControl<ContentControl>("SystemMapHost");
+        if (host == null) return;
+
+        var view = new SystemMapView(_vm.SystemMap);
+        host.Content = view;
+        AppLogger.Debug("System Map view initialized");
     }
 
     // ── Timeline ──────────────────────────────────────────────────────────────
