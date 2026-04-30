@@ -379,6 +379,7 @@ public partial class ArchitectureHypothesisDialog : Window
         _vm.StatusMessage = $"Accepted system: {sys.Name}";
         RebuildAcceptSystemsList();
         RebuildSystemsList();
+        UpdateFinishSummary();
     }
 
     private void OnAcceptNodeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -392,7 +393,38 @@ public partial class ArchitectureHypothesisDialog : Window
         _vm.StatusMessage = $"Accepted high-value node: {node.Name}";
         RebuildAcceptHvnList();
         RebuildHvnList();
+        UpdateFinishSummary();
     }
+
+    // ── Finish tab ────────────────────────────────────────────────────────────
+
+    private void UpdateFinishSummary()
+    {
+        var text = this.FindControl<TextBlock>("FinishSummaryText");
+        if (text == null) return;
+
+        if (_vm.AcceptedCount == 0)
+        {
+            text.Text = "No items accepted yet. Go to the Accept tab to accept suggestions.";
+            return;
+        }
+
+        var acceptedSystems = _vm.Systems.Count(s => s.IsAccepted);
+        var acceptedNodes   = _vm.HighValueNodes.Count(n => n.IsAccepted);
+        text.Text = $"{_vm.AcceptedCount} item(s) accepted: " +
+                    $"{acceptedSystems} system(s), {acceptedNodes} high-value node(s). " +
+                    "Click 'Apply to Canvas' to close and refresh the System Map.";
+    }
+
+    private void OnClearCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _vm.ClearSystemMap();
+        SyncStatusText();
+        UpdateFinishSummary();
+    }
+
+    private void OnApplyToCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Close();
 
     // ── Shared ────────────────────────────────────────────────────────────────
 
