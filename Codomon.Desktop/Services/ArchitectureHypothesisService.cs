@@ -223,9 +223,17 @@ public static class ArchitectureHypothesisService
             var result = await response.Content.ReadFromJsonAsync<ChatResponse>(LlmJsonOptions, cancellationToken)
                          ?? throw new InvalidOperationException("LLM API returned an empty response.");
 
-            var content = result.Choices?.FirstOrDefault()?.Message?.Content;
+            var firstChoice = result.Choices?.FirstOrDefault();
+            var finishReason = firstChoice?.FinishReason ?? "(null)";
+            var content = firstChoice?.Message?.Content;
+
+            AppLogger.Debug($"[Hypothesis] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}");
+
             if (string.IsNullOrWhiteSpace(content))
+            {
+                AppLogger.Warn($"[Hypothesis] CallLlm: response content is empty. finish_reason={finishReason}");
                 throw new InvalidOperationException("LLM API returned a response with empty content.");
+            }
 
             return content;
         }
@@ -330,6 +338,9 @@ public static class ArchitectureHypothesisService
     {
         [JsonPropertyName("message")]
         public ChatMessage? Message { get; set; }
+
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
     }
 }
 
