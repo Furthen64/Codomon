@@ -14,6 +14,8 @@ public static class LlmSummaryService
 {
     private const string SummariesFolder = "summaries";
     private const string PromptFileName = "summary_prompt.md";
+    private const string RuntimeStatsFileName = "runtime_stats.json";
+    private const double DefaultEstimatedTokensPerSecond = 1200.0;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -234,7 +236,119 @@ public static class LlmSummaryService
             .ToList();
     }
 
+    /// <summary>
+    /// Loads learned runtime statistics for LLM summary generation for the given endpoint/model.
+    /// Returns a default fallback profile when no recorded history exists.
+    /// </summary>
+    public static async Task<SummaryRuntimeProfile> LoadRuntimeProfileAsync(
+        string workspaceFolderPath,
+        string apiEndpoint,
+        string modelName,
+        CancellationToken cancellationToken = default)
+    {
+        var store = await LoadRuntimeStatsStoreAsync(workspaceFolderPath, cancellationToken);
+        var entry = store.Entries.FirstOrDefault(e =>
+            string.Equals(e.ApiEndpoint, NormalizeApiEndpoint(apiEndpoint), StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(e.ModelName, modelName ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+
+        if (entry == null || entry.TotalElapsedSeconds <= 0 || entry.TotalEstimatedTokens <= 0)
+        {
+            return new SummaryRuntimeProfile
+            {
+                SampleCount = 0,
+                AverageTokensPerSecond = DefaultEstimatedTokensPerSecond,
+                UsesFallback = true
+            };
+        }
+
+        return new SummaryRuntimeProfile
+        {
+            SampleCount = entry.SampleCount,
+            AverageTokensPerSecond = Math.Max(1.0, entry.TotalEstimatedTokens / entry.TotalElapsedSeconds),
+            UsesFallback = false
+        };
+    }
+
+    /// <summary>
+    /// Records a completed summary-generation batch so future runtime estimates can use
+    /// observed throughput for the same endpoint/model pair.
+    /// </summary>
+    public static async Task RecordRuntimeSampleAsync(
+        string workspaceFolderPath,
+        string apiEndpoint,
+        string modelName,
+        int estimatedTokens,
+        TimeSpan elapsed,
+        CancellationToken cancellationToken = default)
+    {
+        if (estimatedTokens <= 0 || elapsed.TotalSeconds <= 0)
+            return;
+
+        var store = await LoadRuntimeStatsStoreAsync(workspaceFolderPath, cancellationToken);
+        var normalizedEndpoint = NormalizeApiEndpoint(apiEndpoint);
+        var normalizedModelName = modelName ?? string.Empty;
+
+        var entry = store.Entries.FirstOrDefault(e =>
+            string.Equals(e.ApiEndpoint, normalizedEndpoint, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(e.ModelName, normalizedModelName, StringComparison.OrdinalIgnoreCase));
+
+        if (entry == null)
+        {
+            entry = new SummaryRuntimeStatsEntry
+            {
+                ApiEndpoint = normalizedEndpoint,
+                ModelName = normalizedModelName
+            };
+            store.Entries.Add(entry);
+        }
+
+        entry.SampleCount += 1;
+        entry.TotalEstimatedTokens += estimatedTokens;
+        entry.TotalElapsedSeconds += elapsed.TotalSeconds;
+        entry.LastObservedTokensPerSecond = estimatedTokens / elapsed.TotalSeconds;
+        entry.LastUpdatedUtc = DateTime.UtcNow;
+
+        await SaveRuntimeStatsStoreAsync(workspaceFolderPath, store, cancellationToken);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static string GetRuntimeStatsPath(string workspaceFolderPath)
+        => Path.Combine(workspaceFolderPath, SummariesFolder, RuntimeStatsFileName);
+
+    private static async Task<SummaryRuntimeStatsStore> LoadRuntimeStatsStoreAsync(
+        string workspaceFolderPath,
+        CancellationToken cancellationToken)
+    {
+        var path = GetRuntimeStatsPath(workspaceFolderPath);
+        if (!File.Exists(path))
+            return new SummaryRuntimeStatsStore();
+
+        try
+        {
+            await using var stream = File.OpenRead(path);
+            var store = await JsonSerializer.DeserializeAsync<SummaryRuntimeStatsStore>(stream, JsonOptions, cancellationToken);
+            return store ?? new SummaryRuntimeStatsStore();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"[LLM] Failed to load runtime stats: {ex.GetType().Name}: {ex.Message}");
+            return new SummaryRuntimeStatsStore();
+        }
+    }
+
+    private static async Task SaveRuntimeStatsStoreAsync(
+        string workspaceFolderPath,
+        SummaryRuntimeStatsStore store,
+        CancellationToken cancellationToken)
+    {
+        var summariesRoot = Path.Combine(workspaceFolderPath, SummariesFolder);
+        Directory.CreateDirectory(summariesRoot);
+
+        var path = GetRuntimeStatsPath(workspaceFolderPath);
+        await using var stream = File.Create(path);
+        await JsonSerializer.SerializeAsync(stream, store, JsonOptions, cancellationToken);
+    }
 
     private static async Task<string> CallLlmAsync(
         string apiEndpoint,
@@ -477,4 +591,28 @@ public class SummaryEntry
 
     public string DisplayName =>
         $"{SourceRelativePath}  ({GeneratedAt:yyyy-MM-dd HH:mm})";
+}
+
+/// <summary>Learned runtime profile for summary generation estimates.</summary>
+public class SummaryRuntimeProfile
+{
+    public int SampleCount { get; set; }
+    public double AverageTokensPerSecond { get; set; } = 1200.0;
+    public bool UsesFallback { get; set; }
+}
+
+internal sealed class SummaryRuntimeStatsStore
+{
+    public List<SummaryRuntimeStatsEntry> Entries { get; set; } = new();
+}
+
+internal sealed class SummaryRuntimeStatsEntry
+{
+    public string ApiEndpoint { get; set; } = string.Empty;
+    public string ModelName { get; set; } = string.Empty;
+    public int SampleCount { get; set; }
+    public double TotalEstimatedTokens { get; set; }
+    public double TotalElapsedSeconds { get; set; }
+    public double LastObservedTokensPerSecond { get; set; }
+    public DateTime LastUpdatedUtc { get; set; }
 }

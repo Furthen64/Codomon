@@ -127,6 +127,13 @@
               <Button Content="↺ Reload Files" Click="OnReloadFilesClick" Padding="10,4"/>
               <Button Content="✓ Select All"   Click="OnSelectAllClick"   Padding="10,4"/>
               <Button Content="✗ Deselect All" Click="OnDeselectAllClick" Padding="10,4"/>
+              <CheckBox x:Name="HideSummarizedCheckBox"
+                        Content="Hide summarized"
+                        IsChecked="False"
+                        IsCheckedChanged="OnHideSummarizedChanged"
+                        Foreground="#AABBCC"
+                        VerticalAlignment="Center"
+                        Margin="8,0,0,0"/>
               <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
               <Button x:Name="GenerateButton" Content="▶ Generate for Selected"
                       Click="OnGenerateClick" Padding="10,4"

@@ -202,6 +202,8 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
     {
         CsFiles.Clear();
 
+        var summariesBySourcePath = BuildSummaryLookup();
+
         var sourcePath = _workspace.SourceProjectPath;
         if (string.IsNullOrEmpty(sourcePath))
         {
@@ -226,12 +228,20 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                 .ToList());
 
         foreach (var f in files)
+        {
+            var relPath = Path.GetRelativePath(searchRoot, f);
+            var normalizedRelPath = NormalizeRelativePath(relPath);
+            summariesBySourcePath.TryGetValue(normalizedRelPath, out var existingSummary);
+
             CsFiles.Add(new CsFileItem
             {
                 FullPath = f,
-                RelativePath = Path.GetRelativePath(searchRoot, f),
-                IsSelected = false
+                RelativePath = relPath,
+                IsSelected = false,
+                HasSummary = existingSummary != null,
+                LastSummaryGeneratedAtUtc = existingSummary?.GeneratedAt
             });
+        }
 
         StatusMessage = $"Found {files.Count} C# file(s).";
     }
@@ -272,15 +282,19 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         int estimatedTokens = 0;
         string estimatedRuntimeLabel = "unknown";
         string estimatedComplexityLabel = "Unknown complexity.";
+        SummaryRuntimeProfile? runtimeProfile = null;
 
         try
         {
             estimatedTokens = await EstimateSelectedTokenCountAsync(selected, ct);
-            (estimatedRuntimeLabel, estimatedComplexityLabel) = EstimateRuntimeFromTokens(estimatedTokens, selected.Count);
+            runtimeProfile = await LlmSummaryService.LoadRuntimeProfileAsync(_workspaceFolderPath, ApiEndpoint, ModelName, ct);
+            (estimatedRuntimeLabel, estimatedComplexityLabel) = EstimateRuntimeFromTokens(estimatedTokens, selected.Count, runtimeProfile);
 
-            AppLogger.Debug($"[LLM] Preflight estimate: files={selected.Count} tokens={estimatedTokens} runtime={estimatedRuntimeLabel} complexity={estimatedComplexityLabel}");
+            AppLogger.Debug($"[LLM] Preflight estimate: files={selected.Count} tokens={estimatedTokens} runtime={estimatedRuntimeLabel} complexity={estimatedComplexityLabel} samples={runtimeProfile.SampleCount} fallback={runtimeProfile.UsesFallback}");
             ReportProgress($"Estimated input size: {estimatedTokens:N0} token(s) across {selected.Count} file(s).");
-            ReportProgress($"Estimated runtime: {estimatedRuntimeLabel}. {estimatedComplexityLabel}");
+            ReportProgress(runtimeProfile.UsesFallback
+                ? $"Estimated runtime: {estimatedRuntimeLabel}. {estimatedComplexityLabel} Using default heuristic until completed runs are recorded."
+                : $"Estimated runtime: {estimatedRuntimeLabel}. {estimatedComplexityLabel} Based on {runtimeProfile.SampleCount} recorded run(s) for this model/endpoint.");
             StatusMessage = $"Generating summaries... estimated {estimatedRuntimeLabel}.";
         }
         catch (OperationCanceledException)
@@ -346,6 +360,18 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
             batchTimer.Stop();
             AppLogger.Info($"[LLM] GenerateSummaries completed: {done} file(s) summarised.");
             var actualDuration = FormatDuration(batchTimer.Elapsed);
+
+            if (done > 0 && estimatedTokens > 0)
+            {
+                await LlmSummaryService.RecordRuntimeSampleAsync(
+                    _workspaceFolderPath,
+                    ApiEndpoint,
+                    ModelName,
+                    estimatedTokens,
+                    batchTimer.Elapsed,
+                    ct);
+            }
+
             StatusMessage = estimatedTokens > 0
                 ? $"Done - {done} summary(s) generated in {actualDuration} (estimated {estimatedRuntimeLabel})."
                 : $"Done - {done} summary(s) generated in {actualDuration}.";
@@ -354,6 +380,8 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                 ReportProgress($"Completed: {done} file(s) summarised in {actualDuration} (estimated {estimatedRuntimeLabel}).");
             else
                 ReportProgress($"Completed: {done} file(s) summarised in {actualDuration}.");
+
+            RefreshSummaryStatusFlags();
 
             // Refresh the browse list.
             RefreshSummaries();
@@ -408,22 +436,55 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         return total;
     }
 
-    private static (string RuntimeLabel, string ComplexityLabel) EstimateRuntimeFromTokens(int estimatedTokens, int fileCount)
+    private static (string RuntimeLabel, string ComplexityLabel) EstimateRuntimeFromTokens(
+        int estimatedTokens,
+        int fileCount,
+        SummaryRuntimeProfile? runtimeProfile)
     {
-        // Broad guidance for users before generation starts.
-        // Heuristic target: about 1200 effective prompt tokens processed per second.
-        const double tokensPerSecond = 1200.0;
+        var tokensPerSecond = Math.Max(1.0, runtimeProfile?.AverageTokensPerSecond ?? 1200.0);
         var estimatedSeconds = Math.Max(1, (int)Math.Ceiling(estimatedTokens / tokensPerSecond));
         var runtimeLabel = FormatDuration(TimeSpan.FromSeconds(estimatedSeconds));
 
         if (estimatedTokens >= 120_000 || fileCount >= 8 && estimatedTokens >= 80_000)
-            return (runtimeLabel, "Large/complex selection: a lot of time expected.");
+            return (runtimeLabel, runtimeProfile?.UsesFallback == false
+                ? "Large/complex selection: a lot of time expected from recent observed runtimes."
+                : "Large/complex selection: a lot of time expected.");
 
         if (estimatedTokens <= 15_000 && fileCount <= 12)
-            return (runtimeLabel, "Small selection: this should complete in a few seconds.");
+            return (runtimeLabel, runtimeProfile?.UsesFallback == false
+                ? "Small selection: recent runs suggest this should finish quickly."
+                : "Small selection: this should complete in a few seconds.");
 
-        return (runtimeLabel, "Medium selection: expect moderate generation time.");
+        return (runtimeLabel, runtimeProfile?.UsesFallback == false
+            ? "Medium selection: estimate is based on recorded runtimes for this model/endpoint."
+            : "Medium selection: expect moderate generation time.");
     }
+
+    private Dictionary<string, SummaryEntry> BuildSummaryLookup()
+    {
+        var summaries = LlmSummaryService.ListSummaries(_workspaceFolderPath);
+        return summaries
+            .GroupBy(s => NormalizeRelativePath(s.SourceRelativePath), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(s => s.GeneratedAt).First(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void RefreshSummaryStatusFlags()
+    {
+        var summariesBySourcePath = BuildSummaryLookup();
+        foreach (var file in CsFiles)
+        {
+            var key = NormalizeRelativePath(file.RelativePath);
+            summariesBySourcePath.TryGetValue(key, out var summary);
+            file.HasSummary = summary != null;
+            file.LastSummaryGeneratedAtUtc = summary?.GeneratedAt;
+        }
+    }
+
+    private static string NormalizeRelativePath(string path)
+        => (path ?? string.Empty).Replace('\\', '/');
 
     private static string FormatDuration(TimeSpan elapsed)
     {
@@ -459,6 +520,8 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 public class CsFileItem : INotifyPropertyChanged
 {
     private bool _isSelected;
+    private bool _hasSummary;
+    private DateTime? _lastSummaryGeneratedAtUtc;
 
     public string FullPath { get; set; } = string.Empty;
     public string RelativePath { get; set; } = string.Empty;
@@ -467,6 +530,20 @@ public class CsFileItem : INotifyPropertyChanged
     {
         get => _isSelected;
         set { _isSelected = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Whether the workspace currently has a stored summary for this file.</summary>
+    public bool HasSummary
+    {
+        get => _hasSummary;
+        set { _hasSummary = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>UTC timestamp of the latest stored summary for this file, if any.</summary>
+    public DateTime? LastSummaryGeneratedAtUtc
+    {
+        get => _lastSummaryGeneratedAtUtc;
+        set { _lastSummaryGeneratedAtUtc = value; OnPropertyChanged(); }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

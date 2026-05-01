@@ -13,10 +13,12 @@ namespace Codomon.Desktop.Views;
 public partial class LlmSummaryDialog : Window
 {
     private readonly LlmSummaryViewModel _vm;
+    private readonly List<int> _visibleFileIndices = new();
     private int _lastFileToggleIndex = -1;
     private int _pendingShiftClickIndex = -1;
     private bool _pendingShiftClick;
     private bool _isApplyingRangeSelection;
+    private bool _hideSummarized;
 
     private DispatcherTimer? _spinnerTimer;
     private int _spinnerFrame;
@@ -216,20 +218,33 @@ public partial class LlmSummaryDialog : Window
 
     private void OnSelectAllClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _vm.SelectAll(true);
+        SetVisibleSelection(true);
         RebuildFileList();
     }
 
     private void OnDeselectAllClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _vm.SelectAll(false);
+        SetVisibleSelection(false);
         RebuildFileList();
+    }
+
+    private void OnHideSummarizedChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is CheckBox cb)
+        {
+            _hideSummarized = cb.IsChecked == true;
+            _lastFileToggleIndex = -1;
+            _pendingShiftClick = false;
+            _pendingShiftClickIndex = -1;
+            RebuildFileList();
+        }
     }
 
     private async void OnGenerateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await _vm.GenerateSummariesAsync();
         SyncStatusText();
+        RebuildFileList();
     }
 
     private void OnCancelGenerateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -282,21 +297,25 @@ public partial class LlmSummaryDialog : Window
         if (listBox == null) return;
 
         listBox.Items.Clear();
+        _visibleFileIndices.Clear();
 
-        for (int index = 0; index < _vm.CsFiles.Count; index++)
+        for (int sourceIndex = 0; sourceIndex < _vm.CsFiles.Count; sourceIndex++)
         {
-            var file = _vm.CsFiles[index];
-            var itemIndex = index;
+            if (_hideSummarized && _vm.CsFiles[sourceIndex].HasSummary)
+                continue;
+
+            _visibleFileIndices.Add(sourceIndex);
+        }
+
+        for (int visibleIndex = 0; visibleIndex < _visibleFileIndices.Count; visibleIndex++)
+        {
+            var sourceIndex = _visibleFileIndices[visibleIndex];
+            var file = _vm.CsFiles[sourceIndex];
+            var itemIndex = visibleIndex;
             var checkBox = new CheckBox
             {
                 IsChecked = file.IsSelected,
-                Content = new TextBlock
-                {
-                    Text = file.RelativePath,
-                    FontSize = 11,
-                    Foreground = Avalonia.Media.Brushes.LightGray,
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-                },
+                Content = BuildFileLabel(file),
                 Tag = file,
                 Padding = new Avalonia.Thickness(4, 2)
             };
@@ -338,7 +357,43 @@ public partial class LlmSummaryDialog : Window
 
         var countText = this.FindControl<TextBlock>("FileCountText");
         if (countText != null)
-            countText.Text = $"C# Files ({_vm.CsFiles.Count})";
+            countText.Text = _hideSummarized
+                ? $"C# Files ({_visibleFileIndices.Count}/{_vm.CsFiles.Count})"
+                : $"C# Files ({_vm.CsFiles.Count})";
+    }
+
+    private static Control BuildFileLabel(CsFileItem file)
+    {
+        var panel = new StackPanel
+        {
+            Spacing = 0,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = file.RelativePath,
+            FontSize = 11,
+            Foreground = Avalonia.Media.Brushes.LightGray,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        });
+
+        if (file.HasSummary)
+        {
+            var generatedText = file.LastSummaryGeneratedAtUtc.HasValue
+                ? $"Summary exists - generated {file.LastSummaryGeneratedAtUtc.Value:yyyy-MM-dd HH:mm} UTC"
+                : "Summary exists";
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = generatedText,
+                FontSize = 10,
+                Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#6FCF97")),
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            });
+        }
+
+        return panel;
     }
 
     private void ApplySelectionRange(int fromIndex, int toIndex, bool selected)
@@ -354,10 +409,11 @@ public partial class LlmSummaryDialog : Window
         {
             for (int i = min; i <= max; i++)
             {
-                if (i < 0 || i >= _vm.CsFiles.Count)
+                if (i < 0 || i >= _visibleFileIndices.Count)
                     continue;
 
-                _vm.CsFiles[i].IsSelected = selected;
+                var sourceIndex = _visibleFileIndices[i];
+                _vm.CsFiles[sourceIndex].IsSelected = selected;
 
                 if (listBox.Items[i] is ListBoxItem item && item.Content is CheckBox cb)
                     cb.IsChecked = selected;
@@ -366,6 +422,19 @@ public partial class LlmSummaryDialog : Window
         finally
         {
             _isApplyingRangeSelection = false;
+        }
+    }
+
+    private void SetVisibleSelection(bool selected)
+    {
+        if (_hideSummarized)
+        {
+            foreach (var sourceIndex in _visibleFileIndices)
+                _vm.CsFiles[sourceIndex].IsSelected = selected;
+        }
+        else
+        {
+            _vm.SelectAll(selected);
         }
     }
 
