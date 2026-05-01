@@ -1,7 +1,9 @@
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Codomon.Desktop.ViewModels;
@@ -53,6 +55,8 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Timeline));
             // Reload the System Map from the new workspace.
             SystemMap.LoadFrom(value.SystemMap);
+            // Reload the Graph from the new workspace's System Map.
+            Graph.RefreshFromSystemMap(value.SystemMap);
         }
     }
 
@@ -84,6 +88,14 @@ public class MainViewModel : INotifyPropertyChanged
     /// Code Detail View, Startup View).  Reloaded whenever the workspace changes.
     /// </summary>
     public SystemMapViewModel SystemMap { get; } = new SystemMapViewModel();
+
+    // ── Graph ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// View-model for the Nodify graph canvas. Refreshed from the System Map
+    /// whenever the workspace changes or a Roslyn scan is applied.
+    /// </summary>
+    public GraphViewModel Graph { get; } = new GraphViewModel();
 
     // ── Log Replay ────────────────────────────────────────────────────────────
 
@@ -483,6 +495,39 @@ public class MainViewModel : INotifyPropertyChanged
         IsDirty = true;
         StatusMessage = $"Connection '{conn.Name}' promoted to manual.";
         AppLogger.Info($"Roslyn connection promoted to manual: {conn.Id}");
+    }
+
+    /// <summary>
+    /// Runs <see cref="SystemDetector"/> on <paramref name="scanResult"/>, upserts
+    /// every detected <see cref="SystemModel"/> into <see cref="Workspace.SystemMap"/>
+    /// (idempotent by <see cref="SystemModel.IdentityKey"/>), then refreshes the
+    /// System Map view-model and the Graph from the updated data.
+    /// </summary>
+    public async Task ApplyRoslynScanAsync(RoslynScanResult scanResult)
+    {
+        var detected = await SystemDetector.DetectAsync(scanResult);
+
+        int added = 0;
+        foreach (var system in detected)
+        {
+            // Ensure a stable identity key is set before the duplicate check.
+            if (string.IsNullOrEmpty(system.IdentityKey))
+                system.IdentityKey = SystemMapIdentity.CreateSystemKey(system.Name, system.Kind.ToString());
+
+            if (Workspace.SystemMap.Systems.Any(s => s.IdentityKey == system.IdentityKey))
+                continue;
+
+            Workspace.SystemMap.Systems.Add(system);
+            added++;
+        }
+
+        Workspace.SystemMap.UpdatedAt = DateTime.UtcNow;
+        SystemMap.LoadFrom(Workspace.SystemMap);
+        Graph.RefreshFromSystemMap(Workspace.SystemMap);
+
+        IsDirty = true;
+        StatusMessage = $"Roslyn scan applied: {added} new system(s) added to System Map.";
+        AppLogger.Info($"[ApplyRoslynScan] Detected {detected.Count} system(s), added {added} new.");
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -9,10 +9,11 @@ public class ConnectionViewModel : INotifyPropertyChanged
     private readonly ConnectorViewModel _source;
     private readonly ConnectorViewModel _target;
 
-    public ConnectionViewModel(ConnectorViewModel source, ConnectorViewModel target)
+    public ConnectionViewModel(ConnectorViewModel source, ConnectorViewModel target, string label = "")
     {
         _source = source;
         _target = target;
+        Label = label;
 
         _source.PropertyChanged += OnConnectorPropertyChanged;
         _target.PropertyChanged += OnConnectorPropertyChanged;
@@ -23,6 +24,9 @@ public class ConnectionViewModel : INotifyPropertyChanged
 
     /// <summary>Canvas position of the target (input) connector.</summary>
     public Point Target => _target.Anchor;
+
+    /// <summary>Short label shown as a tooltip on the edge (e.g. the relationship kind).</summary>
+    public string Label { get; }
 
     private void OnConnectorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
