@@ -332,10 +332,10 @@ public class MainViewModel : INotifyPropertyChanged
     {
         var workspace = await WorkspaceSerializer.CreateNewAsync(
             folderPath, workspaceName, sourceProjectPath, profileName, initialSystemNames);
+        HasWorkspace = true;
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
         IsDirty = false;
-        HasWorkspace = true;
         ClearSelection();
         StatusMessage = $"New workspace created: {folderPath}";
         RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName, Math.Max(1, UserConfigService.Load().MaxRecentWorkspaces));
@@ -346,10 +346,10 @@ public class MainViewModel : INotifyPropertyChanged
     public async Task OpenWorkspaceAsync(string folderPath)
     {
         var workspace = await WorkspaceSerializer.LoadAsync(folderPath);
+        HasWorkspace = true;
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
         IsDirty = false;
-        HasWorkspace = true;
         ClearSelection();
         StatusMessage = $"Opened: {folderPath}";
         RecentWorkspacesService.AddOrUpdate(folderPath, workspace.WorkspaceName, Math.Max(1, UserConfigService.Load().MaxRecentWorkspaces));
