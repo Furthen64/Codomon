@@ -80,7 +80,8 @@
         <DataTemplate x:DataType="vm:NodeViewModel">
           <nodify:Node Header="{Binding Title}"
                        Input="{Binding Inputs}"
-                       Output="{Binding Outputs}">
+                       Output="{Binding Outputs}"
+                       BorderThickness="{Binding BorderThickness}">
 
             <!-- Each input connector rendered as a NodeInput on the left -->
             <nodify:Node.InputConnectorTemplate>
