@@ -9,6 +9,12 @@ public class ExternalSystemModel
     /// <summary>Unique identifier for this external system.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    /// <summary>
+    /// Stable identity key used for duplicate detection and upsert/merge logic.
+    /// Computed from normalized name + kind on creation.
+    /// </summary>
+    public string IdentityKey { get; set; } = string.Empty;
+
     /// <summary>Display name (e.g. "SQL Server", "Stripe").</summary>
     public string Name { get; set; } = string.Empty;
 

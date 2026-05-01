@@ -209,96 +209,48 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     // ── Accept suggestions into System Map ────────────────────────────────────
 
     /// <summary>
-    /// Accepts a suggested system into <see cref="WorkspaceModel.SystemMap"/>.
-    /// Returns the created <see cref="SystemModel"/>.
+    /// Accepts a suggested system into <see cref="WorkspaceModel.SystemMap"/> using
+    /// idempotent upsert logic. If a matching System already exists, merges into it.
+    /// Returns the created or merged <see cref="SystemModel"/>.
     /// </summary>
     public SystemModel AcceptSystem(HypothesisSystemModel suggestion)
     {
-        var system = new SystemModel
-        {
-            Name       = suggestion.Name,
-            Kind       = suggestion.Kind,
-            Confidence = suggestion.Confidence,
-            Evidence   = suggestion.Evidence.Select(e => new EvidenceModel
-            {
-                Source      = "LLM",
-                Description = e
-            }).ToList()
-        };
+        var (system, isNew) = SystemMapUpsertService.UpsertSystem(_workspace.SystemMap, suggestion);
 
-        _workspace.SystemMap.Systems.Add(system);
-        suggestion.IsAccepted = true;
-        AcceptedCount++;
-        AppLogger.Info($"[Hypothesis] Accepted system: {system.Name}");
+        if (isNew) AcceptedCount++;
+        AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} system: {system.Name}");
         ReapplyManualOverrides();
+        SystemMapValidator.Validate(_workspace.SystemMap);
         return system;
     }
 
     /// <summary>
     /// Accepts a suggested module into the given <paramref name="targetSystem"/>
-    /// in the System Map.
+    /// using idempotent upsert logic. If a matching Module already exists, merges into it.
     /// </summary>
     public ModuleModel AcceptModule(HypothesisModuleModel suggestion, SystemModel targetSystem)
     {
-        var module = new ModuleModel
-        {
-            Name       = suggestion.Name,
-            Confidence = suggestion.Confidence,
-            SystemIds  = new List<string> { targetSystem.Id }
-        };
+        var (module, isNew) = SystemMapUpsertService.UpsertModule(_workspace.SystemMap, suggestion, targetSystem);
 
-        targetSystem.Modules.Add(module);
-        AcceptedCount++;
-        AppLogger.Info($"[Hypothesis] Accepted module: {module.Name} → {targetSystem.Name}");
+        if (isNew) AcceptedCount++;
+        AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} module: {module.Name} → {targetSystem.Name}");
         ReapplyManualOverrides();
         return module;
     }
 
     /// <summary>
-    /// Accepts a high-value node suggestion as a <see cref="CodeNodeModel"/> appended to
-    /// the first available module in the System Map, or creates a holding module on the
-    /// first system if no modules exist.
+    /// Accepts a high-value node suggestion using idempotent upsert logic.
+    /// If a matching Code Node already exists, merges the high-value metadata into it.
+    /// Returns the created or merged <see cref="CodeNodeModel"/>.
     /// </summary>
     public CodeNodeModel AcceptHighValueNode(HypothesisHighValueNodeModel suggestion)
     {
-        var node = new CodeNodeModel
-        {
-            Name       = suggestion.Name,
-            Confidence = suggestion.Confidence,
-            Notes      = suggestion.Reason,
-            Evidence   = new List<EvidenceModel>
-            {
-                new() { Source = "LLM", Description = suggestion.Reason }
-            }
-        };
+        var (node, isNew) = SystemMapUpsertService.UpsertHighValueNode(_workspace.SystemMap, suggestion);
 
-        // Try to place in the first available module.
-        var firstModule = _workspace.SystemMap.AllModules.FirstOrDefault();
-        if (firstModule != null)
-        {
-            firstModule.CodeNodes.Add(node);
-        }
-        else
-        {
-            // No modules yet — create a holding module on the first accepted system.
-            var firstSystem = _workspace.SystemMap.Systems.FirstOrDefault();
-            if (firstSystem != null)
-            {
-                var holdingModule = new ModuleModel
-                {
-                    Name = "UnassignedHighValueNodes",
-                    Confidence = ConfidenceLevel.Unknown
-                };
-                holdingModule.CodeNodes.Add(node);
-                firstSystem.Modules.Add(holdingModule);
-            }
-            // If there are no systems either, the node cannot be placed.
-        }
-
-        suggestion.IsAccepted = true;
-        AcceptedCount++;
-        AppLogger.Info($"[Hypothesis] Accepted high-value node: {node.Name}");
+        if (isNew) AcceptedCount++;
+        AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} high-value node: {node.Name}");
         ReapplyManualOverrides();
+        SystemMapValidator.Validate(_workspace.SystemMap);
         return node;
     }
 

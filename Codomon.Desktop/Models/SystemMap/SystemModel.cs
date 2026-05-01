@@ -9,6 +9,12 @@ public class SystemModel
     /// <summary>Unique identifier for this system.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    /// <summary>
+    /// Stable identity key used for duplicate detection and upsert/merge logic.
+    /// Computed from normalized name + kind on creation; persisted to survive reloads.
+    /// </summary>
+    public string IdentityKey { get; set; } = string.Empty;
+
     /// <summary>Display name.</summary>
     public string Name { get; set; } = string.Empty;
 

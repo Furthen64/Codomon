@@ -8,6 +8,12 @@ public class ModuleModel
     /// <summary>Unique identifier for this module.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    /// <summary>
+    /// Stable identity key used for duplicate detection and upsert/merge logic.
+    /// Computed from normalized system key + module name on creation.
+    /// </summary>
+    public string IdentityKey { get; set; } = string.Empty;
+
     /// <summary>Display name.</summary>
     public string Name { get; set; } = string.Empty;
 

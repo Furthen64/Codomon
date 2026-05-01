@@ -9,6 +9,12 @@ public class CodeNodeModel
     /// <summary>Unique identifier for this code node.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    /// <summary>
+    /// Stable identity key used for duplicate detection and upsert/merge logic.
+    /// Computed from the fully-qualified name when available, or from path + name.
+    /// </summary>
+    public string IdentityKey { get; set; } = string.Empty;
+
     /// <summary>Display name (e.g. simple class name or file name).</summary>
     public string Name { get; set; } = string.Empty;
 
