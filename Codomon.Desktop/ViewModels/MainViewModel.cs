@@ -521,14 +521,285 @@ public class MainViewModel : INotifyPropertyChanged
             added++;
         }
 
+        // Build first-pass code nodes directly from Roslyn facts, then classify
+        // them into modules. This populates Module and Code Detail views without
+        // requiring an LLM hypothesis pass.
+        var codeNodes = CodeNodeBuilder.Build(scanResult);
+        var summaryFolderPath = ResolveLatestSummaryBatchFolder(WorkspaceFolderPath);
+        var classifiedModules = ModuleClassifier.Classify(codeNodes, scanResult, summaryFolderPath);
+
+        var projectByRelativePath = BuildProjectByRelativePath(scanResult);
+        var systemsByProjectName = BuildSystemsByProjectName(Workspace.SystemMap.Systems);
+
+        int addedModules = 0;
+        int mergedModules = 0;
+        int addedCodeNodes = 0;
+
+        foreach (var module in classifiedModules)
+        {
+            var targetSystem = ResolveTargetSystemForModule(
+                module,
+                projectByRelativePath,
+                systemsByProjectName,
+                Workspace.SystemMap.Systems);
+
+            if (targetSystem != null)
+            {
+                if (string.IsNullOrWhiteSpace(targetSystem.IdentityKey))
+                    targetSystem.IdentityKey = SystemMapIdentity.CreateSystemKey(targetSystem.Name, targetSystem.Kind.ToString());
+
+                module.SystemIds = new List<string> { targetSystem.Id };
+                module.IdentityKey = SystemMapIdentity.CreateModuleKey(targetSystem.IdentityKey, module.Name);
+            }
+            else
+            {
+                module.SystemIds = new List<string>();
+                module.IdentityKey = SystemMapIdentity.CreateModuleKey(null, module.Name);
+            }
+
+            var existingModule = FindModuleByIdentityKey(Workspace.SystemMap, module.IdentityKey);
+            if (existingModule == null)
+            {
+                StampCodeNodeIdentityKeys(module.CodeNodes, scanResult.SourcePath);
+
+                if (targetSystem != null)
+                    targetSystem.Modules.Add(module);
+                else
+                    Workspace.SystemMap.Modules.Add(module);
+
+                addedModules++;
+                addedCodeNodes += module.CodeNodes.Count;
+                continue;
+            }
+
+            mergedModules++;
+
+            if (targetSystem != null)
+            {
+                if (!existingModule.SystemIds.Contains(targetSystem.Id, StringComparer.Ordinal))
+                    existingModule.SystemIds.Add(targetSystem.Id);
+
+                if (!targetSystem.Modules.Any(m => m.Id == existingModule.Id))
+                    targetSystem.Modules.Add(existingModule);
+            }
+
+            if (existingModule.Confidence != ConfidenceLevel.Manual &&
+                IsStronger(module.Confidence, existingModule.Confidence))
+            {
+                existingModule.Confidence = module.Confidence;
+            }
+
+            if (existingModule.Kind == ModuleKind.Other && module.Kind != ModuleKind.Other)
+                existingModule.Kind = module.Kind;
+
+            MergeEvidence(existingModule.Evidence, module.Evidence);
+            addedCodeNodes += MergeCodeNodes(existingModule, module.CodeNodes, scanResult.SourcePath);
+        }
+
         Workspace.SystemMap.UpdatedAt = DateTime.UtcNow;
         SystemMap.LoadFrom(Workspace.SystemMap);
         Graph.RefreshFromSystemMap(Workspace.SystemMap);
 
         IsDirty = true;
-        StatusMessage = $"Roslyn scan applied: {added} new system(s) added to System Map.";
-        AppLogger.Info($"[ApplyRoslynScan] Detected {detected.Count} system(s), added {added} new.");
+        StatusMessage =
+            $"Roslyn scan applied: +{added} system(s), +{addedModules} module(s), +{addedCodeNodes} code node(s) " +
+            $"({mergedModules} module merge(s)).";
+        AppLogger.Info(
+            $"[ApplyRoslynScan] Detected {detected.Count} system(s), added {added}; " +
+            $"classified {classifiedModules.Count} module(s), added {addedModules}, merged {mergedModules}, " +
+            $"added code nodes {addedCodeNodes}.");
     }
+
+    private static string? ResolveLatestSummaryBatchFolder(string workspaceFolderPath)
+    {
+        if (string.IsNullOrWhiteSpace(workspaceFolderPath))
+            return null;
+
+        var summariesRoot = Path.Combine(workspaceFolderPath, "summaries");
+        if (!Directory.Exists(summariesRoot))
+            return null;
+
+        return Directory
+            .EnumerateDirectories(summariesRoot)
+            .OrderByDescending(Path.GetFileName)
+            .FirstOrDefault(dir => Directory.EnumerateFiles(dir, "*.md").Any());
+    }
+
+    private static Dictionary<string, string> BuildProjectByRelativePath(RoslynScanResult scanResult)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var relativeByAbsolutePath = scanResult.Files
+            .Where(f => !string.IsNullOrWhiteSpace(f.FilePath) && !string.IsNullOrWhiteSpace(f.RelativePath))
+            .GroupBy(f => NormalizePath(f.FilePath), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => NormalizePath(g.First().RelativePath),
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in scanResult.Projects)
+        {
+            foreach (var absoluteFilePath in project.FilePaths)
+            {
+                var abs = NormalizePath(absoluteFilePath);
+                if (relativeByAbsolutePath.TryGetValue(abs, out var rel))
+                {
+                    result[rel] = project.Name;
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(scanResult.SourcePath))
+                {
+                    try
+                    {
+                        var fallbackRel = NormalizePath(Path.GetRelativePath(scanResult.SourcePath, absoluteFilePath));
+                        result[fallbackRel] = project.Name;
+                    }
+                    catch (ArgumentException)
+                    {
+                        // Ignore files that cannot be relativised against scan root.
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, SystemModel> BuildSystemsByProjectName(IEnumerable<SystemModel> systems)
+    {
+        return systems
+            .GroupBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(s => (int)s.Confidence).First(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static SystemModel? ResolveTargetSystemForModule(
+        ModuleModel module,
+        IReadOnlyDictionary<string, string> projectByRelativePath,
+        IReadOnlyDictionary<string, SystemModel> systemsByProjectName,
+        IReadOnlyList<SystemModel> allSystems)
+    {
+        var projectVotes = module.CodeNodes
+            .Select(n => NormalizePath(n.FilePath))
+            .Where(path => projectByRelativePath.ContainsKey(path))
+            .Select(path => projectByRelativePath[path])
+            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (projectVotes.Count > 0)
+        {
+            var projectName = projectVotes[0].Key;
+            if (systemsByProjectName.TryGetValue(projectName, out var matchedSystem))
+                return matchedSystem;
+        }
+
+        return allSystems.Count == 1 ? allSystems[0] : null;
+    }
+
+    private static ModuleModel? FindModuleByIdentityKey(SystemMapModel map, string identityKey)
+    {
+        if (string.IsNullOrWhiteSpace(identityKey))
+            return null;
+
+        return map.AllModules.FirstOrDefault(m =>
+            !string.IsNullOrWhiteSpace(m.IdentityKey) &&
+            string.Equals(m.IdentityKey, identityKey, StringComparison.Ordinal));
+    }
+
+    private static int MergeCodeNodes(ModuleModel targetModule, IEnumerable<CodeNodeModel> incomingNodes, string sourcePath)
+    {
+        var existingByKey = targetModule.CodeNodes
+            .Select(node => new
+            {
+                Node = node,
+                Key = string.IsNullOrWhiteSpace(node.IdentityKey)
+                    ? SystemMapIdentity.CreateCodeNodeKey(node.FullName, sourcePath, node.FilePath, node.Name)
+                    : node.IdentityKey
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.Key))
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().Node, StringComparer.Ordinal);
+
+        int added = 0;
+
+        foreach (var incoming in incomingNodes)
+        {
+            incoming.IdentityKey = SystemMapIdentity.CreateCodeNodeKey(
+                incoming.FullName,
+                sourcePath,
+                incoming.FilePath,
+                incoming.Name);
+
+            if (!existingByKey.TryGetValue(incoming.IdentityKey, out var existing))
+            {
+                targetModule.CodeNodes.Add(incoming);
+                existingByKey[incoming.IdentityKey] = incoming;
+                added++;
+                continue;
+            }
+
+            if (existing.Confidence != ConfidenceLevel.Manual &&
+                IsStronger(incoming.Confidence, existing.Confidence))
+            {
+                existing.Confidence = incoming.Confidence;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.FullName))
+                existing.FullName = incoming.FullName;
+            if (string.IsNullOrWhiteSpace(existing.FilePath))
+                existing.FilePath = incoming.FilePath;
+            if (string.IsNullOrWhiteSpace(existing.Notes))
+                existing.Notes = incoming.Notes;
+
+            if (existing.Kind == CodeNodeKind.Other && incoming.Kind != CodeNodeKind.Other)
+                existing.Kind = incoming.Kind;
+
+            existing.IsHighValue |= incoming.IsHighValue;
+            existing.IsNoisy |= incoming.IsNoisy;
+            existing.HideFromOverview |= incoming.HideFromOverview;
+
+            MergeEvidence(existing.Evidence, incoming.Evidence);
+        }
+
+        return added;
+    }
+
+    private static void StampCodeNodeIdentityKeys(IEnumerable<CodeNodeModel> nodes, string sourcePath)
+    {
+        foreach (var node in nodes)
+        {
+            node.IdentityKey = SystemMapIdentity.CreateCodeNodeKey(
+                node.FullName,
+                sourcePath,
+                node.FilePath,
+                node.Name);
+        }
+    }
+
+    private static bool IsStronger(ConfidenceLevel incoming, ConfidenceLevel current)
+        => (int)incoming < (int)current;
+
+    private static void MergeEvidence(List<EvidenceModel> target, IEnumerable<EvidenceModel> incoming)
+    {
+        foreach (var ev in incoming)
+        {
+            var exists = target.Any(existing =>
+                string.Equals(existing.Source, ev.Source, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(existing.Description, ev.Description, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(existing.SourceRef, ev.SourceRef, StringComparison.OrdinalIgnoreCase));
+
+            if (!exists)
+                target.Add(ev);
+        }
+    }
+
+    private static string NormalizePath(string path)
+        => (path ?? string.Empty).Replace('\\', '/');
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
