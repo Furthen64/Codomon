@@ -128,6 +128,9 @@ public class GraphViewModel : INotifyPropertyChanged
     /// <summary>
     /// Re-renders nodes and connections using <see cref="_currentSystemMap"/> and
     /// the active filter settings. No-ops when no system map has been loaded.
+    /// Note: filter changes made before the first <see cref="Refresh"/> or
+    /// <see cref="RefreshFromSystemMap"/> call have no visual effect — the
+    /// design-time demo graph loaded in the constructor is unaffected by filters.
     /// </summary>
     private void ApplyFilters()
     {
@@ -135,6 +138,7 @@ public class GraphViewModel : INotifyPropertyChanged
             BuildFromSystemMap(_currentSystemMap);
         else if (_currentWorkspace != null)
             BuildFromWorkspaceConnections(_currentWorkspace);
+        // If neither is set (design-time demo graph), do nothing.
     }
 
     private void BuildFromSystemMap(SystemMapModel map)

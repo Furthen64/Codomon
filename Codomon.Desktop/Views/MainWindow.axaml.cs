@@ -1241,8 +1241,10 @@ public partial class MainWindow : Window
             }
             else if (result.PromotedConnections.Count > 0)
             {
-                // Promoted class-level connections only — refresh graph from whatever
-                // data is available (System Map if populated, otherwise workspace connections).
+                // Promoted class-level connections only (legacy "Promote" per-connection flow).
+                // GraphViewModel.Refresh will use System Map data when it is populated, so
+                // these workspace-level connections are intentionally not shown in the graph
+                // once a System Map exists — only system-level relationships appear there.
                 _vm.Graph.Refresh(_vm.Workspace);
             }
         });
