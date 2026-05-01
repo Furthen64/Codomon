@@ -68,12 +68,20 @@ public static class ArchitectureHypothesisService
 
     /// <summary>
     /// Runs a full architecture-hypothesis synthesis pass using the stored Markdown summaries.
+    /// When the estimated token count of the combined summaries exceeds
+    /// <paramref name="tokenThreshold"/>, the summaries are automatically split into
+    /// smaller batches and the results are merged into a single hypothesis.
     /// Returns the populated <see cref="ArchitectureHypothesisModel"/> and saves it to disk.
     /// </summary>
+    /// <param name="tokenThreshold">
+    /// Maximum estimated token count per LLM call.
+    /// Pass 0 or a negative value to disable batching (no split, single call).
+    /// </param>
     public static async Task<ArchitectureHypothesisModel> RunSynthesisAsync(
         string apiEndpoint,
         string modelName,
         string workspaceFolderPath,
+        int tokenThreshold = 0,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -86,30 +94,71 @@ public static class ArchitectureHypothesisService
         progress?.Report($"Loaded {summaries.Count} summary file(s).");
         AppLogger.Debug($"[Hypothesis] Synthesis start: {summaries.Count} summaries  model={modelName}");
 
-        // Build the combined summaries block.
-        var summariesBlock = await BuildSummariesBlockAsync(summaries, cancellationToken);
-        progress?.Report("Combined summaries into synthesis input.");
-
-        // Load and fill prompt template.
+        // Load the prompt template up front — it is needed for every batch.
         var promptTemplate = await LoadPromptTemplateAsync(workspaceFolderPath);
         if (string.IsNullOrWhiteSpace(promptTemplate))
             throw new InvalidOperationException(
                 "Hypothesis prompt template is empty. Open the Hypothesis dialog Setup tab and save a prompt first.");
 
-        var prompt = promptTemplate.Replace("{Summaries}", summariesBlock);
-        AppLogger.Debug($"[Hypothesis] Prompt length={prompt.Length} chars");
+        // Determine batches based on the token threshold.
+        List<List<SummaryEntry>> batches;
+        if (tokenThreshold > 0)
+        {
+            var estimatedTokens = await LlmHelper.EstimateTokenCountAsync(summaries, cancellationToken);
+            AppLogger.Debug($"[Hypothesis] Estimated token count: {estimatedTokens}  threshold={tokenThreshold}");
 
-        progress?.Report("Calling LLM — this may take a while…");
+            if (estimatedTokens > tokenThreshold)
+            {
+                batches = await LlmHelper.SplitIntoBatchesAsync(summaries, tokenThreshold, cancellationToken);
+                AppLogger.Info($"[Hypothesis] Token threshold exceeded — splitting into {batches.Count} batch(es).");
+                progress?.Report($"Token budget exceeded ({estimatedTokens} estimated tokens). Splitting into {batches.Count} batch(es).");
+            }
+            else
+            {
+                batches = new List<List<SummaryEntry>> { summaries };
+            }
+        }
+        else
+        {
+            batches = new List<List<SummaryEntry>> { summaries };
+        }
 
-        // Call the LLM.
-        var rawResponse = await CallLlmAsync(apiEndpoint, modelName, prompt, cancellationToken);
-        AppLogger.Debug($"[Hypothesis] LLM responded: {rawResponse.Length} chars");
-        AppLogger.Debug($"[Hypothesis] LLM raw output:\n{rawResponse}");
+        // Run synthesis for each batch and merge the results.
+        ArchitectureHypothesisModel? merged = null;
+        for (int i = 0; i < batches.Count; i++)
+        {
+            var batch = batches[i];
+            var batchLabel = batches.Count > 1 ? $"batch {i + 1}/{batches.Count}" : "all summaries";
 
-        progress?.Report("Parsing LLM response…");
+            progress?.Report($"Calling LLM for {batchLabel} ({batch.Count} summaries) — this may take a while…");
 
-        // Extract and parse the JSON.
-        var hypothesis = ParseHypothesis(rawResponse);
+            // Build the combined summaries block for this batch.
+            var summariesBlock = await BuildSummariesBlockAsync(batch, cancellationToken);
+            var prompt = promptTemplate.Replace("{Summaries}", summariesBlock);
+            AppLogger.Debug($"[Hypothesis] {batchLabel}: Prompt length={prompt.Length} chars");
+
+            // Call the LLM.
+            var rawResponse = await CallLlmAsync(apiEndpoint, modelName, prompt, cancellationToken);
+            AppLogger.Debug($"[Hypothesis] {batchLabel}: LLM responded: {rawResponse.Length} chars");
+            AppLogger.Debug($"[Hypothesis] {batchLabel}: LLM raw output:\n{rawResponse}");
+
+            progress?.Report($"Parsing LLM response for {batchLabel}…");
+
+            // Extract and parse the JSON.
+            var batchHypothesis = ParseHypothesis(rawResponse);
+
+            if (merged == null)
+            {
+                merged = batchHypothesis;
+            }
+            else
+            {
+                MergeHypothesis(merged, batchHypothesis);
+                AppLogger.Debug($"[Hypothesis] Merged {batchLabel} into combined hypothesis.");
+            }
+        }
+
+        var hypothesis = merged!;
         hypothesis.ModelName = modelName;
         hypothesis.SummaryCount = summaries.Count;
         hypothesis.CreatedAt = DateTime.UtcNow;
@@ -120,6 +169,63 @@ public static class ArchitectureHypothesisService
         progress?.Report($"Hypothesis saved: {Path.GetFileName(savedPath)}");
 
         return hypothesis;
+    }
+
+    /// <summary>
+    /// Merges the content of <paramref name="source"/> into <paramref name="target"/> by
+    /// appending Systems, HighValueNodes, Startup entries, and UncertainAreas that are not
+    /// already present (matched by name, case-insensitive).
+    /// </summary>
+    private static void MergeHypothesis(ArchitectureHypothesisModel target, ArchitectureHypothesisModel source)
+    {
+        var existingSystemNames = new HashSet<string>(
+            target.Systems.Select(s => s.Name ?? string.Empty),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var s in source.Systems)
+        {
+            if (!existingSystemNames.Contains(s.Name ?? string.Empty))
+            {
+                target.Systems.Add(s);
+                existingSystemNames.Add(s.Name ?? string.Empty);
+            }
+        }
+
+        var existingHvnNames = new HashSet<string>(
+            target.HighValueNodes.Select(n => n.Name ?? string.Empty),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var n in source.HighValueNodes)
+        {
+            if (!existingHvnNames.Contains(n.Name ?? string.Empty))
+            {
+                target.HighValueNodes.Add(n);
+                existingHvnNames.Add(n.Name ?? string.Empty);
+            }
+        }
+
+        var existingStartupSystems = new HashSet<string>(
+            target.Startup.Select(s => s.System ?? string.Empty),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var s in source.Startup)
+        {
+            if (!existingStartupSystems.Contains(s.System ?? string.Empty))
+            {
+                target.Startup.Add(s);
+                existingStartupSystems.Add(s.System ?? string.Empty);
+            }
+        }
+
+        var existingUncertain = new HashSet<string>(target.UncertainAreas, StringComparer.OrdinalIgnoreCase);
+        foreach (var a in source.UncertainAreas)
+        {
+            if (!existingUncertain.Contains(a))
+            {
+                target.UncertainAreas.Add(a);
+                existingUncertain.Add(a);
+            }
+        }
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
