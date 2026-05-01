@@ -258,7 +258,7 @@ public partial class RoslynScanDialog : Window
                 if (addAllBtn     != null)
                 {
                     addAllBtn.IsVisible = true;
-                    addAllBtn.IsEnabled = _vm.ScanResult?.SuggestedConnections.Count > 0;
+                    addAllBtn.IsEnabled = _vm.ScanResult != null;
                 }
                 break;
         }

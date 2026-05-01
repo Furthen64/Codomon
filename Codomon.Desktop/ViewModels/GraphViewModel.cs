@@ -1,13 +1,16 @@
 using Avalonia;
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.Services.Graph;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Codomon.Desktop.ViewModels;
 
-public class GraphViewModel
+public class GraphViewModel : INotifyPropertyChanged
 {
     public ObservableCollection<NodeViewModel> Nodes { get; } = new();
     public ObservableCollection<ConnectionViewModel> Connections { get; } = new();
@@ -15,9 +18,65 @@ public class GraphViewModel
     // Directed edges between node view-models, used by AutoAlign for topological layout.
     private readonly List<(NodeViewModel From, NodeViewModel To)> _nodeEdges = new();
 
+    // Cached source data so filters can be re-applied without a full external reload.
+    private SystemMapModel? _currentSystemMap;
+    private WorkspaceModel? _currentWorkspace;
+
+    // ── Filters ───────────────────────────────────────────────────────────────
+
+    private bool _showLowConfidenceItems = false;
+    private bool _showCallsRelationships     = true;
+    private bool _showDependsRelationships   = true;
+    private bool _showImportsRelationships   = true;
+    private bool _showOtherRelationships     = true;
+
+    /// <summary>
+    /// When <c>false</c> (default) nodes and relationships with
+    /// <see cref="ConfidenceLevel.Unknown"/> confidence are hidden.
+    /// </summary>
+    public bool ShowLowConfidenceItems
+    {
+        get => _showLowConfidenceItems;
+        set { if (_showLowConfidenceItems == value) return; _showLowConfidenceItems = value; OnPropertyChanged(); ApplyFilters(); }
+    }
+
+    /// <summary>Show / hide edges of kind <see cref="RelationshipKind.Calls"/>.</summary>
+    public bool ShowCallsRelationships
+    {
+        get => _showCallsRelationships;
+        set { if (_showCallsRelationships == value) return; _showCallsRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+    }
+
+    /// <summary>Show / hide edges of kind <see cref="RelationshipKind.Depends"/>.</summary>
+    public bool ShowDependsRelationships
+    {
+        get => _showDependsRelationships;
+        set { if (_showDependsRelationships == value) return; _showDependsRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+    }
+
+    /// <summary>Show / hide edges of kind <see cref="RelationshipKind.Imports"/>.</summary>
+    public bool ShowImportsRelationships
+    {
+        get => _showImportsRelationships;
+        set { if (_showImportsRelationships == value) return; _showImportsRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+    }
+
+    /// <summary>
+    /// Show / hide edges whose kind is none of the individually-toggled kinds
+    /// (Configures, Logs, Publishes, Subscribes, Reads, Writes, Hosts, Other).
+    /// </summary>
+    public bool ShowOtherRelationships
+    {
+        get => _showOtherRelationships;
+        set { if (_showOtherRelationships == value) return; _showOtherRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+    }
+
+    // ── Construction ──────────────────────────────────────────────────────────
+
     /// <summary>
     /// Parameterless constructor — loads the fake demo graph, useful for design-time previews.
-    /// Call <see cref="Refresh"/> immediately after construction to load real workspace data.
+    /// Call <see cref="Refresh"/> or <see cref="RefreshFromSystemMap"/> after construction
+    /// to load real workspace data.
     /// </summary>
     public GraphViewModel()
     {
@@ -34,19 +93,137 @@ public class GraphViewModel
             _nodeEdges.Add(edge);
     }
 
+    // ── Public Refresh API ────────────────────────────────────────────────────
+
     /// <summary>
-    /// Clears all current nodes and connections, then rebuilds the graph from
-    /// <paramref name="workspace"/> data: one node per <see cref="SystemBoxModel"/>,
-    /// one connection per <see cref="ConnectionModel"/> whose FromId/ToId resolve
-    /// to known system nodes.
+    /// Rebuilds the graph from the <see cref="SystemMapModel"/> data inside
+    /// <paramref name="workspace"/>. When the System Map has no systems, falls back
+    /// to the legacy workspace-connections rendering.
     /// </summary>
     public void Refresh(WorkspaceModel workspace)
+    {
+        _currentWorkspace  = workspace;
+        _currentSystemMap  = workspace.SystemMap.Systems.Count > 0 ? workspace.SystemMap : null;
+
+        if (_currentSystemMap != null)
+            ApplyFilters();
+        else
+            BuildFromWorkspaceConnections(workspace);
+    }
+
+    /// <summary>
+    /// Rebuilds the graph directly from a <see cref="SystemMapModel"/>:
+    /// one node per <see cref="SystemModel"/> / <see cref="ExternalSystemModel"/>,
+    /// one connection per <see cref="RelationshipModel"/>.
+    /// Current filter settings are applied immediately.
+    /// </summary>
+    public void RefreshFromSystemMap(SystemMapModel map)
+    {
+        _currentSystemMap = map;
+        ApplyFilters();
+    }
+
+    // ── Private render helpers ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Re-renders nodes and connections using <see cref="_currentSystemMap"/> and
+    /// the active filter settings. No-ops when no system map has been loaded.
+    /// Note: filter changes made before the first <see cref="Refresh"/> or
+    /// <see cref="RefreshFromSystemMap"/> call have no visual effect — the
+    /// design-time demo graph loaded in the constructor is unaffected by filters.
+    /// </summary>
+    private void ApplyFilters()
+    {
+        if (_currentSystemMap != null)
+            BuildFromSystemMap(_currentSystemMap);
+        else if (_currentWorkspace != null)
+            BuildFromWorkspaceConnections(_currentWorkspace);
+        // If neither is set (design-time demo graph), do nothing.
+    }
+
+    private void BuildFromSystemMap(SystemMapModel map)
     {
         Nodes.Clear();
         Connections.Clear();
         _nodeEdges.Clear();
 
-        // Build a node per system box.
+        bool lowConf = ShowLowConfidenceItems;
+
+        // ── Nodes ─────────────────────────────────────────────────────────────
+
+        var nodeMap = new Dictionary<string, NodeViewModel>(
+            map.Systems.Count + map.ExternalSystems.Count, StringComparer.Ordinal);
+
+        double autoX = 80;
+        const double autoY   = 200;
+        const double autoGap = 220;
+
+        foreach (var sys in map.Systems)
+        {
+            if (!lowConf && sys.Confidence == ConfidenceLevel.Unknown) continue;
+
+            var node = new NodeViewModel { Title = sys.Name, Location = new Point(autoX, autoY) };
+            nodeMap[sys.Id] = node;
+            Nodes.Add(node);
+            autoX += autoGap;
+        }
+
+        foreach (var ext in map.ExternalSystems)
+        {
+            if (!lowConf && ext.Confidence == ConfidenceLevel.Unknown) continue;
+
+            var node = new NodeViewModel { Title = $"[ext] {ext.Name}", Location = new Point(autoX, autoY + 160) };
+            nodeMap[ext.Id] = node;
+            Nodes.Add(node);
+            autoX += autoGap;
+        }
+
+        // ── Connections ───────────────────────────────────────────────────────
+
+        foreach (var rel in map.Relationships)
+        {
+            if (!lowConf && rel.Confidence == ConfidenceLevel.Unknown) continue;
+            if (!IsKindVisible(rel.Kind)) continue;
+
+            if (!nodeMap.TryGetValue(rel.FromId, out var fromNode) ||
+                !nodeMap.TryGetValue(rel.ToId,   out var toNode))
+                continue;
+
+            fromNode.OutputConnector.IsConnected = true;
+            toNode.InputConnector.IsConnected    = true;
+
+            Connections.Add(new ConnectionViewModel(
+                fromNode.OutputConnector, toNode.InputConnector, rel.Kind.ToString()));
+            _nodeEdges.Add((fromNode, toNode));
+        }
+
+        // Set ChildCount (outgoing edge count) on each node.
+        foreach (var node in Nodes) node.ChildCount = 0;
+        foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+
+        AppLogger.Debug($"[Graph] BuildFromSystemMap complete. " +
+                        $"Nodes={Nodes.Count}  Connections={Connections.Count}");
+    }
+
+    private bool IsKindVisible(RelationshipKind kind) => kind switch
+    {
+        RelationshipKind.Calls   => ShowCallsRelationships,
+        RelationshipKind.Depends => ShowDependsRelationships,
+        RelationshipKind.Imports => ShowImportsRelationships,
+        _                        => ShowOtherRelationships,
+    };
+
+    /// <summary>
+    /// Legacy render path: one node per <see cref="SystemBoxModel"/>,
+    /// one edge per <see cref="ConnectionModel"/>. Used when no System Map data
+    /// is available.
+    /// </summary>
+    private void BuildFromWorkspaceConnections(WorkspaceModel workspace)
+    {
+        Nodes.Clear();
+        Connections.Clear();
+        _nodeEdges.Clear();
+
         var nodeMap = new Dictionary<string, NodeViewModel>(workspace.Systems.Count, StringComparer.Ordinal);
         double autoX = 80;
         const double autoY   = 200;
@@ -54,33 +231,26 @@ public class GraphViewModel
 
         foreach (var sys in workspace.Systems)
         {
-            // Use the saved position when either coordinate is non-zero, otherwise auto-layout.
             bool hasSavedPosition = sys.X != 0 || sys.Y != 0;
             double x = hasSavedPosition ? sys.X : autoX;
             double y = hasSavedPosition ? sys.Y : autoY;
 
-            var node = new NodeViewModel
-            {
-                Title    = sys.Name,
-                Location = new Point(x, y),
-            };
-
+            var node = new NodeViewModel { Title = sys.Name, Location = new Point(x, y) };
             nodeMap[sys.Id] = node;
             Nodes.Add(node);
             autoX += autoGap;
         }
 
-        // Build connections from workspace connection models.
         foreach (var conn in workspace.Connections)
         {
             if (!nodeMap.TryGetValue(conn.FromId, out var fromNode))
             {
-                AppLogger.Debug($"[Graph] Skipping connection '{conn.Name}' — FromId='{conn.FromId}' not found in node map (Origin={conn.Origin}).");
+                AppLogger.Debug($"[Graph] Skipping connection '{conn.Name}' — FromId='{conn.FromId}' not found (Origin={conn.Origin}).");
                 continue;
             }
             if (!nodeMap.TryGetValue(conn.ToId, out var toNode))
             {
-                AppLogger.Debug($"[Graph] Skipping connection '{conn.Name}' — ToId='{conn.ToId}' not found in node map (Origin={conn.Origin}).");
+                AppLogger.Debug($"[Graph] Skipping connection '{conn.Name}' — ToId='{conn.ToId}' not found (Origin={conn.Origin}).");
                 continue;
             }
 
@@ -91,13 +261,10 @@ public class GraphViewModel
             _nodeEdges.Add((fromNode, toNode));
         }
 
-        // Set ChildCount (outgoing edge count) on each node.
-        foreach (var node in Nodes)
-            node.ChildCount = 0;
-        foreach (var (from, _) in _nodeEdges)
-            from.ChildCount++;
+        foreach (var node in Nodes) node.ChildCount = 0;
+        foreach (var (from, _) in _nodeEdges) from.ChildCount++;
 
-        AppLogger.Debug($"[Graph] Refresh complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
+        AppLogger.Debug($"[Graph] BuildFromWorkspaceConnections complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
                         $"(workspace had {workspace.Connections.Count} connection(s) total).");
     }
 
@@ -250,4 +417,9 @@ public class GraphViewModel
 
         return layers;
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

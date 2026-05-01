@@ -30,6 +30,23 @@ public partial class GraphView : UserControl
         // ── ARRANGE ──────────────────────────────────────────────────────────
         AutoAlignButton.Click   += OnAutoAlignClick;
         DistributeHButton.Click += OnDistributeHorizontallyClick;
+
+        // ── FILTER ───────────────────────────────────────────────────────────
+        FilterLowConfidenceCheck.IsCheckedChanged += (_, _) => ApplyFilterChange();
+        FilterCallsCheck.IsCheckedChanged         += (_, _) => ApplyFilterChange();
+        FilterDependsCheck.IsCheckedChanged       += (_, _) => ApplyFilterChange();
+        FilterImportsCheck.IsCheckedChanged       += (_, _) => ApplyFilterChange();
+        FilterOtherKindsCheck.IsCheckedChanged    += (_, _) => ApplyFilterChange();
+    }
+
+    private void ApplyFilterChange()
+    {
+        if (DataContext is not GraphViewModel vm) return;
+        vm.ShowLowConfidenceItems    = FilterLowConfidenceCheck.IsChecked == true;
+        vm.ShowCallsRelationships    = FilterCallsCheck.IsChecked         == true;
+        vm.ShowDependsRelationships  = FilterDependsCheck.IsChecked       == true;
+        vm.ShowImportsRelationships  = FilterImportsCheck.IsChecked       == true;
+        vm.ShowOtherRelationships    = FilterOtherKindsCheck.IsChecked    == true;
     }
 
     private void OnAutoAlignClick(object? sender, RoutedEventArgs e)
