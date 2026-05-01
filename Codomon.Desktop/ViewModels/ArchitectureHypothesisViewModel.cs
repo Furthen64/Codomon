@@ -148,7 +148,9 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => ProgressMessages.Add(msg)));
 
             var hypothesis = await ArchitectureHypothesisService.RunSynthesisAsync(
-                _apiEndpoint, _modelName, _workspaceFolderPath, progress, _cts.Token);
+                _apiEndpoint, _modelName, _workspaceFolderPath,
+                _workspace.LlmSettings.HypothesisTokenThreshold,
+                progress, _cts.Token);
 
             CurrentHypothesis = hypothesis;
             RefreshSavedHypotheses();
