@@ -13,6 +13,14 @@ namespace Codomon.Desktop.Views;
 public partial class LlmSummaryDialog : Window
 {
     private readonly LlmSummaryViewModel _vm;
+    private int _lastFileToggleIndex = -1;
+    private int _pendingShiftClickIndex = -1;
+    private bool _pendingShiftClick;
+    private bool _isApplyingRangeSelection;
+
+    private DispatcherTimer? _spinnerTimer;
+    private int _spinnerFrame;
+    private static readonly string[] SpinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
     public LlmSummaryDialog(LlmSummaryViewModel vm)
     {
@@ -234,6 +242,38 @@ public partial class LlmSummaryDialog : Window
 
         if (genBtn    != null) genBtn.IsEnabled    = !_vm.IsGenerating;
         if (cancelBtn != null) cancelBtn.IsEnabled =  _vm.IsGenerating;
+
+        if (_vm.IsGenerating)
+            StartSpinner();
+        else
+            StopSpinner();
+    }
+
+    private void StartSpinner()
+    {
+        if (_spinnerTimer != null) return;
+
+        var spinner = this.FindControl<TextBlock>("SpinnerText");
+        if (spinner != null) spinner.IsVisible = true;
+
+        _spinnerFrame = 0;
+        _spinnerTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+        _spinnerTimer.Tick += (_, _) =>
+        {
+            var s = this.FindControl<TextBlock>("SpinnerText");
+            if (s != null) s.Text = SpinnerFrames[_spinnerFrame % SpinnerFrames.Length];
+            _spinnerFrame++;
+        };
+        _spinnerTimer.Start();
+    }
+
+    private void StopSpinner()
+    {
+        _spinnerTimer?.Stop();
+        _spinnerTimer = null;
+
+        var spinner = this.FindControl<TextBlock>("SpinnerText");
+        if (spinner != null) spinner.IsVisible = false;
     }
 
     private void RebuildFileList()
@@ -243,8 +283,10 @@ public partial class LlmSummaryDialog : Window
 
         listBox.Items.Clear();
 
-        foreach (var file in _vm.CsFiles)
+        for (int index = 0; index < _vm.CsFiles.Count; index++)
         {
+            var file = _vm.CsFiles[index];
+            var itemIndex = index;
             var checkBox = new CheckBox
             {
                 IsChecked = file.IsSelected,
@@ -259,10 +301,32 @@ public partial class LlmSummaryDialog : Window
                 Padding = new Avalonia.Thickness(4, 2)
             };
 
+            checkBox.PointerPressed += (_, args) =>
+            {
+                _pendingShiftClick = args.KeyModifiers.HasFlag(KeyModifiers.Shift);
+                _pendingShiftClickIndex = itemIndex;
+            };
+
             checkBox.IsCheckedChanged += (_, _) =>
             {
                 if (checkBox.Tag is CsFileItem f)
                     f.IsSelected = checkBox.IsChecked == true;
+
+                if (_isApplyingRangeSelection)
+                    return;
+
+                var currentState = checkBox.IsChecked == true;
+                if (_pendingShiftClick &&
+                    _pendingShiftClickIndex == itemIndex &&
+                    _lastFileToggleIndex >= 0 &&
+                    _lastFileToggleIndex != itemIndex)
+                {
+                    ApplySelectionRange(_lastFileToggleIndex, itemIndex, currentState);
+                }
+
+                _lastFileToggleIndex = itemIndex;
+                _pendingShiftClick = false;
+                _pendingShiftClickIndex = -1;
             };
 
             listBox.Items.Add(new ListBoxItem
@@ -275,6 +339,34 @@ public partial class LlmSummaryDialog : Window
         var countText = this.FindControl<TextBlock>("FileCountText");
         if (countText != null)
             countText.Text = $"C# Files ({_vm.CsFiles.Count})";
+    }
+
+    private void ApplySelectionRange(int fromIndex, int toIndex, bool selected)
+    {
+        var listBox = this.FindControl<ListBox>("CsFilesListBox");
+        if (listBox == null) return;
+
+        var min = Math.Min(fromIndex, toIndex);
+        var max = Math.Max(fromIndex, toIndex);
+
+        _isApplyingRangeSelection = true;
+        try
+        {
+            for (int i = min; i <= max; i++)
+            {
+                if (i < 0 || i >= _vm.CsFiles.Count)
+                    continue;
+
+                _vm.CsFiles[i].IsSelected = selected;
+
+                if (listBox.Items[i] is ListBoxItem item && item.Content is CheckBox cb)
+                    cb.IsChecked = selected;
+            }
+        }
+        finally
+        {
+            _isApplyingRangeSelection = false;
+        }
     }
 
     private void ScrollProgressToBottom()

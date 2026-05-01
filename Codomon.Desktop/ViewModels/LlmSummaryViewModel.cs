@@ -1,6 +1,7 @@
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -263,10 +264,36 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
         IsGenerating = true;
         ProgressMessages.Clear();
-        StatusMessage = "Generating summaries…";
+        StatusMessage = "Estimating token budget…";
 
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
+
+        int estimatedTokens = 0;
+        string estimatedRuntimeLabel = "unknown";
+        string estimatedComplexityLabel = "Unknown complexity.";
+
+        try
+        {
+            estimatedTokens = await EstimateSelectedTokenCountAsync(selected, ct);
+            (estimatedRuntimeLabel, estimatedComplexityLabel) = EstimateRuntimeFromTokens(estimatedTokens, selected.Count);
+
+            AppLogger.Debug($"[LLM] Preflight estimate: files={selected.Count} tokens={estimatedTokens} runtime={estimatedRuntimeLabel} complexity={estimatedComplexityLabel}");
+            ReportProgress($"Estimated input size: {estimatedTokens:N0} token(s) across {selected.Count} file(s).");
+            ReportProgress($"Estimated runtime: {estimatedRuntimeLabel}. {estimatedComplexityLabel}");
+            StatusMessage = $"Generating summaries... estimated {estimatedRuntimeLabel}.";
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Estimation is advisory; continue generation even if it fails.
+            AppLogger.Warn($"[LLM] Token preflight estimate failed: {ex.GetType().Name}: {ex.Message}");
+            ReportProgress($"Token estimation failed: {ex.Message}");
+            StatusMessage = "Generating summaries…";
+        }
 
         var sourcePath = _workspace.SourceProjectPath;
         var searchRoot = Directory.Exists(sourcePath)
@@ -278,6 +305,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
             var batchFolder = LlmSummaryService.CreateBatchFolder(_workspaceFolderPath);
             ReportProgress($"Batch folder: {Path.GetFileName(batchFolder)}");
             ReportProgress($"Generating summaries for {selected.Count} file(s)…");
+            var batchTimer = Stopwatch.StartNew();
 
             int done = 0;
             foreach (var file in selected)
@@ -286,6 +314,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
                 AppLogger.Debug($"[LLM] Processing [{done + 1}/{selected.Count}]: {file.RelativePath}");
                 ReportProgress($"[{done + 1}/{selected.Count}] {file.RelativePath}");
+                var fileTimer = Stopwatch.StartNew();
 
                 try
                 {
@@ -294,9 +323,10 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                         _workspaceFolderPath, batchFolder,
                         file.FullPath, searchRoot, ct);
 
+                    fileTimer.Stop();
                     done++;
                     AppLogger.Debug($"[LLM] Done [{done}/{selected.Count}]: {file.RelativePath}");
-                    ReportProgress($"  ✔ Done");
+                    ReportProgress($"  ✔ Done (took {FormatDuration(fileTimer.Elapsed)})");
                 }
                 catch (OperationCanceledException)
                 {
@@ -313,9 +343,17 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                 }
             }
 
+            batchTimer.Stop();
             AppLogger.Info($"[LLM] GenerateSummaries completed: {done} file(s) summarised.");
-            StatusMessage = $"Done — {done} summary(s) generated.";
-            ReportProgress($"Completed: {done} file(s) summarised.");
+            var actualDuration = FormatDuration(batchTimer.Elapsed);
+            StatusMessage = estimatedTokens > 0
+                ? $"Done - {done} summary(s) generated in {actualDuration} (estimated {estimatedRuntimeLabel})."
+                : $"Done - {done} summary(s) generated in {actualDuration}.";
+
+            if (estimatedTokens > 0)
+                ReportProgress($"Completed: {done} file(s) summarised in {actualDuration} (estimated {estimatedRuntimeLabel}).");
+            else
+                ReportProgress($"Completed: {done} file(s) summarised in {actualDuration}.");
 
             // Refresh the browse list.
             RefreshSummaries();
@@ -350,6 +388,56 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
     private void ReportProgress(string message)
         => Avalonia.Threading.Dispatcher.UIThread.Post(() => ProgressMessages.Add(message));
+
+    private static async Task<int> EstimateSelectedTokenCountAsync(
+        IReadOnlyList<CsFileItem> selected,
+        CancellationToken cancellationToken)
+    {
+        int total = 0;
+        foreach (var file in selected)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!File.Exists(file.FullPath))
+                continue;
+
+            var content = await File.ReadAllTextAsync(file.FullPath, cancellationToken);
+            total += LlmHelper.EstimateTokenCount(content);
+        }
+
+        return total;
+    }
+
+    private static (string RuntimeLabel, string ComplexityLabel) EstimateRuntimeFromTokens(int estimatedTokens, int fileCount)
+    {
+        // Broad guidance for users before generation starts.
+        // Heuristic target: about 1200 effective prompt tokens processed per second.
+        const double tokensPerSecond = 1200.0;
+        var estimatedSeconds = Math.Max(1, (int)Math.Ceiling(estimatedTokens / tokensPerSecond));
+        var runtimeLabel = FormatDuration(TimeSpan.FromSeconds(estimatedSeconds));
+
+        if (estimatedTokens >= 120_000 || fileCount >= 8 && estimatedTokens >= 80_000)
+            return (runtimeLabel, "Large/complex selection: a lot of time expected.");
+
+        if (estimatedTokens <= 15_000 && fileCount <= 12)
+            return (runtimeLabel, "Small selection: this should complete in a few seconds.");
+
+        return (runtimeLabel, "Medium selection: expect moderate generation time.");
+    }
+
+    private static string FormatDuration(TimeSpan elapsed)
+    {
+        if (elapsed.TotalHours >= 1)
+            return $"{(int)elapsed.TotalHours}h{elapsed.Minutes:D2}m{elapsed.Seconds:D2}s";
+
+        if (elapsed.TotalMinutes >= 1)
+            return $"{(int)elapsed.TotalMinutes}m{elapsed.Seconds:D2}s";
+
+        if (elapsed.TotalSeconds >= 1)
+            return $"{(int)elapsed.TotalSeconds}s";
+
+        return $"{elapsed.TotalMilliseconds:0}ms";
+    }
 
     private static bool IsExcluded(string filePath)
     {
