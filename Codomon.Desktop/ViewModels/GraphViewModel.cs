@@ -91,6 +91,12 @@ public class GraphViewModel
             _nodeEdges.Add((fromNode, toNode));
         }
 
+        // Set ChildCount (outgoing edge count) on each node.
+        foreach (var node in Nodes)
+            node.ChildCount = 0;
+        foreach (var (from, _) in _nodeEdges)
+            from.ChildCount++;
+
         AppLogger.Debug($"[Graph] Refresh complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
                         $"(workspace had {workspace.Connections.Count} connection(s) total).");
     }

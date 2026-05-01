@@ -44,6 +44,10 @@ public static class CodomonGraphAdapter
             edges.Add((fromNode, toNode));
         }
 
+        // Set ChildCount (outgoing edge count) for each node.
+        foreach (var edge in edges)
+            edge.From.ChildCount++;
+
         return (nodeMap.Values.ToList(), connections, edges);
     }
 }
