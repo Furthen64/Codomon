@@ -98,6 +98,8 @@ public partial class MainWindow : Window
             bool has = _vm.HasWorkspace;
             if (workspaceGrid != null) workspaceGrid.IsVisible = has;
             if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has;
+            if (has && _graphVm != null)
+                _graphVm.Refresh(_vm.Workspace);
             UpdateWindowTitle();
             RefreshLiveMonitorPanel();
         }
@@ -1543,8 +1545,7 @@ public partial class MainWindow : Window
         _canvas.OnLayoutChanged = () => _vm.IsDirty = true;
 
         _graphVm = new ViewModels.GraphViewModel();
-        if (_vm.HasWorkspace)
-            _graphVm.Refresh(_vm.Workspace);
+        _graphVm.Refresh(_vm.Workspace);
 
         var graphView = new GraphView
         {
