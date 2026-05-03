@@ -98,12 +98,10 @@ public partial class ArchitectureHypothesisDialog : Window
         _vm.StatusMessage = "Prompt saved.";
     }
 
-    private void OnPromptTemplateSelectionChanged(object? sender, SelectionChangedEventArgs e)
-        => SyncPromptTemplateDescription();
-
-    private async void OnLoadPromptTemplateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnPromptTemplateSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         var fileName = GetSelectedPromptTemplateFileName();
+        SyncPromptTemplateDescription();
         if (string.IsNullOrWhiteSpace(fileName)) return;
 
         await _vm.LoadPromptPresetAsync(fileName);

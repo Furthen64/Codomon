@@ -59,7 +59,6 @@
                     <ComboBox x:Name="PromptTemplateComboBox"
                               Width="280"
                               SelectionChanged="OnPromptTemplateSelectionChanged"/>
-                    <Button Content="Load Preset" Click="OnLoadPromptTemplateClick" Padding="12,4"/>
                   </StackPanel>
                   <TextBlock x:Name="PromptTemplateDescriptionText"
                              Text=""
