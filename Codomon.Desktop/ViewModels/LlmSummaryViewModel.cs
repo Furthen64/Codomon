@@ -34,19 +34,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         _workspace = workspace;
         _workspaceFolderPath = workspaceFolderPath;
 
-        // Copy settings from model so edits are buffered until user saves.
-        // Fall back to the user-wide default LLM settings when the workspace has none configured.
-        var userConfig = UserConfigService.Load();
-        var hasExplicitWorkspaceEndpoint = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ApiEndpoint)
-            && (!string.Equals(workspace.LlmSettings.ApiEndpoint, DefaultWorkspaceEndpoint, StringComparison.OrdinalIgnoreCase)
-                || !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName));
-
-        _apiEndpoint = hasExplicitWorkspaceEndpoint
-            ? workspace.LlmSettings.ApiEndpoint
-            : userConfig.DefaultLlmSettings.ApiEndpoint;
-        _modelName = !string.IsNullOrEmpty(workspace.LlmSettings.ModelName)
-            ? workspace.LlmSettings.ModelName
-            : userConfig.DefaultLlmSettings.ModelName;
+        RefreshEffectiveSettingsFromConfig();
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -97,6 +85,24 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
     /// <summary>Model IDs returned by the last successful probe of the endpoint.</summary>
     public ObservableCollection<string> AvailableModels { get; } = new();
+
+    /// <summary>
+    /// Reloads endpoint/model values from workspace settings, falling back to user defaults.
+    /// </summary>
+    public void RefreshEffectiveSettingsFromConfig()
+    {
+        var userConfig = UserConfigService.Load();
+        var hasExplicitWorkspaceEndpoint = !string.IsNullOrWhiteSpace(_workspace.LlmSettings.ApiEndpoint)
+            && (!string.Equals(_workspace.LlmSettings.ApiEndpoint, DefaultWorkspaceEndpoint, StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(_workspace.LlmSettings.ModelName));
+
+        ApiEndpoint = hasExplicitWorkspaceEndpoint
+            ? _workspace.LlmSettings.ApiEndpoint
+            : userConfig.DefaultLlmSettings.ApiEndpoint;
+        ModelName = !string.IsNullOrEmpty(_workspace.LlmSettings.ModelName)
+            ? _workspace.LlmSettings.ModelName
+            : userConfig.DefaultLlmSettings.ModelName;
+    }
 
     // ── Generation state ──────────────────────────────────────────────────────
 
@@ -233,11 +239,23 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
             var normalizedRelPath = NormalizeRelativePath(relPath);
             summariesBySourcePath.TryGetValue(normalizedRelPath, out var existingSummary);
 
+            int estimatedTokens = 0;
+            try
+            {
+                var content = await File.ReadAllTextAsync(f);
+                estimatedTokens = LlmHelper.EstimateTokenCount(content);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"[LLM] Failed to estimate tokens for {relPath}: {ex.Message}");
+            }
+
             CsFiles.Add(new CsFileItem
             {
                 FullPath = f,
                 RelativePath = relPath,
                 IsSelected = false,
+                EstimatedTokenCount = estimatedTokens,
                 HasSummary = existingSummary != null,
                 LastSummaryGeneratedAtUtc = existingSummary?.GeneratedAt
             });
@@ -522,6 +540,7 @@ public class CsFileItem : INotifyPropertyChanged
     private bool _isSelected;
     private bool _hasSummary;
     private DateTime? _lastSummaryGeneratedAtUtc;
+    private int _estimatedTokenCount;
 
     public string FullPath { get; set; } = string.Empty;
     public string RelativePath { get; set; } = string.Empty;
@@ -530,6 +549,13 @@ public class CsFileItem : INotifyPropertyChanged
     {
         get => _isSelected;
         set { _isSelected = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Estimated token count for this source file.</summary>
+    public int EstimatedTokenCount
+    {
+        get => _estimatedTokenCount;
+        set { _estimatedTokenCount = value; OnPropertyChanged(); }
     }
 
     /// <summary>Whether the workspace currently has a stored summary for this file.</summary>

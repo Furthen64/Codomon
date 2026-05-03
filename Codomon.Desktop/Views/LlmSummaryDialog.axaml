@@ -38,63 +38,26 @@
     <!-- Tab content -->
     <TabControl Background="#111820">
 
-      <!-- ── Tab 1: Setup ───────────────────────────────────────────────── -->
-      <TabItem Header="Setup">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <StackPanel Margin="24,18" Spacing="16">
+      <!-- ── Tab 1: Setup (intentionally blank for now) ─────────────────── -->
+      <TabItem Header="Setup"/>
 
-            <!-- API Endpoint -->
-            <StackPanel Spacing="6">
-              <TextBlock Text="API Endpoint" Foreground="#AABBCC" FontWeight="SemiBold"/>
-              <TextBlock Text="Base URL of your OpenAI-compatible endpoint (e.g. http://localhost:8080/v1)"
-                         Foreground="#556677" FontSize="11"/>
-              <TextBox x:Name="ApiEndpointBox"
-                       Watermark="http://localhost:8080/v1"
-                       TextChanged="OnApiEndpointChanged"/>
-            </StackPanel>
+      <!-- ── Tab 2: Generate ────────────────────────────────────────────── -->
+      <TabItem Header="Generate" x:Name="GenerateTab">
+        <DockPanel Margin="0">
 
-            <!-- Model Name -->
-            <StackPanel Spacing="6">
-              <TextBlock Text="Model Name" Foreground="#AABBCC" FontWeight="SemiBold"/>
-              <TextBlock Text="Type a model name, or click Probe Models to fetch available models from the host."
-                         Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBox x:Name="ModelNameBox" Grid.Column="0"
-                         Watermark="model name…"
-                         TextChanged="OnModelNameChanged"/>
-                <Button x:Name="ProbeModelsButton" Content="Probe Models" Grid.Column="1"
-                        Click="OnProbeModelsClick" Padding="10,5" Margin="8,0,0,0"/>
-              </Grid>
-              <ComboBox x:Name="ModelPickerComboBox"
-                        PlaceholderText="— select from probed models —"
-                        HorizontalAlignment="Stretch"
-                        IsEnabled="False"
-                        SelectionChanged="OnModelPickerSelectionChanged"/>
-              <TextBlock x:Name="ProbeStatusText" Text="" Foreground="#AABBCC" FontSize="11"/>
-            </StackPanel>
-
-            <!-- Test Connection -->
+          <!-- Prompt editor moved from Setup -->
+          <Border DockPanel.Dock="Top" Background="#141E2D" Padding="16,12"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
             <StackPanel Spacing="8">
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <Button x:Name="TestConnectionButton" Content="Test Connection"
-                        Click="OnTestConnectionClick" Padding="14,5"/>
-                <TextBlock x:Name="ConnectionStatusText"
-                           Text="" VerticalAlignment="Center"
-                           Foreground="#AABBCC" FontSize="12" TextWrapping="Wrap"/>
-              </StackPanel>
-            </StackPanel>
-
-            <Border Height="1" Background="#2A3F5A"/>
-
-            <!-- Prompt Editor -->
-            <StackPanel Spacing="6">
               <TextBlock Text="Summary Prompt (summary_prompt.md)" Foreground="#AABBCC" FontWeight="SemiBold"/>
               <TextBlock Text="This prompt is sent to the LLM for each file. Use {FilePath} and {SourceCode} as placeholders."
                          Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+              <TextBlock Text="Endpoint/model configuration lives in main Settings."
+                         Foreground="#88AABB" FontSize="11" TextWrapping="Wrap"/>
               <TextBox x:Name="PromptBox"
                        AcceptsReturn="True"
-                       MinHeight="160"
-                       MaxHeight="300"
+                       MinHeight="120"
+                       MaxHeight="220"
                        FontFamily="Monospace"
                        FontSize="11"
                        Background="#0F141E"
@@ -103,22 +66,11 @@
                        TextWrapping="Wrap"/>
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Content="Save Prompt" Click="OnSavePromptClick" Padding="12,4"/>
+                <Button Content="Open Settings" Click="OnOpenSettingsClick" Padding="12,4"
+                        Background="#1A3A5A" Foreground="White"/>
               </StackPanel>
             </StackPanel>
-
-            <!-- Save Settings -->
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Content="Save Settings" Click="OnSaveSettingsClick"
-                      Padding="14,5" Background="#1A3A5A" Foreground="White"/>
-            </StackPanel>
-
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ── Tab 2: Generate ────────────────────────────────────────────── -->
-      <TabItem Header="Generate" x:Name="GenerateTab">
-        <DockPanel Margin="0">
+          </Border>
 
           <!-- Toolbar -->
           <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
@@ -155,8 +107,14 @@
             <Border Grid.Column="0" BorderBrush="#2A3F5A" BorderThickness="0,0,1,0">
               <DockPanel>
                 <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-                  <TextBlock x:Name="FileCountText" Text="C# Files"
-                             FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+                  <StackPanel Spacing="6">
+                    <TextBlock x:Name="FileCountText" Text="C# Files"
+                               FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+                    <TextBox x:Name="FileFilterBox"
+                             Watermark="Filter files (e.g. OpenRA.Game/Network or Network)"
+                             TextChanged="OnFileFilterChanged"
+                             FontSize="11"/>
+                  </StackPanel>
                 </Border>
                 <ListBox x:Name="CsFilesListBox"
                          Background="Transparent"

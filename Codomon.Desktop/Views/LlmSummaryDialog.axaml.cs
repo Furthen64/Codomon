@@ -8,12 +8,13 @@ namespace Codomon.Desktop.Views;
 
 /// <summary>
 /// LLM Summaries dialog.
-/// Three tabs: Setup (endpoint/model/prompt), Generate (file selection + progress), Browse (view stored summaries).
+/// Three tabs: Setup (currently blank), Generate (prompt + file selection + progress), Browse (view stored summaries).
 /// </summary>
 public partial class LlmSummaryDialog : Window
 {
     private readonly LlmSummaryViewModel _vm;
     private readonly List<int> _visibleFileIndices = new();
+    private string _fileFilter = string.Empty;
     private int _lastFileToggleIndex = -1;
     private int _pendingShiftClickIndex = -1;
     private bool _pendingShiftClick;
@@ -33,10 +34,6 @@ public partial class LlmSummaryDialog : Window
         {
             if (e.PropertyName is nameof(LlmSummaryViewModel.StatusMessage))
                 SyncStatusText();
-            else if (e.PropertyName is nameof(LlmSummaryViewModel.ConnectionOk)
-                                    or nameof(LlmSummaryViewModel.ConnectionStatus)
-                                    or nameof(LlmSummaryViewModel.IsTestingConnection))
-                SyncConnectionStatus();
             else if (e.PropertyName is nameof(LlmSummaryViewModel.IsGenerating))
                 SyncGenerateButtons();
         };
@@ -54,12 +51,6 @@ public partial class LlmSummaryDialog : Window
 
     private async Task OnDialogOpenedAsync()
     {
-        // Populate settings fields.
-        var endpointBox = this.FindControl<TextBox>("ApiEndpointBox");
-        var modelBox = this.FindControl<TextBox>("ModelNameBox");
-        if (endpointBox != null) endpointBox.Text = _vm.ApiEndpoint;
-        if (modelBox != null) modelBox.Text = _vm.ModelName;
-
         await _vm.LoadPromptAsync();
         var promptBox = this.FindControl<TextBox>("PromptBox");
         if (promptBox != null) promptBox.Text = _vm.PromptTemplate;
@@ -72,125 +63,6 @@ public partial class LlmSummaryDialog : Window
         SyncStatusText();
     }
 
-    // ── Setup tab ─────────────────────────────────────────────────────────────
-
-    private void OnApiEndpointChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (sender is TextBox tb)
-            _vm.ApiEndpoint = tb.Text ?? string.Empty;
-    }
-
-    private void OnModelNameChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (sender is TextBox tb)
-            _vm.ModelName = tb.Text ?? string.Empty;
-    }
-
-    private async void OnTestConnectionClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var btn = this.FindControl<Button>("TestConnectionButton");
-        if (btn != null) btn.IsEnabled = false;
-
-        try
-        {
-            await _vm.TestConnectionAsync();
-        }
-        finally
-        {
-            if (btn != null) btn.IsEnabled = true;
-        }
-    }
-
-    private async void OnProbeModelsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var btn = this.FindControl<Button>("ProbeModelsButton");
-        var probeText = this.FindControl<TextBlock>("ProbeStatusText");
-        var picker = this.FindControl<ComboBox>("ModelPickerComboBox");
-
-        if (btn != null) btn.IsEnabled = false;
-        if (probeText != null)
-        {
-            probeText.Text = "Probing…";
-            probeText.Foreground = Avalonia.Media.Brushes.Gray;
-        }
-
-        try
-        {
-            await _vm.FetchModelsAsync();
-
-            var count = _vm.AvailableModels.Count;
-            if (picker != null)
-            {
-                picker.ItemsSource = _vm.AvailableModels;
-                picker.IsEnabled = count > 0;
-            }
-
-            if (probeText != null)
-            {
-                if (count > 0)
-                {
-                    probeText.Text = $"Found {count} model(s).";
-                    probeText.Foreground = Avalonia.Media.Brushes.LightGreen;
-                }
-                else
-                {
-                    probeText.Text = "No models returned — check endpoint and try Test Connection first.";
-                    probeText.Foreground = new Avalonia.Media.SolidColorBrush(
-                        Avalonia.Media.Color.Parse("#FF8888"));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            if (probeText != null)
-            {
-                probeText.Text = $"Probe failed: {ex.Message}";
-                probeText.Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.Parse("#FF8888"));
-            }
-        }
-        finally
-        {
-            if (btn != null) btn.IsEnabled = true;
-        }
-    }
-
-    private void OnModelPickerSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (sender is ComboBox cb && cb.SelectedItem is string modelId)
-        {
-            var modelBox = this.FindControl<TextBox>("ModelNameBox");
-            if (modelBox != null) modelBox.Text = modelId;
-        }
-    }
-
-    private void SyncConnectionStatus()
-    {
-        var text = this.FindControl<TextBlock>("ConnectionStatusText");
-        if (text == null) return;
-
-        if (_vm.IsTestingConnection)
-        {
-            text.Text = "Testing…";
-            text.Foreground = Avalonia.Media.Brushes.Gray;
-        }
-        else if (_vm.ConnectionOk)
-        {
-            text.Text = "✔  " + _vm.ConnectionStatus;
-            text.Foreground = Avalonia.Media.Brushes.LightGreen;
-        }
-        else if (!string.IsNullOrEmpty(_vm.ConnectionStatus))
-        {
-            text.Text = "✖  " + _vm.ConnectionStatus;
-            text.Foreground = new Avalonia.Media.SolidColorBrush(
-                Avalonia.Media.Color.Parse("#FF8888"));
-        }
-        else
-        {
-            text.Text = string.Empty;
-        }
-    }
-
     private async void OnSavePromptClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var promptBox = this.FindControl<TextBox>("PromptBox");
@@ -201,10 +73,12 @@ public partial class LlmSummaryDialog : Window
         _vm.StatusMessage = "Prompt saved.";
     }
 
-    private void OnSaveSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnOpenSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _vm.SaveSettings();
-        _vm.StatusMessage = "Settings saved.";
+        var dialog = new UserSettingsDialog();
+        await dialog.ShowDialog(this);
+        _vm.RefreshEffectiveSettingsFromConfig();
+        _vm.StatusMessage = "Settings refreshed from main Settings.";
     }
 
     // ── Generate tab ──────────────────────────────────────────────────────────
@@ -238,6 +112,17 @@ public partial class LlmSummaryDialog : Window
             _pendingShiftClickIndex = -1;
             RebuildFileList();
         }
+    }
+
+    private void OnFileFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (sender is not TextBox tb) return;
+
+        _fileFilter = tb.Text ?? string.Empty;
+        _lastFileToggleIndex = -1;
+        _pendingShiftClick = false;
+        _pendingShiftClickIndex = -1;
+        RebuildFileList();
     }
 
     private async void OnGenerateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -299,9 +184,16 @@ public partial class LlmSummaryDialog : Window
         listBox.Items.Clear();
         _visibleFileIndices.Clear();
 
+        var eligibleCount = 0;
+
         for (int sourceIndex = 0; sourceIndex < _vm.CsFiles.Count; sourceIndex++)
         {
             if (_hideSummarized && _vm.CsFiles[sourceIndex].HasSummary)
+                continue;
+
+            eligibleCount++;
+
+            if (!MatchesFileFilter(_vm.CsFiles[sourceIndex].RelativePath, _fileFilter))
                 continue;
 
             _visibleFileIndices.Add(sourceIndex);
@@ -317,7 +209,8 @@ public partial class LlmSummaryDialog : Window
                 IsChecked = file.IsSelected,
                 Content = BuildFileLabel(file),
                 Tag = file,
-                Padding = new Avalonia.Thickness(4, 2)
+                Padding = new Avalonia.Thickness(4, 2),
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
             };
 
             checkBox.PointerPressed += (_, args) =>
@@ -357,20 +250,39 @@ public partial class LlmSummaryDialog : Window
 
         var countText = this.FindControl<TextBlock>("FileCountText");
         if (countText != null)
-            countText.Text = _hideSummarized
-                ? $"C# Files ({_visibleFileIndices.Count}/{_vm.CsFiles.Count})"
+            countText.Text = _hideSummarized || !string.IsNullOrWhiteSpace(_fileFilter)
+                ? $"C# Files (shown {_visibleFileIndices.Count}, eligible {eligibleCount}, total {_vm.CsFiles.Count})"
                 : $"C# Files ({_vm.CsFiles.Count})";
     }
 
+    private static bool MatchesFileFilter(string relativePath, string filter)
+    {
+        if (string.IsNullOrWhiteSpace(filter))
+            return true;
+
+        var path = NormalizeForMatch(relativePath);
+        var query = NormalizeForMatch(filter.Trim());
+
+        // Path-like queries imply prefix intent, e.g. "OpenRA.Game/Network".
+        if (query.Contains('/'))
+            return path.StartsWith(query, StringComparison.OrdinalIgnoreCase);
+
+        // Non-path queries use contains matching, e.g. "Network".
+        return path.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeForMatch(string value)
+        => (value ?? string.Empty).Replace('\\', '/');
+
     private static Control BuildFileLabel(CsFileItem file)
     {
-        var panel = new StackPanel
+        var textPanel = new StackPanel
         {
             Spacing = 0,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
         };
 
-        panel.Children.Add(new TextBlock
+        textPanel.Children.Add(new TextBlock
         {
             Text = file.RelativePath,
             FontSize = 11,
@@ -384,7 +296,7 @@ public partial class LlmSummaryDialog : Window
                 ? $"Summary exists - generated {file.LastSummaryGeneratedAtUtc.Value:yyyy-MM-dd HH:mm} UTC"
                 : "Summary exists";
 
-            panel.Children.Add(new TextBlock
+            textPanel.Children.Add(new TextBlock
             {
                 Text = generatedText,
                 FontSize = 10,
@@ -393,7 +305,52 @@ public partial class LlmSummaryDialog : Window
             });
         }
 
-        return panel;
+        var indicator = new Border
+        {
+            Width = 10,
+            Height = 10,
+            CornerRadius = new Avalonia.CornerRadius(1),
+            Background = GetComplexityBrush(file.EstimatedTokenCount),
+            BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#334455")),
+            BorderThickness = new Avalonia.Thickness(1),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Margin = new Avalonia.Thickness(8, 0, 0, 0)
+        };
+
+        var label = GetComplexityLabel(file.EstimatedTokenCount);
+        ToolTip.SetTip(indicator, $"{label} complexity (~{file.EstimatedTokenCount:N0} tokens)");
+
+        var row = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
+        };
+        row.Children.Add(textPanel);
+        Grid.SetColumn(textPanel, 0);
+        row.Children.Add(indicator);
+        Grid.SetColumn(indicator, 1);
+
+        return row;
+    }
+
+    private static Avalonia.Media.IBrush GetComplexityBrush(int estimatedTokens)
+    {
+        if (estimatedTokens >= 3000)
+            return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#E74C3C")); // red
+        if (estimatedTokens >= 1500)
+            return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#E67E22")); // orange
+        if (estimatedTokens >= 700)
+            return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#F1C40F")); // yellow
+        return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#2ECC71")); // green
+    }
+
+    private static string GetComplexityLabel(int estimatedTokens)
+    {
+        if (estimatedTokens >= 3000) return "High";
+        if (estimatedTokens >= 1500) return "Medium-high";
+        if (estimatedTokens >= 700) return "Medium";
+        return "Low";
     }
 
     private void ApplySelectionRange(int fromIndex, int toIndex, bool selected)
@@ -427,6 +384,14 @@ public partial class LlmSummaryDialog : Window
 
     private void SetVisibleSelection(bool selected)
     {
+        if (!selected)
+        {
+            // "Deselect All" should always clear all file selections, including
+            // files currently hidden by filters or the hide-summarized toggle.
+            _vm.SelectAll(false);
+            return;
+        }
+
         if (_hideSummarized)
         {
             foreach (var sourceIndex in _visibleFileIndices)
