@@ -117,6 +117,19 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         PromptTemplate = await ArchitectureHypothesisService.LoadPromptTemplateAsync(_workspaceFolderPath);
     }
 
+    /// <summary>Returns available preset prompt template files for this workspace.</summary>
+    public async Task<IReadOnlyList<(string FileName, string Description)>> GetPromptTemplatePresetsAsync()
+    {
+        await ArchitectureHypothesisService.EnsurePromptTemplatesAsync(_workspaceFolderPath);
+        return ArchitectureHypothesisService.ListPromptTemplatePresets();
+    }
+
+    /// <summary>Loads one preset template into <see cref="PromptTemplate"/>.</summary>
+    public async Task LoadPromptPresetAsync(string fileName)
+    {
+        PromptTemplate = await ArchitectureHypothesisService.LoadPromptTemplatePresetAsync(_workspaceFolderPath, fileName);
+    }
+
     /// <summary>Saves the edited prompt template.</summary>
     public async Task SavePromptAsync()
     {

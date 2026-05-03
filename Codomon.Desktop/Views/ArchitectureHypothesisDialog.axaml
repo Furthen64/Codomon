@@ -52,6 +52,22 @@
               <TextBlock Text="Synthesis Prompt (hypothesis_prompt.md)" Foreground="#AABBCC" FontWeight="SemiBold"/>
               <TextBlock Text="This prompt is sent to the LLM with all summaries appended. Use {Summaries} as the placeholder for the combined summary text. The LLM must return structured JSON."
                          Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+              <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Preset Prompt Templates" Foreground="#AABBCC" FontWeight="SemiBold" FontSize="12"/>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox x:Name="PromptTemplateComboBox"
+                              Width="280"
+                              SelectionChanged="OnPromptTemplateSelectionChanged"/>
+                    <Button Content="Load Preset" Click="OnLoadPromptTemplateClick" Padding="12,4"/>
+                  </StackPanel>
+                  <TextBlock x:Name="PromptTemplateDescriptionText"
+                             Text=""
+                             Foreground="#88AABB"
+                             FontSize="11"
+                             TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
               <TextBox x:Name="PromptBox"
                        AcceptsReturn="True"
                        MinHeight="200"

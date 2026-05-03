@@ -14,6 +14,8 @@ namespace Codomon.Desktop.Views;
 public partial class ArchitectureHypothesisDialog : Window
 {
     private readonly ArchitectureHypothesisViewModel _vm;
+    private readonly Dictionary<string, string> _promptTemplateDescriptions =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public ArchitectureHypothesisDialog(ArchitectureHypothesisViewModel vm)
     {
@@ -48,6 +50,8 @@ public partial class ArchitectureHypothesisDialog : Window
         if (infoText != null)
             infoText.Text = string.Empty;
 
+        await PopulatePromptTemplatePickerAsync();
+
         await _vm.LoadPromptAsync();
         var promptBox = this.FindControl<TextBox>("PromptBox");
         if (promptBox != null) promptBox.Text = _vm.PromptTemplate;
@@ -55,6 +59,31 @@ public partial class ArchitectureHypothesisDialog : Window
         _vm.RefreshSavedHypotheses();
         RebuildHistoryList();
         SyncStatusText();
+    }
+
+    private async Task PopulatePromptTemplatePickerAsync()
+    {
+        var combo = this.FindControl<ComboBox>("PromptTemplateComboBox");
+        if (combo == null) return;
+
+        combo.Items.Clear();
+        _promptTemplateDescriptions.Clear();
+
+        var presets = await _vm.GetPromptTemplatePresetsAsync();
+        foreach (var preset in presets)
+        {
+            _promptTemplateDescriptions[preset.FileName] = preset.Description;
+            combo.Items.Add(new ComboBoxItem
+            {
+                Content = preset.FileName,
+                Tag = preset.FileName
+            });
+        }
+
+        if (combo.ItemCount > 0)
+            combo.SelectedIndex = 0;
+
+        SyncPromptTemplateDescription();
     }
 
     // ── Setup tab ─────────────────────────────────────────────────────────────
@@ -67,6 +96,48 @@ public partial class ArchitectureHypothesisDialog : Window
 
         await _vm.SavePromptAsync();
         _vm.StatusMessage = "Prompt saved.";
+    }
+
+    private void OnPromptTemplateSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => SyncPromptTemplateDescription();
+
+    private async void OnLoadPromptTemplateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var fileName = GetSelectedPromptTemplateFileName();
+        if (string.IsNullOrWhiteSpace(fileName)) return;
+
+        await _vm.LoadPromptPresetAsync(fileName);
+
+        var promptBox = this.FindControl<TextBox>("PromptBox");
+        if (promptBox != null)
+            promptBox.Text = _vm.PromptTemplate;
+
+        _vm.StatusMessage = $"Loaded preset: {fileName}. Click Save Prompt to persist it.";
+        SyncStatusText();
+    }
+
+    private string GetSelectedPromptTemplateFileName()
+    {
+        var combo = this.FindControl<ComboBox>("PromptTemplateComboBox");
+        if (combo?.SelectedItem is ComboBoxItem item)
+            return item.Tag?.ToString() ?? string.Empty;
+        return string.Empty;
+    }
+
+    private void SyncPromptTemplateDescription()
+    {
+        var descriptionText = this.FindControl<TextBlock>("PromptTemplateDescriptionText");
+        if (descriptionText == null) return;
+
+        var fileName = GetSelectedPromptTemplateFileName();
+        if (!string.IsNullOrWhiteSpace(fileName)
+            && _promptTemplateDescriptions.TryGetValue(fileName, out var description))
+        {
+            descriptionText.Text = description;
+            return;
+        }
+
+        descriptionText.Text = "Select a preset to view its description.";
     }
 
     // ── Run tab ───────────────────────────────────────────────────────────────

@@ -101,6 +101,7 @@ public static class WorkspaceSerializer
         Directory.CreateDirectory(Path.Combine(folderPath, "autosaves"));
         Directory.CreateDirectory(Path.Combine(folderPath, "summaries"));
         Directory.CreateDirectory(Path.Combine(folderPath, "hypotheses"));
+        Directory.CreateDirectory(Path.Combine(folderPath, "prompts", "architecture-hypothesis"));
 
         // Write workspace version file so we can detect incompatible workspaces later.
         var versionContent = $"codomon-version={BuildInfo.AppVersion}{Environment.NewLine}build-date={BuildInfo.BuildDate}{Environment.NewLine}";
@@ -115,6 +116,9 @@ public static class WorkspaceSerializer
         var hypothesisPromptPath = Path.Combine(folderPath, "hypothesis_prompt.md");
         if (!File.Exists(hypothesisPromptPath))
             await File.WriteAllTextAsync(hypothesisPromptPath, DefaultHypothesisPrompt);
+
+        // Ensure built-in architecture prompt templates exist for the Setup tab preset picker.
+        await ArchitectureHypothesisService.EnsurePromptTemplatesAsync(folderPath);
 
         var workspaceDto = new WorkspaceFileDto
         {

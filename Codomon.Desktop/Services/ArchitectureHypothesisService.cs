@@ -18,6 +18,172 @@ public static class ArchitectureHypothesisService
 {
     private const string HypothesesFolder = "hypotheses";
     private const string PromptFileName = "hypothesis_prompt.md";
+        private const string PromptTemplatesFolder = "prompts/architecture-hypothesis";
+
+        private static readonly (string FileName, string Description)[] PromptTemplatePresets =
+        {
+                ("DEFAULT.md", "Original default synthesis prompt."),
+                ("LARGE_CODEBASE.md", "For large codebases with eco-system of systems, interconnected systems etc."),
+                ("ONE_DESKTOP_APP.md", "For just one single desktop app"),
+                ("ONE_WEB_APP.md", "For just one web app")
+        };
+
+        private const string LargeCodebasePrompt =
+                """
+                You are an expert enterprise software architect. Below are Markdown summaries of source files from a potentially large and interconnected codebase.
+
+                Prioritize ecosystem-level structure:
+                - Detect distinct systems, bounded contexts, integration seams, and data/contract boundaries.
+                - Prefer fewer, high-confidence systems over many speculative systems.
+                - Capture cross-system evidence explicitly (APIs, messaging, persistence, shared libraries, external integrations).
+                - Mark uncertain areas where summaries are insufficient to infer architecture safely.
+
+                Analyze these summaries and produce a JSON architecture hypothesis following the exact schema below.
+                Only output the JSON object - no prose, no markdown fences.
+
+                Schema:
+                {
+                    "systems": [
+                        {
+                            "name": "string",
+                            "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
+                            "confidence": "Likely|Possible|Unknown",
+                            "evidence": ["string"],
+                            "modules": [
+                                {
+                                    "name": "string",
+                                    "confidence": "Likely|Possible|Unknown",
+                                    "highValueNodes": ["string"]
+                                }
+                            ]
+                        }
+                    ],
+                    "highValueNodes": [
+                        {
+                            "name": "string",
+                            "reason": "string",
+                            "signal": "EntryPoint|Orchestrator|CentralStateModel|ServiceBoundary|SerializationBoundary|IntegrationBoundary|RuntimeHeavy|ErrorProne|BridgeBetweenClusters|Other",
+                            "confidence": "Likely|Possible|Unknown"
+                        }
+                    ],
+                    "startup": [
+                        {
+                            "system": "string",
+                            "mechanism": "string",
+                            "entryPointCandidates": ["string"],
+                            "confidence": "Likely|Possible|Unknown"
+                        }
+                    ],
+                    "uncertainAreas": ["string"]
+                }
+
+                --- SUMMARIES ---
+                {Summaries}
+                """;
+
+        private const string OneDesktopAppPrompt =
+                """
+                You are an expert desktop application architect. Below are Markdown summaries of source files from a single desktop app.
+
+                Prioritize one-system analysis:
+                - Assume there is usually one primary DesktopApp unless strong evidence suggests otherwise.
+                - Focus on startup flow, UI shell, state models, major services, persistence boundaries, and integrations.
+                - Identify high-value nodes that orchestrate behavior or coordinate subsystems.
+
+                Analyze these summaries and produce a JSON architecture hypothesis following the exact schema below.
+                Only output the JSON object - no prose, no markdown fences.
+
+                Schema:
+                {
+                    "systems": [
+                        {
+                            "name": "string",
+                            "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
+                            "confidence": "Likely|Possible|Unknown",
+                            "evidence": ["string"],
+                            "modules": [
+                                {
+                                    "name": "string",
+                                    "confidence": "Likely|Possible|Unknown",
+                                    "highValueNodes": ["string"]
+                                }
+                            ]
+                        }
+                    ],
+                    "highValueNodes": [
+                        {
+                            "name": "string",
+                            "reason": "string",
+                            "signal": "EntryPoint|Orchestrator|CentralStateModel|ServiceBoundary|SerializationBoundary|IntegrationBoundary|RuntimeHeavy|ErrorProne|BridgeBetweenClusters|Other",
+                            "confidence": "Likely|Possible|Unknown"
+                        }
+                    ],
+                    "startup": [
+                        {
+                            "system": "string",
+                            "mechanism": "string",
+                            "entryPointCandidates": ["string"],
+                            "confidence": "Likely|Possible|Unknown"
+                        }
+                    ],
+                    "uncertainAreas": ["string"]
+                }
+
+                --- SUMMARIES ---
+                {Summaries}
+                """;
+
+        private const string OneWebAppPrompt =
+                """
+                You are an expert web application architect. Below are Markdown summaries of source files from a single web application.
+
+                Prioritize one web-app architecture view:
+                - Assume one primary WebApp unless evidence strongly indicates additional systems.
+                - Highlight presentation/UI layer, API layer, domain/service layer, and persistence/external integrations.
+                - Capture request/response boundaries, background work, and critical startup/bootstrapping nodes.
+
+                Analyze these summaries and produce a JSON architecture hypothesis following the exact schema below.
+                Only output the JSON object - no prose, no markdown fences.
+
+                Schema:
+                {
+                    "systems": [
+                        {
+                            "name": "string",
+                            "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
+                            "confidence": "Likely|Possible|Unknown",
+                            "evidence": ["string"],
+                            "modules": [
+                                {
+                                    "name": "string",
+                                    "confidence": "Likely|Possible|Unknown",
+                                    "highValueNodes": ["string"]
+                                }
+                            ]
+                        }
+                    ],
+                    "highValueNodes": [
+                        {
+                            "name": "string",
+                            "reason": "string",
+                            "signal": "EntryPoint|Orchestrator|CentralStateModel|ServiceBoundary|SerializationBoundary|IntegrationBoundary|RuntimeHeavy|ErrorProne|BridgeBetweenClusters|Other",
+                            "confidence": "Likely|Possible|Unknown"
+                        }
+                    ],
+                    "startup": [
+                        {
+                            "system": "string",
+                            "mechanism": "string",
+                            "entryPointCandidates": ["string"],
+                            "confidence": "Likely|Possible|Unknown"
+                        }
+                    ],
+                    "uncertainAreas": ["string"]
+                }
+
+                --- SUMMARIES ---
+                {Summaries}
+                """;
 
     private static readonly JsonSerializerOptions LlmJsonOptions = new()
     {
@@ -51,6 +217,8 @@ public static class ArchitectureHypothesisService
     /// </summary>
     public static async Task<string> LoadPromptTemplateAsync(string workspaceFolderPath)
     {
+        await EnsurePromptTemplatesAsync(workspaceFolderPath);
+
         var path = Path.Combine(workspaceFolderPath, PromptFileName);
         return File.Exists(path)
             ? await File.ReadAllTextAsync(path)
@@ -62,6 +230,59 @@ public static class ArchitectureHypothesisService
     {
         var path = Path.Combine(workspaceFolderPath, PromptFileName);
         await File.WriteAllTextAsync(path, content);
+    }
+
+    /// <summary>
+    /// Ensures built-in prompt template files exist in the workspace prompt presets folder.
+    /// </summary>
+    public static async Task EnsurePromptTemplatesAsync(string workspaceFolderPath)
+    {
+        var templatesFolder = Path.Combine(workspaceFolderPath, PromptTemplatesFolder);
+        Directory.CreateDirectory(templatesFolder);
+
+        var workspacePromptPath = Path.Combine(workspaceFolderPath, PromptFileName);
+        var defaultTemplatePath = Path.Combine(templatesFolder, "DEFAULT.md");
+
+        if (!File.Exists(defaultTemplatePath))
+        {
+            var defaultContent = File.Exists(workspacePromptPath)
+                ? await File.ReadAllTextAsync(workspacePromptPath)
+                : string.Empty;
+            await File.WriteAllTextAsync(defaultTemplatePath, defaultContent);
+        }
+
+        var largeCodebasePath = Path.Combine(templatesFolder, "LARGE_CODEBASE.md");
+        if (!File.Exists(largeCodebasePath))
+            await File.WriteAllTextAsync(largeCodebasePath, LargeCodebasePrompt);
+
+        var oneDesktopAppPath = Path.Combine(templatesFolder, "ONE_DESKTOP_APP.md");
+        if (!File.Exists(oneDesktopAppPath))
+            await File.WriteAllTextAsync(oneDesktopAppPath, OneDesktopAppPrompt);
+
+        var oneWebAppPath = Path.Combine(templatesFolder, "ONE_WEB_APP.md");
+        if (!File.Exists(oneWebAppPath))
+            await File.WriteAllTextAsync(oneWebAppPath, OneWebAppPrompt);
+    }
+
+    /// <summary>Returns built-in prompt preset names and descriptions.</summary>
+    public static IReadOnlyList<(string FileName, string Description)> ListPromptTemplatePresets()
+        => PromptTemplatePresets;
+
+    /// <summary>Loads one prompt template preset file from the workspace prompt presets folder.</summary>
+    public static async Task<string> LoadPromptTemplatePresetAsync(string workspaceFolderPath, string fileName)
+    {
+        await EnsurePromptTemplatesAsync(workspaceFolderPath);
+
+        var knownPreset = PromptTemplatePresets
+            .FirstOrDefault(p => string.Equals(p.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(knownPreset.FileName))
+            throw new InvalidOperationException($"Unknown prompt preset: {fileName}");
+
+        var path = Path.Combine(workspaceFolderPath, PromptTemplatesFolder, knownPreset.FileName);
+        if (!File.Exists(path))
+            throw new FileNotFoundException($"Prompt preset file not found: {knownPreset.FileName}", path);
+
+        return await File.ReadAllTextAsync(path);
     }
 
     // ── Synthesis ─────────────────────────────────────────────────────────────
@@ -98,7 +319,7 @@ public static class ArchitectureHypothesisService
         var promptTemplate = await LoadPromptTemplateAsync(workspaceFolderPath);
         if (string.IsNullOrWhiteSpace(promptTemplate))
             throw new InvalidOperationException(
-                "Hypothesis prompt template is empty. Open the Hypothesis dialog Setup tab and save a prompt first.");
+                "Hypothesis prompt template is empty. Open the Architecture dialog Setup tab and save a prompt first.");
 
         // Determine batches based on the token threshold.
         List<List<SummaryEntry>> batches;
