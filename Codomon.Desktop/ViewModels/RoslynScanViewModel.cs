@@ -27,6 +27,8 @@ public class RoslynScanViewModel : INotifyPropertyChanged
     private SuggestedConnection? _selectedSuggestedConnection;
     private ScannedFile? _selectedFile;
     private ScannedClass? _selectedClass;
+    private bool _isRestoredScanLoaded;
+    private string _restoredScanLabel = string.Empty;
 
     private bool _wasAddedToCanvas;
 
@@ -91,6 +93,24 @@ public class RoslynScanViewModel : INotifyPropertyChanged
     {
         get => _scanResult;
         private set { _scanResult = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// True when the current results were loaded from a previously saved scan file.
+    /// </summary>
+    public bool IsRestoredScanLoaded
+    {
+        get => _isRestoredScanLoaded;
+        private set { _isRestoredScanLoaded = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Short status text describing the restored scan source/time.
+    /// </summary>
+    public string RestoredScanLabel
+    {
+        get => _restoredScanLabel;
+        private set { _restoredScanLabel = value; OnPropertyChanged(); }
     }
 
     public SuggestedConnection? SelectedSuggestedConnection
@@ -158,6 +178,7 @@ public class RoslynScanViewModel : INotifyPropertyChanged
     /// <summary>Transitions to the scan step and begins scanning in the background.</summary>
     public async Task StartScanAsync()
     {
+        ClearRestoredScanInfo();
         Step = ScanDialogStep.Scanning;
         IsRunning = true;
         ScanFinished = false;
@@ -191,6 +212,41 @@ public class RoslynScanViewModel : INotifyPropertyChanged
             IsRunning = false;
             _cts?.Dispose();
             _cts = null;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to load the newest saved scan from the workspace scans folder.
+    /// Returns <c>true</c> when a prior scan was restored and shown as results.
+    /// </summary>
+    public async Task<bool> TryRestoreLatestSavedScanAsync()
+    {
+        try
+        {
+            var saved = RoslynScanService.ListSavedScans(_workspaceFolderPath);
+            if (saved.Count == 0)
+                return false;
+
+            var latest = saved[0];
+            var restored = await RoslynScanService.LoadAsync(latest.FilePath);
+            if (restored == null)
+                return false;
+
+            SyncPromotedFlagsFromWorkspace(restored);
+
+            ScanResult = restored;
+            ScanFinished = true;
+            ProgressMessages.Clear();
+            ProgressMessages.Add($"Loaded saved scan: {Path.GetFileName(latest.FilePath)}");
+            var scanTimeUtc = restored.ScanTime == default ? latest.ScanTime : restored.ScanTime;
+            SetRestoredScanInfo(Path.GetFileName(latest.FilePath), scanTimeUtc);
+            Step = ScanDialogStep.Results;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"[Roslyn] Failed to restore latest scan: {ex.Message}");
+            return false;
         }
     }
 
@@ -303,6 +359,34 @@ public class RoslynScanViewModel : INotifyPropertyChanged
         }
 
         return null;
+    }
+
+    private void SyncPromotedFlagsFromWorkspace(RoslynScanResult scanResult)
+    {
+        if (_workspace == null) return;
+
+        var promotedNames = _workspace.Connections
+            .Where(c => c.Origin == ConnectionOrigin.Roslyn)
+            .Select(c => c.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var suggestion in scanResult.SuggestedConnections)
+        {
+            var promotedName = $"{ShortName(suggestion.FromClass)} → {ShortName(suggestion.ToClass)}";
+            suggestion.IsPromoted = promotedNames.Contains(promotedName);
+        }
+    }
+
+    private void SetRestoredScanInfo(string fileName, DateTime scanTimeUtc)
+    {
+        IsRestoredScanLoaded = true;
+        RestoredScanLabel = $"Loaded saved scan from {scanTimeUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss} ({fileName}).";
+    }
+
+    private void ClearRestoredScanInfo()
+    {
+        IsRestoredScanLoaded = false;
+        RestoredScanLabel = string.Empty;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

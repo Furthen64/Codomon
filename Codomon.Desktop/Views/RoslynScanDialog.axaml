@@ -46,6 +46,9 @@
           <Button x:Name="ViewResultsButton" Content="Browse Results →"
                   Click="OnViewResultsClick"
                   Padding="16,6" IsVisible="False"/>
+            <Button x:Name="RescanButton" Content="↻ Rescan"
+              Click="OnRescanClick"
+              Padding="16,6" IsVisible="False"/>
           <Button x:Name="AddAllToCanvasButton" Content="🗺 Import to System Map"
                   Click="OnAddAllToCanvasClick"
                   Padding="20,8" FontSize="14" FontWeight="SemiBold"
@@ -149,6 +152,22 @@
 
           <!-- Right: detail + connections -->
           <DockPanel Grid.Column="1">
+
+            <Border x:Name="RestoredScanBanner"
+                    DockPanel.Dock="Top"
+                    IsVisible="False"
+                    Margin="12,10,12,0"
+                    Padding="10,8"
+                    Background="#1A3B2A"
+                    BorderBrush="#2D7A55"
+                    BorderThickness="1"
+                    CornerRadius="4">
+              <TextBlock x:Name="RestoredScanBannerText"
+                         Text=""
+                         Foreground="#CDEEDB"
+                         FontSize="11"
+                         TextWrapping="Wrap"/>
+            </Border>
 
             <!-- Suggested connections panel -->
             <Border DockPanel.Dock="Bottom" Height="280"

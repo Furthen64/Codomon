@@ -32,6 +32,9 @@ public partial class RoslynScanDialog : Window
             else if (e.PropertyName is nameof(RoslynScanViewModel.ScanFinished)
                                     or nameof(RoslynScanViewModel.IsRunning))
                 RefreshButtons();
+            else if (e.PropertyName is nameof(RoslynScanViewModel.IsRestoredScanLoaded)
+                                    or nameof(RoslynScanViewModel.RestoredScanLabel))
+                RefreshRestoredScanBanner();
             else if (e.PropertyName == nameof(RoslynScanViewModel.CanPromote))
                 RefreshPromoteButton();
         };
@@ -40,7 +43,7 @@ public partial class RoslynScanDialog : Window
         _vm.ProgressMessages.CollectionChanged += (_, _) =>
             Dispatcher.UIThread.Post(ScrollProgressToBottom);
 
-        Opened += async (_, _) => await RunPreflightAsync();
+        Opened += async (_, _) => await InitializeAsync();
 
         // When the dialog is closed via the title-bar X button, Avalonia returns null from
         // ShowDialog<T> unless we supply the result explicitly here.
@@ -63,6 +66,20 @@ public partial class RoslynScanDialog : Window
     }
 
     // ── Preflight ─────────────────────────────────────────────────────────────
+
+    private async Task InitializeAsync()
+    {
+        if (await _vm.TryRestoreLatestSavedScanAsync())
+        {
+            PopulateCodeTree();
+            PopulateSuggestedConnectionsList();
+            ApplyStep();
+            return;
+        }
+
+        await RunPreflightAsync();
+        ApplyStep();
+    }
 
     private async Task RunPreflightAsync()
     {
@@ -102,6 +119,12 @@ public partial class RoslynScanDialog : Window
     // ── Button handlers ───────────────────────────────────────────────────────
 
     private async void OnStartScanClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await _vm.StartScanAsync();
+        RefreshButtons();
+    }
+
+    private async void OnRescanClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await _vm.StartScanAsync();
         RefreshButtons();
@@ -220,6 +243,8 @@ public partial class RoslynScanDialog : Window
                 if (dot1 != null) dot1.Fill = doneFill;
                 if (dot2 != null) dot2.Fill = doneFill;
                 if (dot3 != null) dot3.Fill = activeFill;
+                PopulateCodeTree();
+                PopulateSuggestedConnectionsList();
                 break;
         }
 
@@ -231,6 +256,7 @@ public partial class RoslynScanDialog : Window
         var startBtn           = this.FindControl<Button>("StartScanButton");
         var cancelScanBtn      = this.FindControl<Button>("CancelScanButton");
         var viewResultsBtn     = this.FindControl<Button>("ViewResultsButton");
+        var rescanBtn          = this.FindControl<Button>("RescanButton");
         var addAllBtn          = this.FindControl<Button>("AddAllToCanvasButton");
         var addAllHelpBtn      = this.FindControl<Button>("ImportToSystemMapHelpButton");
         var progressBar        = this.FindControl<ProgressBar>("ScanProgressBar");
@@ -241,6 +267,7 @@ public partial class RoslynScanDialog : Window
                 if (startBtn      != null) { startBtn.IsVisible      = true;  startBtn.IsEnabled = _vm.PreflightOk; }
                 if (cancelScanBtn != null)   cancelScanBtn.IsVisible  = false;
                 if (viewResultsBtn!= null)   viewResultsBtn.IsVisible = false;
+                if (rescanBtn     != null)   rescanBtn.IsVisible      = false;
                 if (addAllBtn     != null)   addAllBtn.IsVisible      = false;
                 if (addAllHelpBtn != null)   addAllHelpBtn.IsVisible  = false;
                 break;
@@ -249,6 +276,7 @@ public partial class RoslynScanDialog : Window
                 if (startBtn      != null) startBtn.IsVisible       = false;
                 if (cancelScanBtn != null) cancelScanBtn.IsVisible  = _vm.IsRunning;
                 if (viewResultsBtn!= null) viewResultsBtn.IsVisible = _vm.ScanFinished;
+                if (rescanBtn     != null) rescanBtn.IsVisible      = false;
                 if (addAllBtn     != null) addAllBtn.IsVisible      = false;
                 if (addAllHelpBtn != null) addAllHelpBtn.IsVisible  = false;
                 if (progressBar   != null) progressBar.IsIndeterminate = _vm.IsRunning;
@@ -258,6 +286,11 @@ public partial class RoslynScanDialog : Window
                 if (startBtn      != null) startBtn.IsVisible       = false;
                 if (cancelScanBtn != null) cancelScanBtn.IsVisible  = false;
                 if (viewResultsBtn!= null) viewResultsBtn.IsVisible = false;
+                if (rescanBtn     != null)
+                {
+                    rescanBtn.IsVisible = true;
+                    rescanBtn.IsEnabled = !_vm.IsRunning;
+                }
                 if (addAllBtn     != null)
                 {
                     addAllBtn.IsVisible = true;
@@ -266,12 +299,26 @@ public partial class RoslynScanDialog : Window
                 if (addAllHelpBtn != null) addAllHelpBtn.IsVisible  = true;
                 break;
         }
+
+        RefreshRestoredScanBanner();
     }
 
     private void RefreshPromoteButton()
     {
         var btn = this.FindControl<Button>("PromoteButton");
         if (btn != null) btn.IsEnabled = _vm.CanPromote;
+    }
+
+    private void RefreshRestoredScanBanner()
+    {
+        var banner = this.FindControl<Border>("RestoredScanBanner");
+        var text = this.FindControl<TextBlock>("RestoredScanBannerText");
+        if (banner == null || text == null)
+            return;
+
+        var showBanner = _vm.Step == ScanDialogStep.Results && _vm.IsRestoredScanLoaded;
+        banner.IsVisible = showBanner;
+        text.Text = showBanner ? _vm.RestoredScanLabel : string.Empty;
     }
 
     // ── Code tree population ──────────────────────────────────────────────────

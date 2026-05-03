@@ -113,6 +113,28 @@ public static class RoslynScanService
     }
 
     /// <summary>
+    /// Loads a previously saved Roslyn scan JSON file.
+    /// Returns <c>null</c> when the file is missing or invalid.
+    /// </summary>
+    public static async Task<RoslynScanResult?> LoadAsync(string filePath)
+    {
+        if (!File.Exists(filePath))
+            return null;
+
+        await using var stream = File.OpenRead(filePath);
+        var result = await JsonSerializer.DeserializeAsync<RoslynScanResult>(stream, JsonOptions);
+        if (result == null)
+            return null;
+
+        // Guard against older files that might omit lists.
+        result.Projects ??= new List<ScannedProject>();
+        result.Files ??= new List<ScannedFile>();
+        result.SuggestedConnections ??= new List<SuggestedConnection>();
+        result.PromotedConnectionIds ??= new List<string>();
+        return result;
+    }
+
+    /// <summary>
     /// Returns all previously saved Roslyn scan results for a workspace, newest first.
     /// </summary>
     public static List<(string FilePath, DateTime ScanTime)> ListSavedScans(string workspaceFolderPath)
