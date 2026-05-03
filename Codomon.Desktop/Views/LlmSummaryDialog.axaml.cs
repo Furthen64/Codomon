@@ -102,6 +102,17 @@ public partial class LlmSummaryDialog : Window
         RebuildFileList();
     }
 
+    private void OnSelectNonSummarizedClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _vm.SelectAll(false);
+        foreach (var sourceIndex in _visibleFileIndices)
+        {
+            if (!_vm.CsFiles[sourceIndex].HasSummary)
+                _vm.CsFiles[sourceIndex].IsSelected = true;
+        }
+        RebuildFileList();
+    }
+
     private void OnHideSummarizedChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is CheckBox cb)
@@ -239,6 +250,7 @@ public partial class LlmSummaryDialog : Window
                 _lastFileToggleIndex = itemIndex;
                 _pendingShiftClick = false;
                 _pendingShiftClickIndex = -1;
+                UpdateSelectionEstimate();
             };
 
             listBox.Items.Add(new ListBoxItem
@@ -253,6 +265,39 @@ public partial class LlmSummaryDialog : Window
             countText.Text = _hideSummarized || !string.IsNullOrWhiteSpace(_fileFilter)
                 ? $"C# Files (shown {_visibleFileIndices.Count}, eligible {eligibleCount}, total {_vm.CsFiles.Count})"
                 : $"C# Files ({_vm.CsFiles.Count})";
+
+        UpdateSelectionEstimate();
+    }
+
+    private void UpdateSelectionEstimate()
+    {
+        var estimateText = this.FindControl<TextBlock>("SelectionEstimateText");
+        if (estimateText == null) return;
+
+        var selected = _vm.CsFiles.Where(f => f.IsSelected).ToList();
+        if (selected.Count == 0)
+        {
+            estimateText.Text = string.Empty;
+            return;
+        }
+
+        var totalTokens = selected.Sum(f => f.EstimatedTokenCount);
+        const double tokensPerSecond = 1200.0;
+        var estimatedSeconds = Math.Max(1, (int)Math.Ceiling(totalTokens / tokensPerSecond));
+        var runtimeLabel = FormatEstimateDuration(TimeSpan.FromSeconds(estimatedSeconds));
+        var fileWord = selected.Count == 1 ? "file" : "files";
+        estimateText.Text = $"{selected.Count} {fileWord} · ~{totalTokens:N0} tokens · ~{runtimeLabel}";
+    }
+
+    private static string FormatEstimateDuration(TimeSpan elapsed)
+    {
+        if (elapsed.TotalHours >= 1)
+            return $"{(int)elapsed.TotalHours}h{elapsed.Minutes:D2}m{elapsed.Seconds:D2}s";
+        if (elapsed.TotalMinutes >= 1)
+            return $"{(int)elapsed.TotalMinutes}m{elapsed.Seconds:D2}s";
+        if (elapsed.TotalSeconds >= 1)
+            return $"{(int)elapsed.TotalSeconds}s";
+        return $"{elapsed.TotalMilliseconds:0}ms";
     }
 
     private static bool MatchesFileFilter(string relativePath, string filter)

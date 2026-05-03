@@ -401,6 +401,10 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
             RefreshSummaryStatusFlags();
 
+            // Deselect all files that were part of this batch.
+            foreach (var file in selected)
+                file.IsSelected = false;
+
             // Refresh the browse list.
             RefreshSummaries();
         }
