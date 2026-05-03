@@ -23,6 +23,11 @@ public partial class SystemMapView : UserControl
     /// </summary>
     public event Action<SystemItemVm>? ShowDetailedRelationshipsRequested;
 
+    /// <summary>
+    /// Raised when the user requests clearing the current System Map canvas.
+    /// </summary>
+    public event Action? ClearCanvasRequested;
+
     // ── Active-view button accent colour ─────────────────────────────────
     private static readonly IBrush ActiveButtonBg   = new SolidColorBrush(Color.Parse("#1A4A6A"));
     private static readonly IBrush InactiveButtonBg = new SolidColorBrush(Color.Parse("#1A2435"));
@@ -177,12 +182,22 @@ public partial class SystemMapView : UserControl
 
         if (item.ModuleCount > 0)
         {
-            details.Children.Add(new TextBlock
+            var moduleInfo = new StackPanel
             {
-                Text       = $"{item.ModuleCount} module(s)",
-                Foreground = new SolidColorBrush(Color.Parse("#778899")),
-                FontSize   = 11
-            });
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text       = $"{item.ModuleCount} module(s)",
+                        Foreground = new SolidColorBrush(Color.Parse("#778899")),
+                        FontSize   = 11
+                    },
+                    BuildModuleSizeIndicator(item.ModuleCount)
+                }
+            };
+
+            details.Children.Add(moduleInfo);
         }
 
         if (!string.IsNullOrEmpty(item.StartupMechanism))
@@ -597,6 +612,11 @@ public partial class SystemMapView : UserControl
         ShowDetailedRelationshipsRequested?.Invoke(_vm.SelectedSystem);
     }
 
+    public void OnClearCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        ClearCanvasRequested?.Invoke();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private static Border MakeBadge(string text, string bgHex, string fgHex)
@@ -615,6 +635,65 @@ public partial class SystemMapView : UserControl
                 LetterSpacing = 0.5
             }
         };
+    }
+
+    private static Control BuildModuleSizeIndicator(int moduleCount)
+    {
+        const int cellCount = 10;
+        int filled = MapModuleCountToCells(moduleCount, cellCount);
+
+        var grid = new Grid();
+        for (int col = 0; col < 5; col++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        for (int row = 0; row < 2; row++)
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+        for (int i = 0; i < cellCount; i++)
+        {
+            bool isFilled = i < filled;
+            var cell = new Border
+            {
+                Width = 12,
+                Height = 8,
+                Margin = new Avalonia.Thickness(0, 0, 3, 3),
+                CornerRadius = new Avalonia.CornerRadius(2),
+                Background = isFilled
+                    ? new SolidColorBrush(Color.Parse("#4A9FBF"))
+                    : new SolidColorBrush(Color.Parse("#26384E")),
+                BorderBrush = new SolidColorBrush(Color.Parse("#2A3F5A")),
+                BorderThickness = new Avalonia.Thickness(1)
+            };
+
+            Grid.SetColumn(cell, i % 5);
+            Grid.SetRow(cell, i / 5);
+            grid.Children.Add(cell);
+        }
+
+        var container = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Spacing = 2,
+            Children = { grid }
+        };
+
+        container.Children.Add(new TextBlock
+        {
+            Text = "log scale",
+            FontSize = 10,
+            Foreground = new SolidColorBrush(Color.Parse("#5B6F88"))
+        });
+
+        return container;
+    }
+
+    private static int MapModuleCountToCells(int moduleCount, int cellCount)
+    {
+        if (moduleCount <= 0) return 0;
+
+        // Log-scale fill keeps large systems visually distinguishable instead of
+        // saturating the meter too early.
+        int mapped = (int)Math.Ceiling(Math.Log2(moduleCount + 1));
+        return Math.Clamp(mapped, 1, cellCount);
     }
 
     private static string ConfidenceColor(Models.SystemMap.ConfidenceLevel c) => c switch

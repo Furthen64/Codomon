@@ -1582,6 +1582,7 @@ public partial class MainWindow : Window
 
         var view = new SystemMapView(_vm.SystemMap);
         view.ShowDetailedRelationshipsRequested += OnShowDetailedRelationshipsRequested;
+        view.ClearCanvasRequested += OnSystemMapClearCanvasRequested;
         host.Content = view;
         AppLogger.Debug("System Map view initialized");
     }
@@ -1596,6 +1597,24 @@ public partial class MainWindow : Window
         var tabs = this.FindControl<TabControl>("CenterTabControl");
         if (tabs != null)
             tabs.SelectedIndex = 1; // Graph tab
+    }
+
+    private void OnSystemMapClearCanvasRequested()
+    {
+        if (!_vm.HasWorkspace) return;
+
+        AppLogger.Info("[SystemMap] Clear Canvas requested from System Overview.");
+
+        _vm.Workspace.SystemMap.Systems.Clear();
+        _vm.Workspace.SystemMap.Modules.Clear();
+        _vm.Workspace.SystemMap.ExternalSystems.Clear();
+        _vm.Workspace.SystemMap.Relationships.Clear();
+
+        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap);
+        _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
+        _vm.IsDirty = true;
+
+        AppLogger.Debug("[SystemMap] Canvas cleared and views refreshed.");
     }
 
     // ── Timeline ──────────────────────────────────────────────────────────────

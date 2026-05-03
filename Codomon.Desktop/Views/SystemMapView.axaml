@@ -62,6 +62,19 @@
                         VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="16,12" Spacing="16">
 
+              <DockPanel>
+                <TextBlock Text="CANVAS ACTIONS" FontSize="9" FontWeight="Bold"
+                           Foreground="#4A6A8A" LetterSpacing="1" VerticalAlignment="Center"/>
+                <Button x:Name="ClearCanvasButton"
+                        DockPanel.Dock="Right"
+                        Content="Clear Canvas"
+                        Click="OnClearCanvasClick"
+                        Padding="10,4"
+                        Background="#3A1A1A"
+                        Foreground="#FFAAAA"
+                        ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
+              </DockPanel>
+
               <TextBlock x:Name="EmptySystemOverviewText"
                          Text="No Systems found. Use Architecture Hypothesis to detect systems from your codebase."
                          Foreground="#556677" FontSize="13" TextWrapping="Wrap"

@@ -44,6 +44,7 @@ public class ModuleItemVm
     public ConfidenceLevel Confidence { get; init; }
     public int CodeNodeCount   { get; init; }
     public string SystemId     { get; init; } = string.Empty;
+    public HashSet<string> SystemIds { get; init; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>Item view-model for a Code Node.</summary>
@@ -281,14 +282,19 @@ public class SystemMapViewModel : INotifyPropertyChanged
             Confidence = e.Confidence
         }).ToList();
 
-        _allModules = model.AllModules.Select(m => new ModuleItemVm
+        _allModules = model.AllModules.Select(m =>
         {
-            Id            = m.Id,
-            Name          = m.Name,
-            KindLabel     = m.Kind.ToString(),
-            Confidence    = m.Confidence,
-            CodeNodeCount = m.CodeNodes.Count,
-            SystemId      = m.SystemIds.FirstOrDefault() ?? string.Empty
+            var ownerSystemIds = ResolveSystemIdsForModule(model, m);
+            return new ModuleItemVm
+            {
+                Id            = m.Id,
+                Name          = m.Name,
+                KindLabel     = m.Kind.ToString(),
+                Confidence    = m.Confidence,
+                CodeNodeCount = m.CodeNodes.Count,
+                SystemId      = ownerSystemIds.FirstOrDefault() ?? string.Empty,
+                SystemIds     = ownerSystemIds
+            };
         }).ToList();
 
         _allCodeNodes = model.AllCodeNodes.Select(cn =>
@@ -375,7 +381,9 @@ public class SystemMapViewModel : INotifyPropertyChanged
         bool lowConf = ShowLowConfidenceItems;
         SyncCollection(ModulesForSelectedSystem,
             _allModules
-                .Where(m => _selectedSystem == null || m.SystemId == _selectedSystem.Id)
+                .Where(m => _selectedSystem == null
+                            || m.SystemIds.Contains(_selectedSystem.Id)
+                            || m.SystemId == _selectedSystem.Id)
                 .Where(m => lowConf || IsHighConfidence(m.Confidence))
                 .ToList());
     }
@@ -394,7 +402,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
         else if (_selectedSystem != null)
         {
             var moduleIds = _allModules
-                .Where(m => m.SystemId == _selectedSystem.Id)
+                .Where(m => m.SystemIds.Contains(_selectedSystem.Id)
+                            || m.SystemId == _selectedSystem.Id)
                 .Select(m => m.Id)
                 .ToHashSet(StringComparer.Ordinal);
             filtered = filtered.Where(c => moduleIds.Contains(c.SourceModuleId));
@@ -517,6 +526,19 @@ public class SystemMapViewModel : INotifyPropertyChanged
         }
 
         return moduleIds.Count;
+    }
+
+    private static HashSet<string> ResolveSystemIdsForModule(SystemMapModel map, ModuleModel module)
+    {
+        var systemIds = new HashSet<string>(module.SystemIds, StringComparer.Ordinal);
+
+        foreach (var system in map.Systems)
+        {
+            if (system.Modules.Any(m => string.Equals(m.Id, module.Id, StringComparison.Ordinal)))
+                systemIds.Add(system.Id);
+        }
+
+        return systemIds;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
