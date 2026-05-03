@@ -78,6 +78,25 @@
           <TextBlock x:Name="ProbeStatusText" Text="" Foreground="#AABBCC" FontSize="11"/>
         </StackPanel>
 
+        <Grid ColumnDefinitions="*,24,*">
+          <StackPanel Grid.Column="0" Spacing="6">
+            <TextBlock Text="Summary output token cap" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <TextBlock Text="Maximum completion tokens per summary request. Set 0 to remove the cap."
+                       Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+            <NumericUpDown x:Name="SummaryMaxOutputTokensBox"
+                           Minimum="0" Maximum="32768" Increment="64" FormatString="0"
+                           Watermark="512"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Text="Summary queue size" Foreground="#AABBCC" FontWeight="SemiBold"/>
+            <TextBlock Text="How many summaries can be processed at once. Set 1 for one-at-a-time."
+                       Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+            <NumericUpDown x:Name="SummaryQueueSizeBox"
+                           Minimum="1" Maximum="32" Increment="1" FormatString="0"
+                           Watermark="1"/>
+          </StackPanel>
+        </Grid>
+
         <!-- Test Connection -->
         <StackPanel Spacing="8">
           <StackPanel Orientation="Horizontal" Spacing="10">
