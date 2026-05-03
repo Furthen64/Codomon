@@ -19,4 +19,16 @@ public class LlmSettingsModel
     /// A value of 0 or less disables the threshold check (no splitting).
     /// </summary>
     public int HypothesisTokenThreshold { get; set; } = 60_000;
+
+    /// <summary>
+    /// Maximum completion tokens allowed for each generated summary.
+    /// A value of 0 or less lets the server/model decide with no explicit cap.
+    /// </summary>
+    public int SummaryMaxOutputTokens { get; set; } = 512;
+
+    /// <summary>
+    /// Number of summaries to process concurrently.
+    /// Set to 1 for strictly one-at-a-time processing.
+    /// </summary>
+    public int SummaryQueueSize { get; set; } = 1;
 }

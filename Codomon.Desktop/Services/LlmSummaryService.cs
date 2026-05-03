@@ -138,6 +138,7 @@ public static class LlmSummaryService
     public static async Task<string> GenerateAndSaveSummaryAsync(
         string apiEndpoint,
         string modelName,
+        int maxOutputTokens,
         string workspaceFolderPath,
         string batchFolder,
         string sourceFilePath,
@@ -158,7 +159,7 @@ public static class LlmSummaryService
         AppLogger.Debug($"[LLM] Prompt ready: template={promptTemplate.Length} chars, sourceCode={sourceCode.Length} chars, totalPrompt={prompt.Length} chars");
 
         // Call the LLM.
-        var summary = await CallLlmAsync(apiEndpoint, modelName, prompt, cancellationToken);
+        var summary = await CallLlmAsync(apiEndpoint, modelName, prompt, maxOutputTokens, cancellationToken);
 
         AppLogger.Debug($"[LLM] GenerateSummary complete: {relPath}  summary={summary.Length} chars");
 
@@ -354,6 +355,7 @@ public static class LlmSummaryService
         string apiEndpoint,
         string modelName,
         string prompt,
+        int maxOutputTokens,
         CancellationToken cancellationToken)
     {
         var url = BuildChatCompletionsUrl(apiEndpoint);
@@ -362,7 +364,8 @@ public static class LlmSummaryService
         var payload = new ChatRequest
         {
             Model = modelName,
-            Messages = new[] { new ChatMessage { Role = "user", Content = prompt } }
+            Messages = new[] { new ChatMessage { Role = "user", Content = prompt } },
+            MaxTokens = maxOutputTokens > 0 ? maxOutputTokens : null
         };
 
         try

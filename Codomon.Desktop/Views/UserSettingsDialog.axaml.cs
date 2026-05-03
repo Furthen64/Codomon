@@ -32,6 +32,10 @@ public partial class UserSettingsDialog : Window
         if (endpointBox != null) endpointBox.Text = _config.DefaultLlmSettings.ApiEndpoint;
         if (modelBox    != null) modelBox.Text    = _config.DefaultLlmSettings.ModelName;
         if (pathText    != null) pathText.Text    = $"Path: {UserConfigService.GetConfigFilePath()}";
+        var maxSummaryTokens = this.FindControl<NumericUpDown>("SummaryMaxOutputTokensBox");
+        var queueSize = this.FindControl<NumericUpDown>("SummaryQueueSizeBox");
+        if (maxSummaryTokens != null) maxSummaryTokens.Value = _config.DefaultLlmSettings.SummaryMaxOutputTokens;
+        if (queueSize != null) queueSize.Value = _config.DefaultLlmSettings.SummaryQueueSize;
 
         // Autosave
         var autosaveInterval = this.FindControl<NumericUpDown>("AutosaveIntervalBox");
@@ -115,6 +119,12 @@ public partial class UserSettingsDialog : Window
 
         _config.DefaultLlmSettings.ApiEndpoint = endpointBox?.Text?.Trim() ?? string.Empty;
         _config.DefaultLlmSettings.ModelName   = modelBox?.Text?.Trim()    ?? string.Empty;
+        var maxSummaryTokens = this.FindControl<NumericUpDown>("SummaryMaxOutputTokensBox");
+        var queueSize = this.FindControl<NumericUpDown>("SummaryQueueSizeBox");
+        if (maxSummaryTokens?.Value is decimal maxTokens)
+            _config.DefaultLlmSettings.SummaryMaxOutputTokens = Math.Max(0, (int)maxTokens);
+        if (queueSize?.Value is decimal qv)
+            _config.DefaultLlmSettings.SummaryQueueSize = Math.Max(1, (int)qv);
 
         // Autosave
         var autosaveInterval = this.FindControl<NumericUpDown>("AutosaveIntervalBox");

@@ -287,6 +287,8 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         }
 
         SaveSettings();
+        var queueSize = Math.Max(1, _workspace.LlmSettings.SummaryQueueSize);
+        var maxOutputTokens = _workspace.LlmSettings.SummaryMaxOutputTokens;
 
         AppLogger.Info($"[LLM] GenerateSummaries starting: {selected.Count} file(s)  endpoint={ApiEndpoint}  model={ModelName}");
 
@@ -337,28 +339,38 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
             var batchFolder = LlmSummaryService.CreateBatchFolder(_workspaceFolderPath);
             ReportProgress($"Batch folder: {Path.GetFileName(batchFolder)}");
             ReportProgress($"Generating summaries for {selected.Count} file(s)…");
+            ReportProgress(queueSize <= 1
+                ? "Processing mode: one summary at a time."
+                : $"Processing mode: up to {queueSize} summaries queued concurrently.");
             var batchTimer = Stopwatch.StartNew();
 
             int done = 0;
-            foreach (var file in selected)
+            for (int batchStart = 0; batchStart < selected.Count; batchStart += queueSize)
             {
                 ct.ThrowIfCancellationRequested();
-
-                AppLogger.Debug($"[LLM] Processing [{done + 1}/{selected.Count}]: {file.RelativePath}");
-                ReportProgress($"[{done + 1}/{selected.Count}] {file.RelativePath}");
-                var fileTimer = Stopwatch.StartNew();
+                var chunk = selected.Skip(batchStart).Take(queueSize).ToList();
+                var chunkTasks = chunk.Select(async file =>
+                {
+                    AppLogger.Debug($"[LLM] Processing [{done + 1}/{selected.Count}]: {file.RelativePath}");
+                    ReportProgress($"[{done + 1}/{selected.Count}] {file.RelativePath}");
+                    var fileTimer = Stopwatch.StartNew();
+                    await LlmSummaryService.GenerateAndSaveSummaryAsync(
+                        ApiEndpoint, ModelName, maxOutputTokens,
+                        _workspaceFolderPath, batchFolder,
+                        file.FullPath, searchRoot, ct);
+                    fileTimer.Stop();
+                    return (file, fileTimer.Elapsed);
+                }).ToList();
 
                 try
                 {
-                    await LlmSummaryService.GenerateAndSaveSummaryAsync(
-                        ApiEndpoint, ModelName,
-                        _workspaceFolderPath, batchFolder,
-                        file.FullPath, searchRoot, ct);
-
-                    fileTimer.Stop();
-                    done++;
-                    AppLogger.Debug($"[LLM] Done [{done}/{selected.Count}]: {file.RelativePath}");
-                    ReportProgress($"  ✔ Done (took {FormatDuration(fileTimer.Elapsed)})");
+                    var chunkResults = await Task.WhenAll(chunkTasks);
+                    foreach (var (file, elapsed) in chunkResults)
+                    {
+                        done++;
+                        AppLogger.Debug($"[LLM] Done [{done}/{selected.Count}]: {file.RelativePath}");
+                        ReportProgress($"  ✔ Done (took {FormatDuration(elapsed)})");
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -366,11 +378,9 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                 }
                 catch (Exception ex)
                 {
-                    var msg = $"  ✖ Failed: {ex.Message}";
-                    ReportProgress(msg);
-                    AppLogger.Error($"[LLM] GenerateSummaries file failed: {file.RelativePath}  {ex.GetType().Name}: {ex.Message}");
-                    // Requirement: stop batching on failure.
-                    StatusMessage = $"Generation stopped after failure on {file.RelativePath}.";
+                    ReportProgress($"  ✖ Failed: {ex.Message}");
+                    AppLogger.Error($"[LLM] GenerateSummaries file failed: {ex.GetType().Name}: {ex.Message}");
+                    StatusMessage = "Generation stopped after failure.";
                     return;
                 }
             }
