@@ -3,6 +3,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Codomon.Desktop.Controls;
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
@@ -1286,6 +1287,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        var systemMapBefore = DescribeSystemMap(_vm.Workspace.SystemMap);
+        AppLogger.Debug($"[Hypothesis] Opening Architecture dialog. Current System Map: {systemMapBefore}");
+
         var hypothesisVm = new ViewModels.ArchitectureHypothesisViewModel(
             _vm.Workspace,
             _vm.WorkspaceFolderPath);
@@ -1293,13 +1297,25 @@ public partial class MainWindow : Window
         var dialog = new ArchitectureHypothesisDialog(hypothesisVm);
         await dialog.ShowDialog(this);
 
-        // Always sync the System Map view model so canvas reflects any accepted or cleared data.
-        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap);
+        var systemMapAfter = DescribeSystemMap(_vm.Workspace.SystemMap);
+        AppLogger.Debug($"[Hypothesis] Architecture dialog closed. AcceptedCount={hypothesisVm.AcceptedCount}; AppliedSuggestionCount={hypothesisVm.AppliedSuggestionCount}; HasCanvasChanges={hypothesisVm.HasCanvasChanges}; System Map before='{systemMapBefore}'; after='{systemMapAfter}'.");
 
-        // Mark workspace dirty only if the user actually accepted suggestions into the System Map.
-        if (hypothesisVm.AcceptedCount > 0)
+        // Sync both views that can render the System Map after the dialog mutates workspace state.
+        AppLogger.Debug("[Hypothesis] Applying Architecture dialog results to System Map view model.");
+        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap);
+        AppLogger.Debug("[Hypothesis] System Map view model refresh completed. Applying graph canvas refresh.");
+        _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
+        AppLogger.Debug("[Hypothesis] Graph canvas refresh completed.");
+
+        // Mark workspace dirty for accepted or cleared changes.
+        if (hypothesisVm.HasCanvasChanges || !string.Equals(systemMapBefore, systemMapAfter, StringComparison.Ordinal))
             _vm.IsDirty = true;
+
+        AppLogger.Debug($"[Hypothesis] Apply-to-canvas flow finished. IsDirty={_vm.IsDirty}; Final System Map: {systemMapAfter}");
     }
+
+    private static string DescribeSystemMap(SystemMapModel map)
+        => $"Systems={map.Systems.Count}, Modules={map.AllModules.Count()}, CodeNodes={map.AllCodeNodes.Count()}, ExternalSystems={map.ExternalSystems.Count}, Relationships={map.Relationships.Count}";
 
     // ── Connections panel (Roslyn-origin connections) ─────────────────────────
 
@@ -1565,8 +1581,21 @@ public partial class MainWindow : Window
         if (host == null) return;
 
         var view = new SystemMapView(_vm.SystemMap);
+        view.ShowDetailedRelationshipsRequested += OnShowDetailedRelationshipsRequested;
         host.Content = view;
         AppLogger.Debug("System Map view initialized");
+    }
+
+    private void OnShowDetailedRelationshipsRequested(SystemItemVm system)
+    {
+        if (!_vm.HasWorkspace) return;
+
+        AppLogger.Debug($"[SystemMap] Opening module relationship graph for system '{system.Name}' ({system.Id}).");
+        _vm.Graph.RefreshModuleRelationshipsForSystem(_vm.Workspace.SystemMap, system.Id);
+
+        var tabs = this.FindControl<TabControl>("CenterTabControl");
+        if (tabs != null)
+            tabs.SelectedIndex = 1; // Graph tab
     }
 
     // ── Timeline ──────────────────────────────────────────────────────────────

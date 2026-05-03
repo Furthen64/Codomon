@@ -3,6 +3,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Codomon.Desktop.ViewModels;
+using System;
 using System.ComponentModel;
 
 namespace Codomon.Desktop.Views;
@@ -15,6 +16,12 @@ namespace Codomon.Desktop.Views;
 public partial class SystemMapView : UserControl
 {
     private readonly SystemMapViewModel _vm;
+
+    /// <summary>
+    /// Raised when the user requests a module-level relationship graph for the
+    /// currently selected system in Module View.
+    /// </summary>
+    public event Action<SystemItemVm>? ShowDetailedRelationshipsRequested;
 
     // ── Active-view button accent colour ─────────────────────────────────
     private static readonly IBrush ActiveButtonBg   = new SolidColorBrush(Color.Parse("#1A4A6A"));
@@ -462,6 +469,7 @@ public partial class SystemMapView : UserControl
         var header    = this.FindControl<TextBlock>("ModuleViewHeader")!;
         var modCtrl   = this.FindControl<ItemsControl>("ModulesItemsControl")!;
         var noModText = this.FindControl<TextBlock>("NoModulesText")!;
+        var detailBtn = this.FindControl<Button>("ShowDetailedRelationshipsButton");
 
         header.Text = _vm.SelectedSystem != null
             ? $"Modules — {_vm.SelectedSystemName}"
@@ -469,6 +477,9 @@ public partial class SystemMapView : UserControl
 
         modCtrl.ItemsSource = _vm.ModulesForSelectedSystem;
         noModText.IsVisible = _vm.SelectedSystem != null && _vm.ModulesForSelectedSystem.Count == 0;
+
+        if (detailBtn != null)
+            detailBtn.IsEnabled = _vm.SelectedSystem != null && _vm.ModulesForSelectedSystem.Count > 0;
     }
 
     private void RefreshCodeDetailView()
@@ -578,6 +589,12 @@ public partial class SystemMapView : UserControl
         if (e.AddedItems.Count == 0) return;
         if (e.AddedItems[0] is CodeNodeItemVm node)
             _vm.SelectCodeNode(node);
+    }
+
+    public void OnShowDetailedRelationshipsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm.SelectedSystem == null) return;
+        ShowDetailedRelationshipsRequested?.Invoke(_vm.SelectedSystem);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

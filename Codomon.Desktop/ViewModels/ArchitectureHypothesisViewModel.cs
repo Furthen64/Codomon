@@ -29,6 +29,8 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     private ArchitectureHypothesisModel? _currentHypothesis;
     private CancellationTokenSource? _cts;
     private int _acceptedCount;
+    private int _appliedSuggestionCount;
+    private bool _hasCanvasChanges;
 
     public ArchitectureHypothesisViewModel(WorkspaceModel workspace, string workspaceFolderPath)
     {
@@ -77,6 +79,26 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     {
         get => _acceptedCount;
         private set { _acceptedCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Count of suggestions the user applied during this dialog session,
+    /// including merges into existing entities.
+    /// </summary>
+    public int AppliedSuggestionCount
+    {
+        get => _appliedSuggestionCount;
+        private set { _appliedSuggestionCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// True once the dialog session has mutated the System Map, including merges
+    /// that may not change top-level entity counts.
+    /// </summary>
+    public bool HasCanvasChanges
+    {
+        get => _hasCanvasChanges;
+        private set { _hasCanvasChanges = value; OnPropertyChanged(); }
     }
 
     /// <summary>The hypothesis most recently loaded or generated.</summary>
@@ -228,29 +250,45 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     /// idempotent upsert logic. If a matching System already exists, merges into it.
     /// Returns the created or merged <see cref="SystemModel"/>.
     /// </summary>
-    public SystemModel AcceptSystem(HypothesisSystemModel suggestion)
+    public (SystemModel System, bool IsNew) AcceptSystem(HypothesisSystemModel suggestion)
     {
+        var before = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] AcceptSystem starting for '{suggestion.Name}'. Before: {before}");
+
         var (system, isNew) = SystemMapUpsertService.UpsertSystem(_workspace.SystemMap, suggestion);
 
         if (isNew) AcceptedCount++;
+        AppliedSuggestionCount++;
+        HasCanvasChanges = true;
         AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} system: {system.Name}");
         ReapplyManualOverrides();
         SystemMapValidator.Validate(_workspace.SystemMap);
-        return system;
+
+        var after = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] AcceptSystem completed for '{system.Name}'. IsNew={isNew}; AppliedSuggestionCount={AppliedSuggestionCount}; After: {after}");
+        return (system, isNew);
     }
 
     /// <summary>
     /// Accepts a suggested module into the given <paramref name="targetSystem"/>
     /// using idempotent upsert logic. If a matching Module already exists, merges into it.
     /// </summary>
-    public ModuleModel AcceptModule(HypothesisModuleModel suggestion, SystemModel targetSystem)
+    public (ModuleModel Module, bool IsNew) AcceptModule(HypothesisModuleModel suggestion, SystemModel targetSystem)
     {
+        var before = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] AcceptModule starting for '{suggestion.Name}' into '{targetSystem.Name}'. Before: {before}");
+
         var (module, isNew) = SystemMapUpsertService.UpsertModule(_workspace.SystemMap, suggestion, targetSystem);
 
         if (isNew) AcceptedCount++;
+        AppliedSuggestionCount++;
+        HasCanvasChanges = true;
         AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} module: {module.Name} → {targetSystem.Name}");
         ReapplyManualOverrides();
-        return module;
+
+        var after = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] AcceptModule completed for '{module.Name}'. IsNew={isNew}; AppliedSuggestionCount={AppliedSuggestionCount}; After: {after}");
+        return (module, isNew);
     }
 
     /// <summary>
@@ -258,15 +296,23 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     /// If a matching Code Node already exists, merges the high-value metadata into it.
     /// Returns the created or merged <see cref="CodeNodeModel"/>.
     /// </summary>
-    public CodeNodeModel AcceptHighValueNode(HypothesisHighValueNodeModel suggestion)
+    public (CodeNodeModel Node, bool IsNew) AcceptHighValueNode(HypothesisHighValueNodeModel suggestion)
     {
+        var before = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] AcceptHighValueNode starting for '{suggestion.Name}'. Before: {before}");
+
         var (node, isNew) = SystemMapUpsertService.UpsertHighValueNode(_workspace.SystemMap, suggestion);
 
         if (isNew) AcceptedCount++;
+        AppliedSuggestionCount++;
+        HasCanvasChanges = true;
         AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} high-value node: {node.Name}");
         ReapplyManualOverrides();
         SystemMapValidator.Validate(_workspace.SystemMap);
-        return node;
+
+        var after = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] AcceptHighValueNode completed for '{node.Name}'. IsNew={isNew}; AppliedSuggestionCount={AppliedSuggestionCount}; After: {after}");
+        return (node, isNew);
     }
 
     /// <summary>
@@ -276,12 +322,17 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     /// </summary>
     public void ClearSystemMap()
     {
+        var before = DescribeSystemMap();
+        AppLogger.Debug($"[Hypothesis] ClearSystemMap starting. Before: {before}");
+
         _workspace.SystemMap.Systems.Clear();
         _workspace.SystemMap.Modules.Clear();
         _workspace.SystemMap.ExternalSystems.Clear();
         _workspace.SystemMap.Relationships.Clear();
+        HasCanvasChanges = true;
         StatusMessage = "Canvas cleared.";
         AppLogger.Info("[Hypothesis] System Map cleared by user.");
+        AppLogger.Debug($"[Hypothesis] ClearSystemMap completed. After: {DescribeSystemMap()}");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -313,6 +364,9 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 
     private void ReportProgress(string message)
         => Avalonia.Threading.Dispatcher.UIThread.Post(() => ProgressMessages.Add(message));
+
+    private string DescribeSystemMap()
+        => $"Systems={_workspace.SystemMap.Systems.Count}, Modules={_workspace.SystemMap.AllModules.Count()}, CodeNodes={_workspace.SystemMap.AllCodeNodes.Count()}, ExternalSystems={_workspace.SystemMap.ExternalSystems.Count}, Relationships={_workspace.SystemMap.Relationships.Count}";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

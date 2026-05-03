@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.SystemMap;
 
 namespace Codomon.Desktop.ViewModels;
@@ -260,6 +261,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// </summary>
     public void LoadFrom(SystemMapModel model)
     {
+        AppLogger.Debug($"[SystemMapViewModel] LoadFrom starting. Systems={model.Systems.Count}, Modules={model.AllModules.Count()}, CodeNodes={model.AllCodeNodes.Count()}, ExternalSystems={model.ExternalSystems.Count}, Relationships={model.Relationships.Count}");
+
         _allSystems = model.Systems.Select(s => new SystemItemVm
         {
             Id               = s.Id,
@@ -267,7 +270,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
             KindLabel        = s.Kind.ToString(),
             StartupMechanism = s.StartupMechanism,
             Confidence       = s.Confidence,
-            ModuleCount      = s.Modules.Count
+            ModuleCount      = CountModulesForSystem(model, s)
         }).ToList();
 
         _allExternalSystems = model.ExternalSystems.Select(e => new ExternalSystemItemVm
@@ -331,6 +334,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
         ClearInspector();
         ApplyFilters();
+
+        AppLogger.Debug($"[SystemMapViewModel] LoadFrom completed. VisibleSystems={Systems.Count}, CachedModules={_allModules.Count}, CachedCodeNodes={_allCodeNodes.Count}, VisibleExternalSystems={ExternalSystems.Count}, VisibleStartupItems={StartupItems.Count}");
     }
 
     /// <summary>Re-applies the current filter settings to all collections.</summary>
@@ -496,6 +501,22 @@ public class SystemMapViewModel : INotifyPropertyChanged
         InspectorDetails    = !string.IsNullOrEmpty(node.FullName)
             ? new List<string> { node.FullName }
             : new List<string>();
+    }
+
+    private static int CountModulesForSystem(SystemMapModel map, SystemModel system)
+    {
+        var moduleIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var module in system.Modules)
+            moduleIds.Add(module.Id);
+
+        foreach (var module in map.Modules)
+        {
+            if (module.SystemIds.Any(id => string.Equals(id, system.Id, StringComparison.Ordinal)))
+                moduleIds.Add(module.Id);
+        }
+
+        return moduleIds.Count;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

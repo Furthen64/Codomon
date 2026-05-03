@@ -10,6 +10,12 @@ using System.Runtime.CompilerServices;
 
 namespace Codomon.Desktop.ViewModels;
 
+public enum GraphRenderMode
+{
+    SystemMap,
+    ModuleRelationships
+}
+
 public class GraphViewModel : INotifyPropertyChanged
 {
     public ObservableCollection<NodeViewModel> Nodes { get; } = new();
@@ -21,6 +27,8 @@ public class GraphViewModel : INotifyPropertyChanged
     // Cached source data so filters can be re-applied without a full external reload.
     private SystemMapModel? _currentSystemMap;
     private WorkspaceModel? _currentWorkspace;
+    private GraphRenderMode _renderMode = GraphRenderMode.SystemMap;
+    private string? _moduleSystemId;
 
     // ── Filters ───────────────────────────────────────────────────────────────
 
@@ -104,6 +112,8 @@ public class GraphViewModel : INotifyPropertyChanged
     {
         _currentWorkspace  = workspace;
         _currentSystemMap  = workspace.SystemMap.Systems.Count > 0 ? workspace.SystemMap : null;
+        _renderMode = GraphRenderMode.SystemMap;
+        _moduleSystemId = null;
 
         if (_currentSystemMap != null)
             ApplyFilters();
@@ -120,6 +130,20 @@ public class GraphViewModel : INotifyPropertyChanged
     public void RefreshFromSystemMap(SystemMapModel map)
     {
         _currentSystemMap = map;
+        _renderMode = GraphRenderMode.SystemMap;
+        _moduleSystemId = null;
+        ApplyFilters();
+    }
+
+    /// <summary>
+    /// Rebuilds the graph as module-to-module relationships for a single selected system.
+    /// Endpoints represented as code-node IDs are resolved to their owner modules first.
+    /// </summary>
+    public void RefreshModuleRelationshipsForSystem(SystemMapModel map, string systemId)
+    {
+        _currentSystemMap = map;
+        _renderMode = GraphRenderMode.ModuleRelationships;
+        _moduleSystemId = systemId;
         ApplyFilters();
     }
 
@@ -135,10 +159,117 @@ public class GraphViewModel : INotifyPropertyChanged
     private void ApplyFilters()
     {
         if (_currentSystemMap != null)
-            BuildFromSystemMap(_currentSystemMap);
+        {
+            if (_renderMode == GraphRenderMode.ModuleRelationships)
+                BuildModuleRelationshipsForSystem(_currentSystemMap, _moduleSystemId);
+            else
+                BuildFromSystemMap(_currentSystemMap);
+        }
         else if (_currentWorkspace != null)
             BuildFromWorkspaceConnections(_currentWorkspace);
         // If neither is set (design-time demo graph), do nothing.
+    }
+
+    private void BuildModuleRelationshipsForSystem(SystemMapModel map, string? systemId)
+    {
+        Nodes.Clear();
+        Connections.Clear();
+        _nodeEdges.Clear();
+
+        if (string.IsNullOrWhiteSpace(systemId))
+        {
+            AppLogger.Warn("[Graph] Module relationship view requested without a system id. Falling back to System Map graph.");
+            BuildFromSystemMap(map);
+            return;
+        }
+
+        bool lowConf = ShowLowConfidenceItems;
+
+        var system = map.Systems.FirstOrDefault(s => string.Equals(s.Id, systemId, StringComparison.Ordinal));
+        if (system == null)
+        {
+            AppLogger.Warn($"[Graph] Module relationship view requested for unknown system id={systemId}. Falling back to System Map graph.");
+            BuildFromSystemMap(map);
+            return;
+        }
+
+        var modules = GetModulesForSystem(map, system);
+        if (modules.Count == 0)
+        {
+            AppLogger.Debug($"[Graph] Module relationship view: system '{system.Name}' has no modules.");
+            return;
+        }
+
+        var moduleById = modules.ToDictionary(m => m.Id, StringComparer.Ordinal);
+        var codeNodeToModule = modules
+            .SelectMany(m => m.CodeNodes.Select(cn => (CodeNodeId: cn.Id, ModuleId: m.Id)))
+            .ToDictionary(x => x.CodeNodeId, x => x.ModuleId, StringComparer.Ordinal);
+
+        double autoX = 80;
+        const double autoY = 180;
+        const double autoGap = 220;
+
+        var nodeMap = new Dictionary<string, NodeViewModel>(modules.Count, StringComparer.Ordinal);
+        foreach (var module in modules)
+        {
+            if (!lowConf && module.Confidence == ConfidenceLevel.Unknown) continue;
+
+            var node = new NodeViewModel
+            {
+                Title = $"{module.Name}\n{module.CodeNodes.Count} code node(s)",
+                Location = new Point(autoX, autoY)
+            };
+
+            nodeMap[module.Id] = node;
+            Nodes.Add(node);
+            autoX += autoGap;
+        }
+
+        string? ResolveModuleId(string entityId)
+        {
+            if (moduleById.ContainsKey(entityId)) return entityId;
+            if (codeNodeToModule.TryGetValue(entityId, out var owner)) return owner;
+            return null;
+        }
+
+        var relCounts = new Dictionary<(string From, string To, RelationshipKind Kind), int>();
+
+        foreach (var rel in map.Relationships)
+        {
+            if (!lowConf && rel.Confidence == ConfidenceLevel.Unknown) continue;
+            if (!IsKindVisible(rel.Kind)) continue;
+
+            var fromModuleId = ResolveModuleId(rel.FromId);
+            var toModuleId   = ResolveModuleId(rel.ToId);
+            if (fromModuleId == null || toModuleId == null) continue;
+            if (!nodeMap.ContainsKey(fromModuleId) || !nodeMap.ContainsKey(toModuleId)) continue;
+            if (string.Equals(fromModuleId, toModuleId, StringComparison.Ordinal)) continue;
+
+            var key = (fromModuleId, toModuleId, rel.Kind);
+            relCounts.TryGetValue(key, out var count);
+            relCounts[key] = count + 1;
+        }
+
+        foreach (var kvp in relCounts)
+        {
+            var (fromId, toId, kind) = kvp.Key;
+            var count = kvp.Value;
+
+            var fromNode = nodeMap[fromId];
+            var toNode   = nodeMap[toId];
+
+            fromNode.OutputConnector.IsConnected = true;
+            toNode.InputConnector.IsConnected    = true;
+
+            var label = count > 1 ? $"{kind} x{count}" : kind.ToString();
+            Connections.Add(new ConnectionViewModel(fromNode.OutputConnector, toNode.InputConnector, label));
+            _nodeEdges.Add((fromNode, toNode));
+        }
+
+        foreach (var node in Nodes) node.ChildCount = 0;
+        foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+
+        AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count}");
     }
 
     private void BuildFromSystemMap(SystemMapModel map)
@@ -162,7 +293,12 @@ public class GraphViewModel : INotifyPropertyChanged
         {
             if (!lowConf && sys.Confidence == ConfidenceLevel.Unknown) continue;
 
-            var node = new NodeViewModel { Title = sys.Name, Location = new Point(autoX, autoY) };
+            var moduleCount = CountModulesForSystem(map, sys);
+            var node = new NodeViewModel
+            {
+                Title = $"{sys.Name}\n{moduleCount} module(s)",
+                Location = new Point(autoX, autoY)
+            };
             nodeMap[sys.Id] = node;
             Nodes.Add(node);
             autoX += autoGap;
@@ -212,6 +348,45 @@ public class GraphViewModel : INotifyPropertyChanged
         RelationshipKind.Imports => ShowImportsRelationships,
         _                        => ShowOtherRelationships,
     };
+
+    private static int CountModulesForSystem(SystemMapModel map, SystemModel system)
+    {
+        var moduleIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var module in system.Modules)
+            moduleIds.Add(module.Id);
+
+        foreach (var module in map.Modules)
+        {
+            if (module.SystemIds.Any(id => string.Equals(id, system.Id, StringComparison.Ordinal)))
+                moduleIds.Add(module.Id);
+        }
+
+        return moduleIds.Count;
+    }
+
+    private static List<ModuleModel> GetModulesForSystem(SystemMapModel map, SystemModel system)
+    {
+        var modules = new List<ModuleModel>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var module in system.Modules)
+        {
+            if (seen.Add(module.Id))
+                modules.Add(module);
+        }
+
+        foreach (var module in map.Modules)
+        {
+            if (module.SystemIds.Any(id => string.Equals(id, system.Id, StringComparison.Ordinal))
+                && seen.Add(module.Id))
+            {
+                modules.Add(module);
+            }
+        }
+
+        return modules;
+    }
 
     /// <summary>
     /// Legacy render path: one node per <see cref="SystemBoxModel"/>,

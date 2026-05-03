@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.ArchitectureHypothesis;
 using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
@@ -451,10 +452,10 @@ public partial class ArchitectureHypothesisDialog : Window
         if (listBox?.SelectedItem is not ListBoxItem item) return;
         if (item.Tag is not HypothesisSystemModel sys) return;
 
-        _vm.AcceptSystem(sys);
-        _vm.StatusMessage = sys.IsAccepted
-            ? $"Merged system: {sys.Name}"
-            : $"Accepted system: {sys.Name}";
+        var (_, isNew) = _vm.AcceptSystem(sys);
+        _vm.StatusMessage = isNew
+            ? $"Accepted system: {sys.Name}"
+            : $"Merged system: {sys.Name}";
         RebuildAcceptSystemsList();
         RebuildSystemsList();
         UpdateFinishSummary();
@@ -466,10 +467,10 @@ public partial class ArchitectureHypothesisDialog : Window
         if (listBox?.SelectedItem is not ListBoxItem item) return;
         if (item.Tag is not HypothesisHighValueNodeModel node) return;
 
-        _vm.AcceptHighValueNode(node);
-        _vm.StatusMessage = node.IsAccepted
-            ? $"Merged high-value node: {node.Name}"
-            : $"Accepted high-value node: {node.Name}";
+        var (_, isNew) = _vm.AcceptHighValueNode(node);
+        _vm.StatusMessage = isNew
+            ? $"Accepted high-value node: {node.Name}"
+            : $"Merged high-value node: {node.Name}";
         RebuildAcceptHvnList();
         RebuildHvnList();
         UpdateFinishSummary();
@@ -482,16 +483,16 @@ public partial class ArchitectureHypothesisDialog : Window
         var text = this.FindControl<TextBlock>("FinishSummaryText");
         if (text == null) return;
 
-        if (_vm.AcceptedCount == 0)
+        if (_vm.AppliedSuggestionCount == 0 && !_vm.HasCanvasChanges)
         {
-            text.Text = "No items accepted yet. Go to the Accept tab to accept suggestions.";
+            text.Text = "No suggestions applied yet. Go to the Accept tab to accept or merge suggestions.";
             return;
         }
 
         var acceptedSystems = _vm.Systems.Count(s => s.IsAccepted);
         var acceptedNodes   = _vm.HighValueNodes.Count(n => n.IsAccepted);
-        text.Text = $"{_vm.AcceptedCount} item(s) accepted: " +
-                    $"{acceptedSystems} system(s), {acceptedNodes} high-value node(s). " +
+        text.Text = $"{_vm.AppliedSuggestionCount} suggestion(s) applied in this session: " +
+                    $"{acceptedSystems} system suggestion(s), {acceptedNodes} high-value node suggestion(s). " +
                     "Click 'Apply to Canvas' to close and refresh the System Map.";
     }
 
@@ -503,7 +504,10 @@ public partial class ArchitectureHypothesisDialog : Window
     }
 
     private void OnApplyToCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => Close();
+    {
+        AppLogger.Debug($"[Hypothesis] Apply to Canvas clicked. AcceptedCount={_vm.AcceptedCount}; AppliedSuggestionCount={_vm.AppliedSuggestionCount}; HasCanvasChanges={_vm.HasCanvasChanges}; Status='{_vm.StatusMessage}'. Closing Architecture dialog to hand off refresh to MainWindow.");
+        Close();
+    }
 
     // ── Shared ────────────────────────────────────────────────────────────────
 

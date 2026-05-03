@@ -101,7 +101,16 @@
           <DockPanel x:Name="PanelModuleView" IsVisible="False">
             <Border DockPanel.Dock="Top" Background="#141C28"
                     Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-              <TextBlock x:Name="ModuleViewHeader" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <DockPanel>
+                <TextBlock x:Name="ModuleViewHeader" Foreground="#AABBCC" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button x:Name="ShowDetailedRelationshipsButton"
+                        DockPanel.Dock="Right"
+                        Content="Show detailed relationships"
+                        Click="OnShowDetailedRelationshipsClick"
+                        Padding="10,4"
+                        Margin="10,0,0,0"
+                        ToolTip.Tip="Open the Graph tab with module-to-module relationships for the selected system."/>
+              </DockPanel>
             </Border>
             <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
