@@ -95,6 +95,25 @@
       </StackPanel>
     </Border>
 
+    <!-- ── Graph Info Panel ──────────────────────────────────────────────── -->
+    <Border DockPanel.Dock="Top"
+            Background="#141C28"
+            BorderThickness="0,0,0,1"
+            BorderBrush="#2A3F5A"
+            Padding="10,6">
+      <StackPanel Spacing="3">
+        <TextBlock Text="About this view"
+                   FontSize="11" FontWeight="Bold" Foreground="#AABBCC"/>
+        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#778899">
+          <Run>The Graph view displays your workspace's architecture as an interactive node graph. Each node represents a component (service, library, class, etc.) and each edge represents a relationship between components (Calls, Depends, Imports, etc.).</Run>
+        </TextBlock>
+        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#556677" Margin="0,2,0,0">
+          <Run FontWeight="SemiBold" Foreground="#4A8A6A">Sources:</Run>
+          <Run> Nodes and connections are populated from Roslyn static-analysis scans, manually added entries, and imported log replays. Use the toolbar above to filter by confidence level or relationship kind, and to arrange nodes automatically.</Run>
+        </TextBlock>
+      </StackPanel>
+    </Border>
+
     <!-- ── Graph Canvas ───────────────────────────────────────────────────── -->
     <nodify:NodifyEditor x:Name="Editor"
                          ItemsSource="{Binding Nodes}"

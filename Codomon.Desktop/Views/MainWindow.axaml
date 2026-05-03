@@ -182,13 +182,13 @@
                       Background="Transparent"
                       BorderThickness="0,0,0,1"
                       BorderBrush="#2A3F5A">
-            <TabItem Header="Graph">
-              <ContentControl x:Name="CanvasHost"
+            <TabItem Header="System Map">
+              <ContentControl x:Name="SystemMapHost"
                               HorizontalContentAlignment="Stretch"
                               VerticalContentAlignment="Stretch"/>
             </TabItem>
-            <TabItem Header="System Map">
-              <ContentControl x:Name="SystemMapHost"
+            <TabItem Header="Graph">
+              <ContentControl x:Name="CanvasHost"
                               HorizontalContentAlignment="Stretch"
                               VerticalContentAlignment="Stretch"/>
             </TabItem>
