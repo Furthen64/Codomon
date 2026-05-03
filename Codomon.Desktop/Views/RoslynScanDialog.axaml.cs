@@ -228,11 +228,12 @@ public partial class RoslynScanDialog : Window
 
     private void RefreshButtons()
     {
-        var startBtn       = this.FindControl<Button>("StartScanButton");
-        var cancelScanBtn  = this.FindControl<Button>("CancelScanButton");
-        var viewResultsBtn = this.FindControl<Button>("ViewResultsButton");
-        var addAllBtn      = this.FindControl<Button>("AddAllToCanvasButton");
-        var progressBar    = this.FindControl<ProgressBar>("ScanProgressBar");
+        var startBtn           = this.FindControl<Button>("StartScanButton");
+        var cancelScanBtn      = this.FindControl<Button>("CancelScanButton");
+        var viewResultsBtn     = this.FindControl<Button>("ViewResultsButton");
+        var addAllBtn          = this.FindControl<Button>("AddAllToCanvasButton");
+        var addAllHelpBtn      = this.FindControl<Button>("ImportToSystemMapHelpButton");
+        var progressBar        = this.FindControl<ProgressBar>("ScanProgressBar");
 
         switch (_vm.Step)
         {
@@ -241,6 +242,7 @@ public partial class RoslynScanDialog : Window
                 if (cancelScanBtn != null)   cancelScanBtn.IsVisible  = false;
                 if (viewResultsBtn!= null)   viewResultsBtn.IsVisible = false;
                 if (addAllBtn     != null)   addAllBtn.IsVisible      = false;
+                if (addAllHelpBtn != null)   addAllHelpBtn.IsVisible  = false;
                 break;
 
             case ScanDialogStep.Scanning:
@@ -248,6 +250,7 @@ public partial class RoslynScanDialog : Window
                 if (cancelScanBtn != null) cancelScanBtn.IsVisible  = _vm.IsRunning;
                 if (viewResultsBtn!= null) viewResultsBtn.IsVisible = _vm.ScanFinished;
                 if (addAllBtn     != null) addAllBtn.IsVisible      = false;
+                if (addAllHelpBtn != null) addAllHelpBtn.IsVisible  = false;
                 if (progressBar   != null) progressBar.IsIndeterminate = _vm.IsRunning;
                 break;
 
@@ -260,6 +263,7 @@ public partial class RoslynScanDialog : Window
                     addAllBtn.IsVisible = true;
                     addAllBtn.IsEnabled = _vm.ScanResult != null;
                 }
+                if (addAllHelpBtn != null) addAllHelpBtn.IsVisible  = true;
                 break;
         }
     }
