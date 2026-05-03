@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Codomon.Desktop.Views.RoslynScanDialog"
         Title="Roslyn C# Scan"
-        Width="660" Height="540"
-        MinWidth="560" MinHeight="440"
+        Width="800" Height="680"
+        MinWidth="660" MinHeight="540"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="#111820">
@@ -51,6 +51,12 @@
                   Padding="20,8" FontSize="14" FontWeight="SemiBold"
                   Background="#1E6A3E" Foreground="White"
                   IsVisible="False"/>
+          <Button x:Name="ImportToSystemMapHelpButton"
+                  Content="?" Padding="8,8" FontSize="14" FontWeight="Bold"
+                  Foreground="#AABBCC" Background="Transparent"
+                  BorderThickness="1" BorderBrush="#2A3F5A"
+                  IsVisible="False"
+                  ToolTip.Tip="Adds all scanned code nodes and their connections&#x0a;directly to the System Map canvas, closing this dialog."/>
         </StackPanel>
       </DockPanel>
     </Border>
@@ -145,7 +151,7 @@
           <DockPanel Grid.Column="1">
 
             <!-- Suggested connections panel -->
-            <Border DockPanel.Dock="Bottom" Height="200"
+            <Border DockPanel.Dock="Bottom" Height="280"
                     BorderBrush="#2A3F5A" BorderThickness="0,1,0,0">
               <DockPanel>
                 <Border DockPanel.Dock="Top" Padding="10,7" Background="#1A2435">
@@ -154,6 +160,10 @@
                       <Button x:Name="PromoteButton" Content="⬆ Promote to Workspace"
                               Click="OnPromoteClick"
                               Padding="10,3" FontSize="11" IsEnabled="False"/>
+                      <Button Content="?" Padding="6,3" FontSize="11" FontWeight="Bold"
+                              Foreground="#AABBCC" Background="Transparent"
+                              BorderThickness="1" BorderBrush="#2A3F5A"
+                              ToolTip.Tip="Moves the selected suggested connection from Roslyn&#x0a;read-only status into your workspace so it becomes a&#x0a;permanent, editable connection in your workspace."/>
                     </StackPanel>
                     <TextBlock Text="Suggested Connections  (Roslyn-origin, read-only)"
                                FontWeight="Bold" Foreground="#AABBCC" FontSize="12"
