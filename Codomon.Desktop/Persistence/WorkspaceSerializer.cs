@@ -356,6 +356,12 @@ public static class WorkspaceSerializer
         // the final authority, regardless of which analysis pass last ran.
         ManualOverrideService.Apply(workspace.SystemMap, workspace.SystemMap.ManualOverrides);
 
+        var validationIssues = SystemMapValidator.Validate(workspace.SystemMap);
+        if (validationIssues > 0)
+            AppLogger.Warn($"[SystemMap] Validation after load found {validationIssues} issue(s).");
+        else
+            AppLogger.Debug("[SystemMap] Validation after load found no issues.");
+
         return workspace;
     }
 
