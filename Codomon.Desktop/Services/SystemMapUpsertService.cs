@@ -228,8 +228,10 @@ public static class SystemMapUpsertService
                 firstSystem.Modules.Add(holding);
             }
             holding.CodeNodes.Add(node);
+            return;
         }
         // If there are no systems either, the node cannot be placed yet.
+        AppLogger.Warn($"[Upsert] HighValueNode '{node.Name}' (id={node.Id}) could not be placed — no systems in the map yet. Node is dropped.");
     }
 
     // ── Lookup helpers ────────────────────────────────────────────────────────

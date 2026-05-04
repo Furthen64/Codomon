@@ -14,6 +14,7 @@ public class EvidenceDto
 public class CodeNodeDto
 {
     public string Id { get; set; } = string.Empty;
+    public string IdentityKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Kind { get; set; } = "Class";
     public string FullName { get; set; } = string.Empty;
@@ -29,6 +30,7 @@ public class CodeNodeDto
 public class ModuleDto
 {
     public string Id { get; set; } = string.Empty;
+    public string IdentityKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Kind { get; set; } = "Other";
     public string Notes { get; set; } = string.Empty;
@@ -41,6 +43,7 @@ public class ModuleDto
 public class SystemDto
 {
     public string Id { get; set; } = string.Empty;
+    public string IdentityKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Kind { get; set; } = "Unknown";
     public string Notes { get; set; } = string.Empty;

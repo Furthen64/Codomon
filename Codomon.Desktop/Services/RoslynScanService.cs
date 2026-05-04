@@ -219,9 +219,10 @@ public static class RoslynScanService
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
             // Skip files that can't be parsed (generated, malformed, etc.)
+            AppLogger.Warn($"[Roslyn] Skipped file '{filePath}': {ex.GetType().Name}: {ex.Message}");
             return null;
         }
     }

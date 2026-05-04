@@ -563,6 +563,7 @@ public static class WorkspaceSerializer
     private static SystemDto SystemToDto(SystemModel s) => new()
     {
         Id = s.Id,
+        IdentityKey = s.IdentityKey,
         Name = s.Name,
         Kind = s.Kind.ToString(),
         Notes = s.Notes,
@@ -578,6 +579,7 @@ public static class WorkspaceSerializer
     private static SystemModel DtoToSystem(SystemDto dto) => new()
     {
         Id = dto.Id,
+        IdentityKey = dto.IdentityKey,
         Name = dto.Name,
         Kind = Enum.TryParse<SystemKind>(dto.Kind, out var sk) ? sk : SystemKind.Unknown,
         Notes = dto.Notes,
@@ -593,6 +595,7 @@ public static class WorkspaceSerializer
     private static ModuleDto ModuleToDto(ModuleModel m) => new()
     {
         Id = m.Id,
+        IdentityKey = m.IdentityKey,
         Name = m.Name,
         Kind = m.Kind.ToString(),
         Notes = m.Notes,
@@ -605,6 +608,7 @@ public static class WorkspaceSerializer
     private static ModuleModel DtoToModule(ModuleDto dto) => new()
     {
         Id = dto.Id,
+        IdentityKey = dto.IdentityKey,
         Name = dto.Name,
         Kind = Enum.TryParse<ModuleKind>(dto.Kind, out var mk) ? mk : ModuleKind.Other,
         Notes = dto.Notes,
@@ -617,6 +621,7 @@ public static class WorkspaceSerializer
     private static CodeNodeDto CodeNodeToDto(CodeNodeModel n) => new()
     {
         Id = n.Id,
+        IdentityKey = n.IdentityKey,
         Name = n.Name,
         Kind = n.Kind.ToString(),
         FullName = n.FullName,
@@ -632,6 +637,7 @@ public static class WorkspaceSerializer
     private static CodeNodeModel DtoToCodeNode(CodeNodeDto dto) => new()
     {
         Id = dto.Id,
+        IdentityKey = dto.IdentityKey,
         Name = dto.Name,
         Kind = Enum.TryParse<CodeNodeKind>(dto.Kind, out var nk) ? nk : CodeNodeKind.Other,
         FullName = dto.FullName,
