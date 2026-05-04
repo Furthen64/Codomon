@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using Codomon.Desktop.Models;
 
 namespace Codomon.Desktop.Persistence;
 
@@ -66,6 +67,43 @@ public static class AutosaveService
         PruneAutosaves(workspaceFolderPath, maxAutosaves);
 
         return autosavePath;
+    }
+
+    /// <summary>
+    /// Creates an autosave snapshot from the live in-memory <paramref name="workspace"/>,
+    /// so unsaved layout changes are captured even before the user performs a manual save.
+    /// </summary>
+    public static async Task<string> CreateAutosaveAsync(WorkspaceModel workspace, string workspaceFolderPath, int maxAutosaves = MaxAutosaves)
+    {
+        var timestamp = DateTime.Now.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+        var autosaveName = $"{AutosavePrefix}{timestamp}";
+        var autosavesRoot = System.IO.Path.Combine(workspaceFolderPath, AutosavesFolder);
+        var autosavePath = System.IO.Path.Combine(autosavesRoot, autosaveName);
+        var stagingPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"codomon_autosave_{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(autosavePath);
+
+            await WorkspaceSerializer.SaveAsync(workspace, stagingPath);
+
+            var nestedAutosavesPath = System.IO.Path.Combine(stagingPath, AutosavesFolder);
+            if (Directory.Exists(nestedAutosavesPath))
+                Directory.Delete(nestedAutosavesPath, recursive: true);
+
+            CopyDirectory(stagingPath, autosavePath);
+
+            var hash = await ComputeHashAsync(autosavePath);
+            await File.WriteAllTextAsync(System.IO.Path.Combine(autosavePath, HashFileName), hash);
+
+            PruneAutosaves(workspaceFolderPath, maxAutosaves);
+            return autosavePath;
+        }
+        finally
+        {
+            if (Directory.Exists(stagingPath))
+                Directory.Delete(stagingPath, recursive: true);
+        }
     }
 
     /// <summary>

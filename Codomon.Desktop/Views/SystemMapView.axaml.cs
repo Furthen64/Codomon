@@ -1,10 +1,13 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Codomon.Desktop.ViewModels;
 using System;
 using System.ComponentModel;
+using System.Linq;
 
 namespace Codomon.Desktop.Views;
 
@@ -16,6 +19,7 @@ namespace Codomon.Desktop.Views;
 public partial class SystemMapView : UserControl
 {
     private readonly SystemMapViewModel _vm;
+    private DragState? _dragState;
 
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
@@ -28,9 +32,26 @@ public partial class SystemMapView : UserControl
     /// </summary>
     public event Action? ClearCanvasRequested;
 
+    /// <summary>
+    /// Raised when a System Overview card has been repositioned.
+    /// </summary>
+    public event Action<string, bool, double, double>? LayoutPositionChanged;
+
     // ── Active-view button accent colour ─────────────────────────────────
     private static readonly IBrush ActiveButtonBg   = new SolidColorBrush(Color.Parse("#1A4A6A"));
     private static readonly IBrush InactiveButtonBg = new SolidColorBrush(Color.Parse("#1A2435"));
+
+    private sealed class DragState
+    {
+        public required Border Card { get; init; }
+        public required Canvas Canvas { get; init; }
+        public required string ItemId { get; init; }
+        public required bool IsExternal { get; init; }
+        public required Action ClickAction { get; init; }
+        public Point PointerOffset { get; init; }
+        public Point StartPosition { get; init; }
+        public bool WasDragged { get; set; }
+    }
 
     public SystemMapView()
         : this(new SystemMapViewModel())
@@ -116,14 +137,6 @@ public partial class SystemMapView : UserControl
 
     private void SetupItemTemplates()
     {
-        // System cards
-        var sysCtrl = this.FindControl<ItemsControl>("SystemsItemsControl")!;
-        sysCtrl.ItemTemplate = new FuncDataTemplate<SystemItemVm>(BuildSystemCard, supportsRecycling: false);
-
-        // External system cards
-        var extCtrl = this.FindControl<ItemsControl>("ExternalSystemsItemsControl")!;
-        extCtrl.ItemTemplate = new FuncDataTemplate<ExternalSystemItemVm>(BuildExternalSystemCard, supportsRecycling: false);
-
         // Module cards
         var modCtrl = this.FindControl<ItemsControl>("ModulesItemsControl")!;
         modCtrl.ItemTemplate = new FuncDataTemplate<ModuleItemVm>(BuildModuleCard, supportsRecycling: false);
@@ -153,7 +166,7 @@ public partial class SystemMapView : UserControl
 
     // ── Card / row builders ───────────────────────────────────────────────
 
-    private Control BuildSystemCard(SystemItemVm? item, INameScope _scope)
+    private Control BuildSystemCard(SystemItemVm? item, INameScope? _scope)
     {
         if (item == null) return new Border();
 
@@ -228,16 +241,20 @@ public partial class SystemMapView : UserControl
             Child = new StackPanel { Spacing = 8, Children = { header, details } }
         };
 
-        card.PointerPressed += (_, _) =>
+        var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
+        if (systemsCanvas != null)
         {
-            _vm.SelectSystem(item);
-            _vm.SetActiveView(SystemMapViewKind.ModuleView);
-        };
+            WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
+            {
+                _vm.SelectSystem(item);
+                _vm.SetActiveView(SystemMapViewKind.ModuleView);
+            });
+        }
 
         return card;
     }
 
-    private Control BuildExternalSystemCard(ExternalSystemItemVm? item, INameScope _scope)
+    private Control BuildExternalSystemCard(ExternalSystemItemVm? item, INameScope? _scope)
     {
         if (item == null) return new Border();
 
@@ -273,7 +290,10 @@ public partial class SystemMapView : UserControl
             }
         };
 
-        card.PointerPressed += (_, _) => _vm.SelectExternalSystem(item);
+        var externalCanvas = this.FindControl<Canvas>("ExternalSystemsCanvas");
+        if (externalCanvas != null)
+            WireOverviewCardDrag(card, externalCanvas, item.Id, isExternal: true, () => _vm.SelectExternalSystem(item));
+
         return card;
     }
 
@@ -465,8 +485,8 @@ public partial class SystemMapView : UserControl
 
     private void RefreshSystemOverview()
     {
-        var sysCtrl    = this.FindControl<ItemsControl>("SystemsItemsControl")!;
-        var extCtrl    = this.FindControl<ItemsControl>("ExternalSystemsItemsControl")!;
+        var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas")!;
+        var externalCanvas = this.FindControl<Canvas>("ExternalSystemsCanvas")!;
         var emptyText  = this.FindControl<TextBlock>("EmptySystemOverviewText")!;
         var sysSection = this.FindControl<StackPanel>("SystemsSection")!;
         var extSection = this.FindControl<StackPanel>("ExternalSystemsSection")!;
@@ -479,8 +499,26 @@ public partial class SystemMapView : UserControl
         sysSection.IsVisible = hasSystems;
         extSection.IsVisible = _vm.ShowExternalSystems;
 
-        sysCtrl.ItemsSource = _vm.Systems;
-        extCtrl.ItemsSource = _vm.ExternalSystems;
+        systemsCanvas.Children.Clear();
+        foreach (var system in _vm.Systems)
+        {
+            if (BuildSystemCard(system, null) is not Border card) continue;
+            systemsCanvas.Children.Add(card);
+            Canvas.SetLeft(card, system.X);
+            Canvas.SetTop(card, system.Y);
+        }
+
+        externalCanvas.Children.Clear();
+        foreach (var external in _vm.ExternalSystems)
+        {
+            if (BuildExternalSystemCard(external, null) is not Border card) continue;
+            externalCanvas.Children.Add(card);
+            Canvas.SetLeft(card, external.X);
+            Canvas.SetTop(card, external.Y);
+        }
+
+        UpdateCanvasExtent(systemsCanvas, minimumWidth: 980, minimumHeight: 200);
+        UpdateCanvasExtent(externalCanvas, minimumWidth: 840, minimumHeight: 160);
         noExtText.IsVisible = _vm.ShowExternalSystems && !hasExt;
     }
 
@@ -699,6 +737,121 @@ public partial class SystemMapView : UserControl
         // saturating the meter too early.
         int mapped = (int)Math.Ceiling(Math.Log2(moduleCount + 1));
         return Math.Clamp(mapped, 1, cellCount);
+    }
+
+    private void WireOverviewCardDrag(Border card, Canvas canvas, string itemId, bool isExternal, Action clickAction)
+    {
+        card.PointerPressed += (_, e) => OnOverviewCardPointerPressed(e, card, canvas, itemId, isExternal, clickAction);
+        card.PointerMoved += (_, e) => OnOverviewCardPointerMoved(e, card);
+        card.PointerReleased += (_, e) => OnOverviewCardPointerReleased(e, card);
+        card.PointerCaptureLost += (_, _) =>
+        {
+            if (_dragState?.Card == card)
+                _dragState = null;
+        };
+    }
+
+    private void OnOverviewCardPointerPressed(
+        PointerPressedEventArgs e,
+        Border card,
+        Canvas canvas,
+        string itemId,
+        bool isExternal,
+        Action clickAction)
+    {
+        if (!e.GetCurrentPoint(card).Properties.IsLeftButtonPressed)
+            return;
+
+        double currentX = GetCanvasLeft(card);
+        double currentY = GetCanvasTop(card);
+        var pointerPosition = e.GetPosition(canvas);
+
+        _dragState = new DragState
+        {
+            Card = card,
+            Canvas = canvas,
+            ItemId = itemId,
+            IsExternal = isExternal,
+            ClickAction = clickAction,
+            PointerOffset = new Point(pointerPosition.X - currentX, pointerPosition.Y - currentY),
+            StartPosition = new Point(currentX, currentY)
+        };
+
+        e.Pointer.Capture(card);
+        e.Handled = true;
+    }
+
+    private void OnOverviewCardPointerMoved(PointerEventArgs e, Border card)
+    {
+        if (_dragState?.Card != card)
+            return;
+
+        var pointerPosition = e.GetPosition(_dragState.Canvas);
+        double x = Math.Max(0, pointerPosition.X - _dragState.PointerOffset.X);
+        double y = Math.Max(0, pointerPosition.Y - _dragState.PointerOffset.Y);
+
+        if (!_dragState.WasDragged)
+        {
+            var delta = new Point(x - _dragState.StartPosition.X, y - _dragState.StartPosition.Y);
+            _dragState.WasDragged = Math.Abs(delta.X) >= 3 || Math.Abs(delta.Y) >= 3;
+        }
+
+        Canvas.SetLeft(card, x);
+        Canvas.SetTop(card, y);
+        UpdateCanvasExtent(_dragState.Canvas, minimumWidth: 720, minimumHeight: 140);
+        e.Handled = true;
+    }
+
+    private void OnOverviewCardPointerReleased(PointerReleasedEventArgs e, Border card)
+    {
+        if (_dragState?.Card != card)
+            return;
+
+        var dragState = _dragState;
+        _dragState = null;
+        e.Pointer.Capture(null);
+
+        double x = GetCanvasLeft(card);
+        double y = GetCanvasTop(card);
+
+        if (dragState.WasDragged)
+        {
+            _vm.SetOverviewPosition(dragState.ItemId, x, y, dragState.IsExternal);
+            LayoutPositionChanged?.Invoke(dragState.ItemId, dragState.IsExternal, x, y);
+            UpdateCanvasExtent(dragState.Canvas, minimumWidth: 720, minimumHeight: 140);
+        }
+        else
+        {
+            dragState.ClickAction();
+        }
+
+        e.Handled = true;
+    }
+
+    private static double GetCanvasLeft(Control control)
+        => double.IsNaN(Canvas.GetLeft(control)) ? 0 : Canvas.GetLeft(control);
+
+    private static double GetCanvasTop(Control control)
+        => double.IsNaN(Canvas.GetTop(control)) ? 0 : Canvas.GetTop(control);
+
+    private static void UpdateCanvasExtent(Canvas canvas, double minimumWidth, double minimumHeight)
+    {
+        double maxRight = minimumWidth;
+        double maxBottom = minimumHeight;
+
+        foreach (var child in canvas.Children.OfType<Control>())
+        {
+            double left = GetCanvasLeft(child);
+            double top = GetCanvasTop(child);
+            double width = !double.IsNaN(child.Width) && child.Width > 0 ? child.Width : child.Bounds.Width;
+            double height = child.Bounds.Height > 0 ? child.Bounds.Height : child.DesiredSize.Height;
+
+            maxRight = Math.Max(maxRight, left + width + 32);
+            maxBottom = Math.Max(maxBottom, top + Math.Max(height, 100) + 24);
+        }
+
+        canvas.Width = maxRight;
+        canvas.Height = maxBottom;
     }
 
     private static string ConfidenceColor(Models.SystemMap.ConfidenceLevel c) => c switch

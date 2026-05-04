@@ -24,6 +24,8 @@ public class SystemItemVm
     public string StartupMechanism { get; init; } = string.Empty;
     public ConfidenceLevel Confidence { get; init; }
     public int ModuleCount         { get; init; }
+    public double X                { get; set; }
+    public double Y                { get; set; }
 }
 
 /// <summary>Item view-model for an External System.</summary>
@@ -33,6 +35,8 @@ public class ExternalSystemItemVm
     public string Name { get; init; } = string.Empty;
     public string Kind { get; init; } = string.Empty;
     public ConfidenceLevel Confidence { get; init; }
+    public double X { get; set; }
+    public double Y { get; set; }
 }
 
 /// <summary>Item view-model for a Module.</summary>
@@ -80,6 +84,13 @@ public class StartupItemVm
 /// </summary>
 public class SystemMapViewModel : INotifyPropertyChanged
 {
+    private const string LayoutPrefix = "systemmap:";
+    private const double CardStartX = 24;
+    private const double CardStartY = 18;
+    private const double CardGapX = 248;
+    private const double CardGapY = 148;
+    private const int CardsPerRow = 4;
+
     // High-value code node kinds shown when ShowOnlyHighValueCodeNodes is active.
     private static readonly HashSet<CodeNodeKind> HighValueKinds = new()
     {
@@ -260,26 +271,43 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// Rebuilds all collections from <paramref name="model"/>.
     /// Call this whenever the workspace's <see cref="SystemMapModel"/> changes.
     /// </summary>
-    public void LoadFrom(SystemMapModel model)
+    public void LoadFrom(SystemMapModel model, IReadOnlyDictionary<string, LayoutPosition>? layoutPositions = null)
     {
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom starting. Systems={model.Systems.Count}, Modules={model.AllModules.Count()}, CodeNodes={model.AllCodeNodes.Count()}, ExternalSystems={model.ExternalSystems.Count}, Relationships={model.Relationships.Count}");
 
-        _allSystems = model.Systems.Select(s => new SystemItemVm
+        int topLaneIndex = 0;
+        int lowerLaneIndex = 0;
+
+        _allSystems = model.Systems.Select(s =>
         {
-            Id               = s.Id,
-            Name             = s.Name,
-            KindLabel        = s.Kind.ToString(),
-            StartupMechanism = s.StartupMechanism,
-            Confidence       = s.Confidence,
-            ModuleCount      = CountModulesForSystem(model, s)
+            var position = GetSystemPosition(s, layoutPositions, ref topLaneIndex, ref lowerLaneIndex);
+            return new SystemItemVm
+            {
+                Id               = s.Id,
+                Name             = s.Name,
+                KindLabel        = s.Kind.ToString(),
+                StartupMechanism = s.StartupMechanism,
+                Confidence       = s.Confidence,
+                ModuleCount      = CountModulesForSystem(model, s),
+                X                = position.X,
+                Y                = position.Y
+            };
         }).ToList();
 
-        _allExternalSystems = model.ExternalSystems.Select(e => new ExternalSystemItemVm
+        int externalIndex = 0;
+
+        _allExternalSystems = model.ExternalSystems.Select(e =>
         {
-            Id         = e.Id,
-            Name       = e.Name,
-            Kind       = e.Kind,
-            Confidence = e.Confidence
+            var position = GetExternalPosition(e.Id, layoutPositions, externalIndex++);
+            return new ExternalSystemItemVm
+            {
+                Id         = e.Id,
+                Name       = e.Name,
+                Kind       = e.Kind,
+                Confidence = e.Confidence,
+                X          = position.X,
+                Y          = position.Y
+            };
         }).ToList();
 
         _allModules = model.AllModules.Select(m =>
@@ -343,6 +371,26 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom completed. VisibleSystems={Systems.Count}, CachedModules={_allModules.Count}, CachedCodeNodes={_allCodeNodes.Count}, VisibleExternalSystems={ExternalSystems.Count}, VisibleStartupItems={StartupItems.Count}");
     }
+
+    public void SetOverviewPosition(string itemId, double x, double y, bool isExternal)
+    {
+        if (isExternal)
+        {
+            var item = _allExternalSystems.FirstOrDefault(ext => string.Equals(ext.Id, itemId, StringComparison.Ordinal));
+            if (item == null) return;
+            item.X = x;
+            item.Y = y;
+            return;
+        }
+
+        var system = _allSystems.FirstOrDefault(sys => string.Equals(sys.Id, itemId, StringComparison.Ordinal));
+        if (system == null) return;
+        system.X = x;
+        system.Y = y;
+    }
+
+    public static string GetLayoutPositionKey(string itemId, bool isExternal)
+        => $"{LayoutPrefix}{(isExternal ? "external" : "system")}:{itemId}";
 
     /// <summary>Re-applies the current filter settings to all collections.</summary>
     public void ApplyFilters()
@@ -420,6 +468,55 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
     private static bool IsHighConfidence(ConfidenceLevel c)
         => c is ConfidenceLevel.Manual or ConfidenceLevel.Confirmed or ConfidenceLevel.Likely;
+
+    private static LayoutPosition GetSystemPosition(
+        SystemModel system,
+        IReadOnlyDictionary<string, LayoutPosition>? layoutPositions,
+        ref int topLaneIndex,
+        ref int lowerLaneIndex)
+    {
+        if (TryGetSavedPosition(GetLayoutPositionKey(system.Id, isExternal: false), layoutPositions, out var saved))
+            return saved;
+
+        bool lowerLane = system.Kind == SystemKind.LibraryOnly ||
+            string.Equals(system.StartupMechanism, "Class Library", StringComparison.OrdinalIgnoreCase);
+
+        return CreateGridPosition(lowerLane ? lowerLaneIndex++ : topLaneIndex++, lowerLane ? 1 : 0);
+    }
+
+    private static LayoutPosition GetExternalPosition(
+        string externalSystemId,
+        IReadOnlyDictionary<string, LayoutPosition>? layoutPositions,
+        int index)
+    {
+        if (TryGetSavedPosition(GetLayoutPositionKey(externalSystemId, isExternal: true), layoutPositions, out var saved))
+            return saved;
+
+        return CreateGridPosition(index, baseRow: 0);
+    }
+
+    private static bool TryGetSavedPosition(
+        string key,
+        IReadOnlyDictionary<string, LayoutPosition>? layoutPositions,
+        out LayoutPosition position)
+    {
+        if (layoutPositions != null && layoutPositions.TryGetValue(key, out position!))
+            return true;
+
+        position = new LayoutPosition();
+        return false;
+    }
+
+    private static LayoutPosition CreateGridPosition(int index, int baseRow)
+    {
+        int row = index / CardsPerRow;
+        int column = index % CardsPerRow;
+        return new LayoutPosition
+        {
+            X = CardStartX + (column * CardGapX),
+            Y = CardStartY + ((baseRow + row) * CardGapY)
+        };
+    }
 
     private static Dictionary<string, int> ComputeStartupOrder(SystemMapModel model)
     {

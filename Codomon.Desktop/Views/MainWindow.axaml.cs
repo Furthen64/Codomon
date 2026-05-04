@@ -141,7 +141,8 @@ public partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.ActiveProfileId))
         {
             SyncProfileComboBoxSelection();
-            // TODO (Phase 02): notify the Nodify graph to refresh when the profile changes.
+            _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
+            _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
             RebuildTimeline();
         }
     }
@@ -1302,7 +1303,7 @@ public partial class MainWindow : Window
 
         // Sync both views that can render the System Map after the dialog mutates workspace state.
         AppLogger.Debug("[Hypothesis] Applying Architecture dialog results to System Map view model.");
-        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap);
+        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
         AppLogger.Debug("[Hypothesis] System Map view model refresh completed. Applying graph canvas refresh.");
         _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
         AppLogger.Debug("[Hypothesis] Graph canvas refresh completed.");
@@ -1583,8 +1584,15 @@ public partial class MainWindow : Window
         var view = new SystemMapView(_vm.SystemMap);
         view.ShowDetailedRelationshipsRequested += OnShowDetailedRelationshipsRequested;
         view.ClearCanvasRequested += OnSystemMapClearCanvasRequested;
+        view.LayoutPositionChanged += OnSystemMapLayoutPositionChanged;
         host.Content = view;
         AppLogger.Debug("System Map view initialized");
+    }
+
+    private void OnSystemMapLayoutPositionChanged(string itemId, bool isExternal, double x, double y)
+    {
+        if (!_vm.HasWorkspace) return;
+        _vm.SaveSystemMapLayoutPosition(itemId, isExternal, x, y);
     }
 
     private void OnShowDetailedRelationshipsRequested(SystemItemVm system)
@@ -1610,7 +1618,7 @@ public partial class MainWindow : Window
         _vm.Workspace.SystemMap.ExternalSystems.Clear();
         _vm.Workspace.SystemMap.Relationships.Clear();
 
-        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap);
+        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
         _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
         _vm.IsDirty = true;
 

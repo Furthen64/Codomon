@@ -58,7 +58,7 @@
 
           <!-- System Overview panel -->
           <ScrollViewer x:Name="PanelSystemOverview" IsVisible="True"
-                        HorizontalScrollBarVisibility="Disabled"
+                        HorizontalScrollBarVisibility="Auto"
                         VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="16,12" Spacing="16">
 
@@ -83,25 +83,17 @@
               <StackPanel x:Name="SystemsSection" Spacing="10">
                 <TextBlock Text="SYSTEMS" FontSize="9" FontWeight="Bold"
                            Foreground="#4A6A8A" LetterSpacing="1"/>
-                <ItemsControl x:Name="SystemsItemsControl">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                <Border Background="Transparent" MinHeight="180">
+                  <Canvas x:Name="SystemsCanvas"/>
+                </Border>
               </StackPanel>
 
               <StackPanel x:Name="ExternalSystemsSection" Spacing="10">
                 <TextBlock Text="EXTERNAL SYSTEMS" FontSize="9" FontWeight="Bold"
                            Foreground="#4A6A8A" LetterSpacing="1"/>
-                <ItemsControl x:Name="ExternalSystemsItemsControl">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                <Border Background="Transparent" MinHeight="160">
+                  <Canvas x:Name="ExternalSystemsCanvas"/>
+                </Border>
                 <TextBlock x:Name="NoExternalSystemsText"
                            Text="No external systems defined."
                            Foreground="#445566" FontSize="11" IsVisible="False"/>

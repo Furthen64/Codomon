@@ -54,7 +54,7 @@ public class MainViewModel : INotifyPropertyChanged
             _timeline = new TimelineViewModel();
             OnPropertyChanged(nameof(Timeline));
             // Reload the System Map from the new workspace.
-            SystemMap.LoadFrom(value.SystemMap);
+            SystemMap.LoadFrom(value.SystemMap, value.ActiveProfile?.LayoutPositions);
             // Reload the Graph from the new workspace's System Map.
             Graph.RefreshFromSystemMap(value.SystemMap);
         }
@@ -214,6 +214,9 @@ public class MainViewModel : INotifyPropertyChanged
         if (newProfile != null)
             WorkspaceSerializer.ApplyProfileLayout(newProfile, Workspace.Systems);
 
+        SystemMap.LoadFrom(Workspace.SystemMap, newProfile?.LayoutPositions);
+        Graph.RefreshFromSystemMap(Workspace.SystemMap);
+
         IsDirty = true;
         OnPropertyChanged(nameof(ActiveProfileId));
         StatusMessage = $"Profile: {newProfile?.ProfileName ?? profileId}";
@@ -333,6 +336,25 @@ public class MainViewModel : INotifyPropertyChanged
             WorkspaceSerializer.CaptureLayoutIntoProfile(Workspace, profile);
     }
 
+    public void SaveSystemMapLayoutPosition(string itemId, bool isExternal, double x, double y)
+    {
+        SystemMap.SetOverviewPosition(itemId, x, y, isExternal);
+
+        var profile = Workspace.ActiveProfile;
+        if (profile != null)
+        {
+            profile.LayoutPositions[SystemMapViewModel.GetLayoutPositionKey(itemId, isExternal)] = new LayoutPosition
+            {
+                X = x,
+                Y = y
+            };
+        }
+
+        Workspace.SystemMap.UpdatedAt = DateTime.UtcNow;
+        IsDirty = true;
+        StatusMessage = "System Map layout updated.";
+    }
+
     // ── Workspace operations ─────────────────────────────────────────────────
 
     public async Task NewWorkspaceAsync(
@@ -442,7 +464,7 @@ public class MainViewModel : INotifyPropertyChanged
         try
         {
             var maxAutosaves = Math.Max(1, UserConfigService.Load().MaxAutosaves);
-            await AutosaveService.CreateAutosaveAsync(WorkspaceFolderPath, maxAutosaves);
+            await AutosaveService.CreateAutosaveAsync(Workspace, WorkspaceFolderPath, maxAutosaves);
         }
         catch (Exception ex)
         {
@@ -598,7 +620,7 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         Workspace.SystemMap.UpdatedAt = DateTime.UtcNow;
-        SystemMap.LoadFrom(Workspace.SystemMap);
+        SystemMap.LoadFrom(Workspace.SystemMap, Workspace.ActiveProfile?.LayoutPositions);
         Graph.RefreshFromSystemMap(Workspace.SystemMap);
 
         IsDirty = true;

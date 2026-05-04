@@ -9,6 +9,7 @@ namespace Codomon.Desktop.Persistence;
 
 public static class WorkspaceSerializer
 {
+    private const string SystemMapLayoutPrefix = "systemmap:";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
@@ -437,7 +438,18 @@ public static class WorkspaceSerializer
     /// </summary>
     public static void CaptureLayoutIntoProfile(WorkspaceModel workspace, ProfileModel profile)
     {
-        var positions = new Dictionary<string, LayoutPosition>();
+        var positions = profile.LayoutPositions
+            .Where(kvp => kvp.Key.StartsWith(SystemMapLayoutPrefix, StringComparison.Ordinal))
+            .ToDictionary(
+                kvp => kvp.Key,
+                kvp => new LayoutPosition
+                {
+                    X = kvp.Value.X,
+                    Y = kvp.Value.Y,
+                    Width = kvp.Value.Width,
+                    Height = kvp.Value.Height
+                },
+                StringComparer.Ordinal);
         var checkboxState = new Dictionary<string, bool>();
 
         foreach (var sys in workspace.Systems)
