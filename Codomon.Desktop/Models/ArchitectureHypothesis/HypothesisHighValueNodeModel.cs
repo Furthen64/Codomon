@@ -12,6 +12,10 @@ public class HypothesisHighValueNodeModel
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Optional fully-qualified node name (namespace + type).</summary>
+    [JsonPropertyName("full_name")]
+    public string FullName { get; set; } = string.Empty;
+
     /// <summary>Human-readable reason for this node being considered high-value.</summary>
     [JsonPropertyName("reason")]
     public string Reason { get; set; } = string.Empty;

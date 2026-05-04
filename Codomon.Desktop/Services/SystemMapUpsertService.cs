@@ -93,7 +93,10 @@ public static class SystemMapUpsertService
         SystemMapModel map,
         HypothesisHighValueNodeModel suggestion)
     {
-        var key = SystemMapIdentity.CreateCodeNodeKey(null, null, null, suggestion.Name);
+        var fullName = string.IsNullOrWhiteSpace(suggestion.FullName)
+            ? suggestion.Name
+            : suggestion.FullName;
+        var key = SystemMapIdentity.CreateCodeNodeKey(fullName, null, null, suggestion.Name);
 
         var existing = FindCodeNodeByKey(map, key);
         if (existing != null)

@@ -29,6 +29,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private WorkspaceModel? _currentWorkspace;
     private GraphRenderMode _renderMode = GraphRenderMode.SystemMap;
     private string? _moduleSystemId;
+    private readonly Dictionary<string, Point> _savedPositions = new(StringComparer.Ordinal);
 
     // ── Filters ───────────────────────────────────────────────────────────────
 
@@ -158,6 +159,7 @@ public class GraphViewModel : INotifyPropertyChanged
     /// </summary>
     private void ApplyFilters()
     {
+        SavePositions();
         if (_currentSystemMap != null)
         {
             if (_renderMode == GraphRenderMode.ModuleRelationships)
@@ -217,7 +219,9 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Title = $"{module.Name}\n{module.CodeNodes.Count} code node(s)",
-                Location = new Point(autoX, autoY)
+                Location = _savedPositions.TryGetValue(module.Id, out var savedPosition)
+                    ? savedPosition
+                    : new Point(autoX, autoY)
             };
 
             nodeMap[module.Id] = node;
@@ -297,7 +301,9 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Title = $"{sys.Name}\n{moduleCount} module(s)",
-                Location = new Point(autoX, autoY)
+                Location = _savedPositions.TryGetValue(sys.Id, out var savedPosition)
+                    ? savedPosition
+                    : new Point(autoX, autoY)
             };
             nodeMap[sys.Id] = node;
             Nodes.Add(node);
@@ -308,7 +314,13 @@ public class GraphViewModel : INotifyPropertyChanged
         {
             if (!lowConf && ext.Confidence == ConfidenceLevel.Unknown) continue;
 
-            var node = new NodeViewModel { Title = $"[ext] {ext.Name}", Location = new Point(autoX, autoY + 160) };
+            var node = new NodeViewModel
+            {
+                Title = $"[ext] {ext.Name}",
+                Location = _savedPositions.TryGetValue(ext.Id, out var savedPosition)
+                    ? savedPosition
+                    : new Point(autoX, autoY + 160)
+            };
             nodeMap[ext.Id] = node;
             Nodes.Add(node);
             autoX += autoGap;
@@ -469,6 +481,7 @@ public class GraphViewModel : INotifyPropertyChanged
             for (int row = 0; row < layer.Count; row++)
                 layer[row].Location = new Point(x, startY + row * rowGap);
         }
+        SavePositions();
     }
 
     /// <summary>
@@ -529,6 +542,16 @@ public class GraphViewModel : INotifyPropertyChanged
 
         for (int i = 1; i < sorted.Count - 1; i++)
             sorted[i].Location = new Point(leftX + i * gap, sorted[i].Location.Y);
+        SavePositions();
+    }
+
+    public void SavePositions()
+    {
+        foreach (var node in Nodes)
+        {
+            if (!string.IsNullOrWhiteSpace(node.Id))
+                _savedPositions[node.Id] = node.Location;
+        }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

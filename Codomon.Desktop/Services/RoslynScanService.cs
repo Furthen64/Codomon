@@ -31,6 +31,12 @@ public static class RoslynScanService
         "ILogger", "Logger", "Log", "_logger", "_log", "logger", "log"
     };
 
+    private static readonly HashSet<string> FrameworkTypeExclusions = new(StringComparer.Ordinal)
+    {
+        "Path", "File", "Directory", "Task", "Console", "Guid", "DateTime", "Environment",
+        "Math", "Convert", "String", "Array", "List", "Dictionary", "Enumerable", "Linq"
+    };
+
     // ── Public entry point ───────────────────────────────────────────────────
 
     /// <summary>
@@ -431,7 +437,10 @@ public static class RoslynScanService
                         _ => null
                     };
 
-                    if (candidate != null && candidate.Length > 0 && char.IsUpper(candidate[0]))
+                    if (candidate != null &&
+                        candidate.Length > 0 &&
+                        char.IsUpper(candidate[0]) &&
+                        !FrameworkTypeExclusions.Contains(candidate))
                         names.Add(candidate);
                 }
             }
@@ -447,7 +456,10 @@ public static class RoslynScanService
                     _ => null
                 };
 
-                if (typeName != null && typeName.Length > 0 && char.IsUpper(typeName[0]))
+                if (typeName != null &&
+                    typeName.Length > 0 &&
+                    char.IsUpper(typeName[0]) &&
+                    !FrameworkTypeExclusions.Contains(typeName))
                     names.Add(typeName);
             }
 
