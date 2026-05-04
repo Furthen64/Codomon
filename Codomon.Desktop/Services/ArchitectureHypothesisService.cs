@@ -423,7 +423,8 @@ public static class ArchitectureHypothesisService
             }
 
             // Merge evidence strings.
-            var existingEvidence = new HashSet<string>(existing.Evidence ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            existing.Evidence ??= new List<string>();
+            var existingEvidence = new HashSet<string>(existing.Evidence, StringComparer.OrdinalIgnoreCase);
             foreach (var ev in s.Evidence ?? new List<string>())
             {
                 if (existingEvidence.Add(ev))

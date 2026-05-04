@@ -1422,7 +1422,7 @@ public partial class MainWindow : Window
 
     // ── Dev Console ───────────────────────────────────────────────────────────
 
-    private async void OnDevConsoleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnDevConsoleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_devConsole != null)
         {

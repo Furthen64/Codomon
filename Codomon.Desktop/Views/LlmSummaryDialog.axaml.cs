@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Codomon.Desktop.Models;
 using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
 
@@ -24,6 +25,11 @@ public partial class LlmSummaryDialog : Window
     private DispatcherTimer? _spinnerTimer;
     private int _spinnerFrame;
     private static readonly string[] SpinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+    public LlmSummaryDialog()
+        : this(new LlmSummaryViewModel(new WorkspaceModel(), string.Empty))
+    {
+    }
 
     public LlmSummaryDialog(LlmSummaryViewModel vm)
     {

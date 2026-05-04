@@ -19,6 +19,11 @@ public partial class RoslynScanDialog : Window
     private readonly RoslynScanViewModel _vm;
     private bool _dialogResultSet;
 
+    public RoslynScanDialog()
+        : this(new RoslynScanViewModel(string.Empty, string.Empty))
+    {
+    }
+
     public RoslynScanDialog(RoslynScanViewModel vm)
     {
         InitializeComponent();

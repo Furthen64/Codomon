@@ -7,9 +7,16 @@ namespace Codomon.Desktop.ViewModels;
 
 public class NodeViewModel : INotifyPropertyChanged
 {
+    private string _key = string.Empty;
     private string _title = string.Empty;
     private Point _location;
     private int _childCount;
+
+    public string Key
+    {
+        get => _key;
+        set { _key = value; OnPropertyChanged(); }
+    }
 
     public string Title
     {

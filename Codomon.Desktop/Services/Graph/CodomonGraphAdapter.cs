@@ -18,6 +18,7 @@ public static class CodomonGraphAdapter
         {
             var vm = new NodeViewModel
             {
+                Key = domainNode.Id,
                 Title    = domainNode.Title,
                 Location = new Point(domainNode.X, domainNode.Y),
             };

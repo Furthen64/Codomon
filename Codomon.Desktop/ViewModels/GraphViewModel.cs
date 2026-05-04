@@ -218,6 +218,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
             var node = new NodeViewModel
             {
+                Key = module.Id,
                 Title = $"{module.Name}\n{module.CodeNodes.Count} code node(s)",
                 Location = _savedPositions.TryGetValue(module.Id, out var savedPosition)
                     ? savedPosition
@@ -300,6 +301,7 @@ public class GraphViewModel : INotifyPropertyChanged
             var moduleCount = CountModulesForSystem(map, sys);
             var node = new NodeViewModel
             {
+                Key = sys.Id,
                 Title = $"{sys.Name}\n{moduleCount} module(s)",
                 Location = _savedPositions.TryGetValue(sys.Id, out var savedPosition)
                     ? savedPosition
@@ -316,6 +318,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
             var node = new NodeViewModel
             {
+                Key = ext.Id,
                 Title = $"[ext] {ext.Name}",
                 Location = _savedPositions.TryGetValue(ext.Id, out var savedPosition)
                     ? savedPosition
@@ -422,7 +425,7 @@ public class GraphViewModel : INotifyPropertyChanged
             double x = hasSavedPosition ? sys.X : autoX;
             double y = hasSavedPosition ? sys.Y : autoY;
 
-            var node = new NodeViewModel { Title = sys.Name, Location = new Point(x, y) };
+            var node = new NodeViewModel { Key = sys.Id, Title = sys.Name, Location = new Point(x, y) };
             nodeMap[sys.Id] = node;
             Nodes.Add(node);
             autoX += autoGap;
@@ -549,8 +552,8 @@ public class GraphViewModel : INotifyPropertyChanged
     {
         foreach (var node in Nodes)
         {
-            if (!string.IsNullOrWhiteSpace(node.Id))
-                _savedPositions[node.Id] = node.Location;
+            if (!string.IsNullOrWhiteSpace(node.Key))
+                _savedPositions[node.Key] = node.Location;
         }
     }
 

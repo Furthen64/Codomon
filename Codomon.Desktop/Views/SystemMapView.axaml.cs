@@ -32,6 +32,11 @@ public partial class SystemMapView : UserControl
     private static readonly IBrush ActiveButtonBg   = new SolidColorBrush(Color.Parse("#1A4A6A"));
     private static readonly IBrush InactiveButtonBg = new SolidColorBrush(Color.Parse("#1A2435"));
 
+    public SystemMapView()
+        : this(new SystemMapViewModel())
+    {
+    }
+
     public SystemMapView(SystemMapViewModel vm)
     {
         InitializeComponent();

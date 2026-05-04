@@ -18,6 +18,11 @@ public partial class ArchitectureHypothesisDialog : Window
     private readonly Dictionary<string, string> _promptTemplateDescriptions =
         new(StringComparer.OrdinalIgnoreCase);
 
+    public ArchitectureHypothesisDialog()
+        : this(new ArchitectureHypothesisViewModel(new WorkspaceModel(), string.Empty))
+    {
+    }
+
     public ArchitectureHypothesisDialog(ArchitectureHypothesisViewModel vm)
     {
         InitializeComponent();
