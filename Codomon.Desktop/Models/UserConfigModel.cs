@@ -31,6 +31,13 @@ public class UserConfigModel
     /// <summary>Default playback speed selected when the replay toolbar is first shown.</summary>
     public double DefaultReplaySpeed { get; set; } = 1.0;
 
+    // ── Graph auto-align defaults ───────────────────────────────────────────
+
+    /// <summary>
+    /// Last-used graph auto-align preset and tuning values from the right-side panel.
+    /// </summary>
+    public GraphAutoAlignSettingsModel GraphAutoAlignSettings { get; set; } = new();
+
     // ── Log import defaults ───────────────────────────────────────────────────
 
     /// <summary>Key of the delimiter option pre-selected in the import wizard (e.g. "tab").</summary>
@@ -44,4 +51,28 @@ public class UserConfigModel
 
     /// <summary>Key of the known-app-format pre-selected in the import wizard (e.g. "none").</summary>
     public string DefaultImportKnownFormatKey { get; set; } = "none";
+}
+
+/// <summary>
+/// User-level defaults for the Graph tab auto-align controls.
+/// </summary>
+public class GraphAutoAlignSettingsModel
+{
+    /// <summary>Selected preset key: balanced, dense, or separated.</summary>
+    public string PresetKey { get; set; } = "balanced";
+
+    /// <summary>Barycentric ordering sweeps per pass.</summary>
+    public int BarycentricSweeps { get; set; } = 6;
+
+    /// <summary>Whether to run a second refinement pass.</summary>
+    public bool RunTwoPassRefinement { get; set; }
+
+    /// <summary>Horizontal distance between columns.</summary>
+    public double ColumnGap { get; set; } = 280;
+
+    /// <summary>Base vertical distance between nodes.</summary>
+    public double BaseRowGap { get; set; } = 96;
+
+    /// <summary>Vertical gap between disconnected components.</summary>
+    public double ComponentGap { get; set; } = 180;
 }

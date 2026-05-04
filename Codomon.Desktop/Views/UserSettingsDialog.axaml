@@ -97,6 +97,15 @@
           </StackPanel>
         </Grid>
 
+        <StackPanel Spacing="6">
+          <TextBlock Text="Architecture synthesis batch cutoff tokens" Foreground="#AABBCC" FontWeight="SemiBold"/>
+          <TextBlock Text="Maximum estimated tokens per synthesis call before summaries are split into batches. Set 0 to disable splitting."
+                     Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+          <NumericUpDown x:Name="HypothesisTokenThresholdBox"
+                         Minimum="0" Maximum="500000" Increment="1000" FormatString="0"
+                         Watermark="60000" HorizontalAlignment="Left" MinWidth="180"/>
+        </StackPanel>
+
         <!-- Test Connection -->
         <StackPanel Spacing="8">
           <StackPanel Orientation="Horizontal" Spacing="10">

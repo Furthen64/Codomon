@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private const double LiveTimelineRebuildThrottleSeconds = 2.0;
     private DateTimeOffset _lastLiveTimelineRebuild = DateTimeOffset.MinValue;
     private bool _firstRunConfigCheckDone;
+    private bool _updatingAutoAlignPreset;
 
     public MainWindow()
     {
@@ -56,6 +57,7 @@ public partial class MainWindow : Window
         SetupCanvas();
         SetupTreeView();
         SetupTimeline();
+        InitializeGraphAutoAlignPanel();
         RefreshProfileComboBox();
         PopulateRecentWorkspaces();
         SetupReplaySpeedComboBox();
@@ -1693,6 +1695,170 @@ public partial class MainWindow : Window
                 ? "No rules defined."
                 : $"{count} rule{(count == 1 ? "" : "s")} defined.";
         }
+    }
+
+    private void InitializeGraphAutoAlignPanel()
+    {
+        var presetCombo = this.FindControl<ComboBox>("PropAutoAlignPresetComboBox");
+        var sweeps = this.FindControl<NumericUpDown>("PropAutoAlignSweepsBox");
+        var twoPass = this.FindControl<CheckBox>("PropAutoAlignTwoPassCheck");
+        var columnGap = this.FindControl<NumericUpDown>("PropAutoAlignColumnGapBox");
+        var rowGap = this.FindControl<NumericUpDown>("PropAutoAlignRowGapBox");
+        var componentGap = this.FindControl<NumericUpDown>("PropAutoAlignComponentGapBox");
+
+        if (presetCombo != null && sweeps != null && twoPass != null &&
+            columnGap != null && rowGap != null && componentGap != null)
+        {
+            var cfg = UserConfigService.Load().GraphAutoAlignSettings;
+            var presetKey = NormaliseAutoAlignPresetKey(cfg.PresetKey);
+
+            _updatingAutoAlignPreset = true;
+            presetCombo.SelectedIndex = presetKey switch
+            {
+                "dense" => 1,
+                "separated" => 2,
+                _ => 0
+            };
+            _updatingAutoAlignPreset = false;
+
+            sweeps.Value = Math.Max(1, cfg.BarycentricSweeps);
+            twoPass.IsChecked = cfg.RunTwoPassRefinement;
+            columnGap.Value = (decimal)Math.Max(100, cfg.ColumnGap);
+            rowGap.Value = (decimal)Math.Max(40, cfg.BaseRowGap);
+            componentGap.Value = (decimal)Math.Max(20, cfg.ComponentGap);
+        }
+
+        UpdateGraphAutoAlignPanelVisibility();
+    }
+
+    private void OnPropAutoAlignPresetChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingAutoAlignPreset) return;
+        if (sender is not ComboBox combo) return;
+        if (combo.SelectedItem is not ComboBoxItem item) return;
+
+        var presetKey = item.Tag?.ToString();
+        if (string.IsNullOrWhiteSpace(presetKey)) return;
+
+        ApplyAutoAlignPreset(presetKey);
+    }
+
+    private static string NormaliseAutoAlignPresetKey(string? presetKey)
+    {
+        var key = (presetKey ?? string.Empty).Trim().ToLowerInvariant();
+        return key is "dense" or "separated" ? key : "balanced";
+    }
+
+    private void ApplyAutoAlignPreset(string presetKey)
+    {
+        var sweeps = this.FindControl<NumericUpDown>("PropAutoAlignSweepsBox");
+        var twoPass = this.FindControl<CheckBox>("PropAutoAlignTwoPassCheck");
+        var columnGap = this.FindControl<NumericUpDown>("PropAutoAlignColumnGapBox");
+        var rowGap = this.FindControl<NumericUpDown>("PropAutoAlignRowGapBox");
+        var componentGap = this.FindControl<NumericUpDown>("PropAutoAlignComponentGapBox");
+
+        if (sweeps == null || twoPass == null || columnGap == null || rowGap == null || componentGap == null)
+            return;
+
+        // Opinionated presets tuned for module relationship readability.
+        switch (presetKey.Trim().ToLowerInvariant())
+        {
+            case "dense":
+                sweeps.Value = 8;
+                twoPass.IsChecked = true;
+                columnGap.Value = 240;
+                rowGap.Value = 84;
+                componentGap.Value = 140;
+                break;
+            case "separated":
+                sweeps.Value = 10;
+                twoPass.IsChecked = true;
+                columnGap.Value = 360;
+                rowGap.Value = 120;
+                componentGap.Value = 260;
+                break;
+            default:
+                sweeps.Value = 6;
+                twoPass.IsChecked = false;
+                columnGap.Value = 280;
+                rowGap.Value = 96;
+                componentGap.Value = 180;
+                break;
+        }
+    }
+
+    private void UpdateGraphAutoAlignPanelVisibility(TabControl? tabs = null)
+    {
+        StackPanel? panel;
+        try
+        {
+            panel = this.FindControl<StackPanel>("PropAutoAlignPanel");
+        }
+        catch (InvalidOperationException)
+        {
+            // Can happen during XAML initialization before the parent name scope exists.
+            return;
+        }
+
+        if (tabs == null)
+        {
+            try
+            {
+                tabs = this.FindControl<TabControl>("CenterTabControl");
+            }
+            catch (InvalidOperationException)
+            {
+                return;
+            }
+        }
+
+        if (panel == null || tabs == null) return;
+
+        panel.IsVisible = tabs.SelectedIndex == 1;
+    }
+
+    private void OnCenterTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => UpdateGraphAutoAlignPanelVisibility(sender as TabControl);
+
+    private void OnPropAutoAlignApplyClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var defaults = _vm.Graph.CreateAutoAlignDefaults();
+
+        var sweeps = this.FindControl<NumericUpDown>("PropAutoAlignSweepsBox")?.Value;
+        var twoPass = this.FindControl<CheckBox>("PropAutoAlignTwoPassCheck")?.IsChecked == true;
+        var columnGap = this.FindControl<NumericUpDown>("PropAutoAlignColumnGapBox")?.Value;
+        var rowGap = this.FindControl<NumericUpDown>("PropAutoAlignRowGapBox")?.Value;
+        var componentGap = this.FindControl<NumericUpDown>("PropAutoAlignComponentGapBox")?.Value;
+
+        var options = new GraphViewModel.AutoAlignOptions
+        {
+            StartX = defaults.StartX,
+            StartY = defaults.StartY,
+            BarycentricSweeps = Math.Max(1, (int)(sweeps ?? defaults.BarycentricSweeps)),
+            RunTwoPassRefinement = twoPass,
+            ColumnGap = Math.Max(100, (double)(columnGap ?? (decimal)defaults.ColumnGap)),
+            BaseRowGap = Math.Max(40, (double)(rowGap ?? (decimal)defaults.BaseRowGap)),
+            ComponentGap = Math.Max(20, (double)(componentGap ?? (decimal)defaults.ComponentGap))
+        };
+
+        _vm.Graph.AutoAlign(options);
+
+        var presetKey = "balanced";
+        if (this.FindControl<ComboBox>("PropAutoAlignPresetComboBox")?.SelectedItem is ComboBoxItem selectedPreset)
+            presetKey = NormaliseAutoAlignPresetKey(selectedPreset.Tag?.ToString());
+
+        var cfg = UserConfigService.Load();
+        cfg.GraphAutoAlignSettings.PresetKey = presetKey;
+        cfg.GraphAutoAlignSettings.BarycentricSweeps = options.BarycentricSweeps;
+        cfg.GraphAutoAlignSettings.RunTwoPassRefinement = options.RunTwoPassRefinement;
+        cfg.GraphAutoAlignSettings.ColumnGap = options.ColumnGap;
+        cfg.GraphAutoAlignSettings.BaseRowGap = options.BaseRowGap;
+        cfg.GraphAutoAlignSettings.ComponentGap = options.ComponentGap;
+        UserConfigService.Save(cfg);
+
+        var statusText = this.FindControl<TextBlock>("StatusText");
+        if (statusText != null)
+            statusText.Text = "Graph auto-align applied and saved.";
     }
 
     private async void OnEditRulesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

@@ -34,8 +34,10 @@ public partial class UserSettingsDialog : Window
         if (pathText    != null) pathText.Text    = $"Path: {UserConfigService.GetConfigFilePath()}";
         var maxSummaryTokens = this.FindControl<NumericUpDown>("SummaryMaxOutputTokensBox");
         var queueSize = this.FindControl<NumericUpDown>("SummaryQueueSizeBox");
+        var hypothesisTokenThreshold = this.FindControl<NumericUpDown>("HypothesisTokenThresholdBox");
         if (maxSummaryTokens != null) maxSummaryTokens.Value = _config.DefaultLlmSettings.SummaryMaxOutputTokens;
         if (queueSize != null) queueSize.Value = _config.DefaultLlmSettings.SummaryQueueSize;
+        if (hypothesisTokenThreshold != null) hypothesisTokenThreshold.Value = _config.DefaultLlmSettings.HypothesisTokenThreshold;
 
         // Autosave
         var autosaveInterval = this.FindControl<NumericUpDown>("AutosaveIntervalBox");
@@ -121,10 +123,13 @@ public partial class UserSettingsDialog : Window
         _config.DefaultLlmSettings.ModelName   = modelBox?.Text?.Trim()    ?? string.Empty;
         var maxSummaryTokens = this.FindControl<NumericUpDown>("SummaryMaxOutputTokensBox");
         var queueSize = this.FindControl<NumericUpDown>("SummaryQueueSizeBox");
+        var hypothesisTokenThreshold = this.FindControl<NumericUpDown>("HypothesisTokenThresholdBox");
         if (maxSummaryTokens?.Value is decimal maxTokens)
             _config.DefaultLlmSettings.SummaryMaxOutputTokens = Math.Max(0, (int)maxTokens);
         if (queueSize?.Value is decimal qv)
             _config.DefaultLlmSettings.SummaryQueueSize = Math.Max(1, (int)qv);
+        if (hypothesisTokenThreshold?.Value is decimal htv)
+            _config.DefaultLlmSettings.HypothesisTokenThreshold = Math.Max(0, (int)htv);
 
         // Autosave
         var autosaveInterval = this.FindControl<NumericUpDown>("AutosaveIntervalBox");

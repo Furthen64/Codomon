@@ -619,6 +619,10 @@ public class MainViewModel : INotifyPropertyChanged
             addedCodeNodes += MergeCodeNodes(existingModule, module.CodeNodes, scanResult.SourcePath);
         }
 
+        var addedRelationships = UpsertRoslynSuggestedRelationships(
+            Workspace.SystemMap,
+            scanResult.SuggestedConnections);
+
         Workspace.SystemMap.UpdatedAt = DateTime.UtcNow;
         SystemMap.LoadFrom(Workspace.SystemMap, Workspace.ActiveProfile?.LayoutPositions);
         Graph.RefreshFromSystemMap(Workspace.SystemMap);
@@ -626,11 +630,11 @@ public class MainViewModel : INotifyPropertyChanged
         IsDirty = true;
         StatusMessage =
             $"Roslyn scan applied: +{added} system(s), +{addedModules} module(s), +{addedCodeNodes} code node(s) " +
-            $"({mergedModules} module merge(s)).";
+            $"({mergedModules} module merge(s), +{addedRelationships} relationship(s)).";
         AppLogger.Info(
             $"[ApplyRoslynScan] Detected {detected.Count} system(s), added {added}; " +
             $"classified {classifiedModules.Count} module(s), added {addedModules}, merged {mergedModules}, " +
-            $"added code nodes {addedCodeNodes}.");
+            $"added code nodes {addedCodeNodes}, added relationships {addedRelationships}.");
     }
 
     private static string? ResolveLatestSummaryBatchFolder(string workspaceFolderPath)
@@ -806,6 +810,95 @@ public class MainViewModel : INotifyPropertyChanged
 
     private static bool IsStronger(ConfidenceLevel incoming, ConfidenceLevel current)
         => (int)incoming < (int)current;
+
+    private static int UpsertRoslynSuggestedRelationships(
+        SystemMapModel map,
+        IEnumerable<SuggestedConnection> suggestions)
+    {
+        var codeNodesByFullName = map.AllCodeNodes
+            .Where(n => !string.IsNullOrWhiteSpace(n.FullName))
+            .GroupBy(n => n.FullName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        int added = 0;
+
+        foreach (var suggestion in suggestions)
+        {
+            if (!codeNodesByFullName.TryGetValue(suggestion.FromClass, out var fromNode))
+                continue;
+            if (!codeNodesByFullName.TryGetValue(suggestion.ToClass, out var toNode))
+                continue;
+            if (string.Equals(fromNode.Id, toNode.Id, StringComparison.Ordinal))
+                continue;
+
+            var existing = map.Relationships.FirstOrDefault(r =>
+                r.Kind == RelationshipKind.Calls &&
+                string.Equals(r.FromId, fromNode.Id, StringComparison.Ordinal) &&
+                string.Equals(r.ToId, toNode.Id, StringComparison.Ordinal));
+
+            var incomingEvidence = BuildRoslynRelationshipEvidence(suggestion);
+            if (existing != null)
+            {
+                if (existing.Confidence != ConfidenceLevel.Manual &&
+                    IsStronger(ConfidenceLevel.Possible, existing.Confidence))
+                {
+                    existing.Confidence = ConfidenceLevel.Possible;
+                }
+
+                if (string.IsNullOrWhiteSpace(existing.Notes))
+                    existing.Notes = $"Auto-derived from Roslyn scan ({suggestion.CallCount} call site(s)).";
+
+                MergeEvidence(existing.Evidence, incomingEvidence);
+                continue;
+            }
+
+            var sourceKey = string.IsNullOrWhiteSpace(fromNode.IdentityKey) ? fromNode.Id : fromNode.IdentityKey;
+            var targetKey = string.IsNullOrWhiteSpace(toNode.IdentityKey) ? toNode.Id : toNode.IdentityKey;
+
+            map.Relationships.Add(new RelationshipModel
+            {
+                Kind = RelationshipKind.Calls,
+                FromId = fromNode.Id,
+                ToId = toNode.Id,
+                Confidence = ConfidenceLevel.Possible,
+                Notes = $"Auto-derived from Roslyn scan ({suggestion.CallCount} call site(s)).",
+                IdentityKey = SystemMapIdentity.CreateRelationshipKey(
+                    sourceKey,
+                    targetKey,
+                    RelationshipKind.Calls.ToString()),
+                Evidence = incomingEvidence
+            });
+
+            added++;
+        }
+
+        return added;
+    }
+
+    private static List<EvidenceModel> BuildRoslynRelationshipEvidence(SuggestedConnection suggestion)
+    {
+        var evidence = new List<EvidenceModel>
+        {
+            new()
+            {
+                Source = "Roslyn",
+                Description = $"Detected {suggestion.CallCount} call site(s) from '{suggestion.FromClass}' to '{suggestion.ToClass}'.",
+                SourceRef = suggestion.Id
+            }
+        };
+
+        foreach (var site in suggestion.CallSites.Take(5))
+        {
+            evidence.Add(new EvidenceModel
+            {
+                Source = "Roslyn",
+                Description = $"Call site: {site}",
+                SourceRef = suggestion.Id
+            });
+        }
+
+        return evidence;
+    }
 
     private static void MergeEvidence(List<EvidenceModel> target, IEnumerable<EvidenceModel> incoming)
     {

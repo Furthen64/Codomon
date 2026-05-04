@@ -22,6 +22,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     private readonly string _workspaceFolderPath;
     private readonly string _apiEndpoint;
     private readonly string _modelName;
+    private readonly int _hypothesisTokenThreshold;
 
     private string _promptTemplate = string.Empty;
     private bool _isRunning;
@@ -49,6 +50,12 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         _modelName = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName)
             ? workspace.LlmSettings.ModelName
             : userConfig.DefaultLlmSettings.ModelName;
+
+        // If the workspace is still using the built-in threshold default, prefer the user-level default.
+        var defaultThreshold = new LlmSettingsModel().HypothesisTokenThreshold;
+        _hypothesisTokenThreshold = workspace.LlmSettings.HypothesisTokenThreshold != defaultThreshold
+            ? workspace.LlmSettings.HypothesisTokenThreshold
+            : userConfig.DefaultLlmSettings.HypothesisTokenThreshold;
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -184,7 +191,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 
             var hypothesis = await ArchitectureHypothesisService.RunSynthesisAsync(
                 _apiEndpoint, _modelName, _workspaceFolderPath,
-                _workspace.LlmSettings.HypothesisTokenThreshold,
+                _hypothesisTokenThreshold,
                 progress, _cts.Token);
 
             CurrentHypothesis = hypothesis;

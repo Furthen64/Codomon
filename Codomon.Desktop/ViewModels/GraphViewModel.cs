@@ -18,6 +18,17 @@ public enum GraphRenderMode
 
 public class GraphViewModel : INotifyPropertyChanged
 {
+    public sealed class AutoAlignOptions
+    {
+        public double StartX { get; set; } = 80;
+        public double StartY { get; set; } = 80;
+        public double ColumnGap { get; set; } = 280;
+        public double BaseRowGap { get; set; } = 96;
+        public double ComponentGap { get; set; } = 180;
+        public int BarycentricSweeps { get; set; } = 6;
+        public bool RunTwoPassRefinement { get; set; }
+    }
+
     public ObservableCollection<NodeViewModel> Nodes { get; } = new();
     public ObservableCollection<ConnectionViewModel> Connections { get; } = new();
 
@@ -465,12 +476,48 @@ public class GraphViewModel : INotifyPropertyChanged
     /// A second pass then promotes hub nodes (many incoming connections) and their
     /// dedicated callers to new columns on the right to reduce visual clutter.
     /// </summary>
-    public void AutoAlign()
+    public AutoAlignOptions CreateAutoAlignDefaults()
     {
-        const double startX       = 80;
-        const double startY       = 80;
-        const double columnGap    = 220;
-        const double rowGap       = 120;
+        if (_renderMode == GraphRenderMode.ModuleRelationships)
+        {
+            return new AutoAlignOptions
+            {
+                StartX = 80,
+                StartY = 80,
+                ColumnGap = 280,
+                BaseRowGap = 96,
+                ComponentGap = 180,
+                BarycentricSweeps = 6,
+                RunTwoPassRefinement = false
+            };
+        }
+
+        return new AutoAlignOptions
+        {
+            StartX = 80,
+            StartY = 80,
+            ColumnGap = 220,
+            BaseRowGap = 120,
+            ComponentGap = 180,
+            BarycentricSweeps = 1,
+            RunTwoPassRefinement = false
+        };
+    }
+
+    public void AutoAlign(AutoAlignOptions? options = null)
+    {
+        options ??= CreateAutoAlignDefaults();
+
+        if (_renderMode == GraphRenderMode.ModuleRelationships)
+        {
+            AutoAlignModuleRelationships(options);
+            return;
+        }
+
+        var startX = Math.Max(0, options.StartX);
+        var startY = Math.Max(0, options.StartY);
+        var columnGap = Math.Max(80, options.ColumnGap);
+        var rowGap = Math.Max(40, options.BaseRowGap);
         const int    hubThreshold = 3;
 
         var layers = ComputeLayers();
@@ -484,6 +531,78 @@ public class GraphViewModel : INotifyPropertyChanged
             for (int row = 0; row < layer.Count; row++)
                 layer[row].Location = new Point(x, startY + row * rowGap);
         }
+        SavePositions();
+    }
+
+    /// <summary>
+    /// Smarter auto-layout for dense module relationship graphs:
+    /// split into weakly connected components, use layered layout per component,
+    /// reorder each layer with barycentric sweeps, and apply adaptive vertical spacing
+    /// so one-to-many hubs are easier to read.
+    /// </summary>
+    private void AutoAlignModuleRelationships(AutoAlignOptions options)
+    {
+        var startX = Math.Max(0, options.StartX);
+        var startY = Math.Max(0, options.StartY);
+        var columnGap = Math.Max(100, options.ColumnGap);
+        var baseRowGap = Math.Max(40, options.BaseRowGap);
+        var componentGap = Math.Max(20, options.ComponentGap);
+        var sweeps = Math.Max(1, options.BarycentricSweeps);
+        var passes = options.RunTwoPassRefinement ? 2 : 1;
+
+        if (Nodes.Count == 0)
+            return;
+
+        BuildAdjacency(out var successors, out var predecessors, out var undirected);
+        var connected = Nodes
+            .Where(n => successors[n].Count > 0 || predecessors[n].Count > 0)
+            .ToHashSet();
+
+        var components = ComputeWeaklyConnectedComponents(connected, undirected)
+            .OrderByDescending(c => c.Sum(n => successors[n].Count + predecessors[n].Count))
+            .ThenByDescending(c => c.Count)
+            .ToList();
+
+        // Keep truly isolated modules out of the main signal path.
+        var isolates = Nodes.Where(n => !connected.Contains(n)).ToList();
+        if (isolates.Count > 0)
+            components.Add(new HashSet<NodeViewModel>(isolates));
+
+        double componentY = startY;
+
+        foreach (var component in components)
+        {
+            var layers = ComputeLayersForSubset(component, successors);
+            RemoveEmptyLayers(layers);
+            if (layers.Count == 0)
+                continue;
+
+            for (int pass = 0; pass < passes; pass++)
+                OrderLayersByBarycenter(layers, predecessors, successors, sweeps);
+
+            double componentBottom = componentY;
+
+            for (int col = 0; col < layers.Count; col++)
+            {
+                var layer = layers[col];
+                double x = startX + col * columnGap;
+                double y = componentY;
+
+                foreach (var node in layer)
+                {
+                    node.Location = new Point(x, y);
+                    var degree = successors[node].Count + predecessors[node].Count;
+                    var adaptiveGap = baseRowGap + Math.Min(48, degree * 8);
+                    y += adaptiveGap;
+                }
+
+                if (y > componentBottom)
+                    componentBottom = y;
+            }
+
+            componentY = componentBottom + componentGap;
+        }
+
         SavePositions();
     }
 
@@ -617,6 +736,181 @@ public class GraphViewModel : INotifyPropertyChanged
             layers[depth[node]].Add(node);
 
         return layers;
+    }
+
+    private void BuildAdjacency(
+        out Dictionary<NodeViewModel, List<NodeViewModel>> successors,
+        out Dictionary<NodeViewModel, List<NodeViewModel>> predecessors,
+        out Dictionary<NodeViewModel, List<NodeViewModel>> undirected)
+    {
+        successors = Nodes.ToDictionary(n => n, _ => new List<NodeViewModel>());
+        predecessors = Nodes.ToDictionary(n => n, _ => new List<NodeViewModel>());
+        undirected = Nodes.ToDictionary(n => n, _ => new List<NodeViewModel>());
+
+        foreach (var (from, to) in _nodeEdges)
+        {
+            if (!successors.ContainsKey(from) || !successors.ContainsKey(to))
+                continue;
+
+            successors[from].Add(to);
+            predecessors[to].Add(from);
+
+            undirected[from].Add(to);
+            undirected[to].Add(from);
+        }
+    }
+
+    private static List<HashSet<NodeViewModel>> ComputeWeaklyConnectedComponents(
+        IEnumerable<NodeViewModel> nodes,
+        IReadOnlyDictionary<NodeViewModel, List<NodeViewModel>> undirected)
+    {
+        var remaining = new HashSet<NodeViewModel>(nodes);
+        var result = new List<HashSet<NodeViewModel>>();
+
+        while (remaining.Count > 0)
+        {
+            var seed = remaining.First();
+            var queue = new Queue<NodeViewModel>();
+            var component = new HashSet<NodeViewModel>();
+
+            queue.Enqueue(seed);
+            remaining.Remove(seed);
+            component.Add(seed);
+
+            while (queue.Count > 0)
+            {
+                var node = queue.Dequeue();
+                foreach (var next in undirected[node])
+                {
+                    if (!remaining.Remove(next)) continue;
+                    component.Add(next);
+                    queue.Enqueue(next);
+                }
+            }
+
+            result.Add(component);
+        }
+
+        return result;
+    }
+
+    private static List<List<NodeViewModel>> ComputeLayersForSubset(
+        IReadOnlySet<NodeViewModel> subset,
+        IReadOnlyDictionary<NodeViewModel, List<NodeViewModel>> successors)
+    {
+        var inDegree = subset.ToDictionary(n => n, _ => 0);
+
+        foreach (var node in subset)
+        {
+            foreach (var succ in successors[node])
+            {
+                if (inDegree.ContainsKey(succ))
+                    inDegree[succ]++;
+            }
+        }
+
+        var depth = subset.ToDictionary(n => n, _ => 0);
+        var queue = new Queue<NodeViewModel>(subset.Where(n => inDegree[n] == 0));
+        var visited = new HashSet<NodeViewModel>();
+
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            if (!visited.Add(node))
+                continue;
+
+            foreach (var succ in successors[node])
+            {
+                if (!inDegree.ContainsKey(succ)) continue;
+
+                if (depth[succ] < depth[node] + 1)
+                    depth[succ] = depth[node] + 1;
+
+                if (--inDegree[succ] == 0)
+                    queue.Enqueue(succ);
+            }
+        }
+
+        int maxDepth = visited.Count > 0 ? visited.Max(n => depth[n]) : 0;
+        int cycleDepth = maxDepth + 1;
+        bool hasCycles = false;
+
+        foreach (var node in subset)
+        {
+            if (visited.Contains(node)) continue;
+            depth[node] = cycleDepth;
+            hasCycles = true;
+        }
+
+        int layerCount = (hasCycles ? cycleDepth : maxDepth) + 1;
+        var layers = Enumerable.Range(0, layerCount)
+            .Select(_ => new List<NodeViewModel>())
+            .ToList();
+
+        foreach (var node in subset)
+            layers[depth[node]].Add(node);
+
+        return layers;
+    }
+
+    private static void RemoveEmptyLayers(List<List<NodeViewModel>> layers)
+        => layers.RemoveAll(layer => layer.Count == 0);
+
+    private static void OrderLayersByBarycenter(
+        List<List<NodeViewModel>> layers,
+        IReadOnlyDictionary<NodeViewModel, List<NodeViewModel>> predecessors,
+        IReadOnlyDictionary<NodeViewModel, List<NodeViewModel>> successors,
+        int sweeps)
+    {
+        if (layers.Count <= 1)
+            return;
+
+        sweeps = Math.Max(1, sweeps);
+
+        for (int sweep = 0; sweep < sweeps; sweep++)
+        {
+            for (int i = 1; i < layers.Count; i++)
+                SortLayerByNeighborOrder(layers[i], layers[i - 1], predecessors);
+
+            for (int i = layers.Count - 2; i >= 0; i--)
+                SortLayerByNeighborOrder(layers[i], layers[i + 1], successors);
+        }
+    }
+
+    private static void SortLayerByNeighborOrder(
+        List<NodeViewModel> layer,
+        List<NodeViewModel> referenceLayer,
+        IReadOnlyDictionary<NodeViewModel, List<NodeViewModel>> neighborLookup)
+    {
+        if (layer.Count <= 1 || referenceLayer.Count == 0)
+            return;
+
+        var refIndex = referenceLayer
+            .Select((node, index) => (node, index))
+            .ToDictionary(x => x.node, x => (double)x.index);
+
+        var withBarycenter = layer
+            .Select((node, index) =>
+            {
+                var neighbors = neighborLookup[node]
+                    .Where(refIndex.ContainsKey)
+                    .ToList();
+
+                var barycenter = neighbors.Count > 0
+                    ? neighbors.Average(n => refIndex[n])
+                    : (double)index;
+
+                var degree = neighborLookup[node].Count;
+                return (node, barycenter, degree, index);
+            })
+            .OrderBy(x => x.barycenter)
+            .ThenByDescending(x => x.degree)
+            .ThenBy(x => x.index)
+            .Select(x => x.node)
+            .ToList();
+
+        layer.Clear();
+        layer.AddRange(withBarycenter);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
