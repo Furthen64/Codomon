@@ -383,6 +383,7 @@ public class MainViewModel : INotifyPropertyChanged
     {
         await WorkspaceSerializer.SaveAsync(Workspace, folderPath);
         WorkspaceFolderPath = folderPath;
+        RecentWorkspacesService.AddOrUpdate(folderPath, Workspace.WorkspaceName, Math.Max(1, UserConfigService.Load().MaxRecentWorkspaces));
         IsDirty = false;
         StatusMessage = $"Saved: {folderPath}";
         StartAutosaveTimer();

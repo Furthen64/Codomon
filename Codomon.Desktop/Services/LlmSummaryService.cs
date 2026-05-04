@@ -397,6 +397,9 @@ public static class LlmSummaryService
                 throw new InvalidOperationException("LLM API returned a response with empty content.");
             }
 
+            if (finishReason == "length")
+                AppLogger.Warn("[LLM] Summary output may be truncated (finish_reason=length). Consider increasing MaxOutputTokens or reducing source size.");
+
             return content;
         }
         catch (OperationCanceledException oce)
