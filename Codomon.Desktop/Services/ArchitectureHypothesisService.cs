@@ -399,17 +399,40 @@ public static class ArchitectureHypothesisService
     /// </summary>
     private static void MergeHypothesis(ArchitectureHypothesisModel target, ArchitectureHypothesisModel source)
     {
-        var existingSystemNames = new HashSet<string>(
-            target.Systems.Select(s => s.Name ?? string.Empty),
-            StringComparer.OrdinalIgnoreCase);
-
         foreach (var s in source.Systems)
         {
-            if (!existingSystemNames.Contains(s.Name ?? string.Empty))
+            var existing = target.Systems.FirstOrDefault(x =>
+                string.Equals(x.Name ?? string.Empty, s.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
             {
                 target.Systems.Add(s);
-                existingSystemNames.Add(s.Name ?? string.Empty);
+                continue;
             }
+
+            // Merge modules by module name.
+            var existingModuleNames = new HashSet<string>(
+                existing.Modules.Select(m => m.Name ?? string.Empty),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var module in s.Modules)
+            {
+                if (!existingModuleNames.Contains(module.Name ?? string.Empty))
+                {
+                    existing.Modules.Add(module);
+                    existingModuleNames.Add(module.Name ?? string.Empty);
+                }
+            }
+
+            // Merge evidence strings.
+            var existingEvidence = new HashSet<string>(existing.Evidence ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            foreach (var ev in s.Evidence ?? new List<string>())
+            {
+                if (existingEvidence.Add(ev))
+                    existing.Evidence.Add(ev);
+            }
+
+            // Keep strongest confidence.
+            if ((int)s.Confidence > (int)existing.Confidence)
+                existing.Confidence = s.Confidence;
         }
 
         var existingHvnNames = new HashSet<string>(

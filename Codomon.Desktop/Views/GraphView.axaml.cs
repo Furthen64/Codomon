@@ -37,6 +37,12 @@ public partial class GraphView : UserControl
         FilterDependsCheck.IsCheckedChanged       += (_, _) => ApplyFilterChange();
         FilterImportsCheck.IsCheckedChanged       += (_, _) => ApplyFilterChange();
         FilterOtherKindsCheck.IsCheckedChanged    += (_, _) => ApplyFilterChange();
+
+        Editor.PointerReleased += (_, _) =>
+        {
+            if (DataContext is GraphViewModel vm)
+                vm.SavePositions();
+        };
     }
 
     private void ApplyFilterChange()
