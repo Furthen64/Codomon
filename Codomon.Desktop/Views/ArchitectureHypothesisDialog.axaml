@@ -23,15 +23,20 @@
     <!-- Bottom button bar -->
     <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
             BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
-      <DockPanel>
-        <Button Content="Close" Click="OnCloseClick" Padding="16,6" DockPanel.Dock="Left"/>
-        <TextBlock x:Name="StatusText" Text="" Foreground="#88AABB" FontSize="11"
-                   VerticalAlignment="Center" HorizontalAlignment="Right"/>
-      </DockPanel>
+      <StackPanel Spacing="8">
+        <DockPanel>
+          <Button Content="Close" Click="OnCloseClick" Padding="16,6" DockPanel.Dock="Left"/>
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button x:Name="BackStepButton" Content="← Back" Click="OnBackStepClick" Padding="12,6"/>
+            <Button x:Name="NextStepButton" Content="Next →" Click="OnNextStepClick" Padding="12,6" Background="#1A3A5A" Foreground="White"/>
+          </StackPanel>
+        </DockPanel>
+        <TextBlock x:Name="StatusText" Text="" Foreground="#88AABB" FontSize="11"/>
+      </StackPanel>
     </Border>
 
     <!-- Tab content -->
-    <TabControl Background="#111820">
+    <TabControl x:Name="WizardTabs" Background="#111820">
 
       <!-- ── Tab 1: Setup ───────────────────────────────────────────────── -->
       <TabItem Header="Setup">
@@ -146,16 +151,20 @@
         <DockPanel>
           <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
                   BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-            <TextBlock x:Name="SystemsHeaderText"
-                       Text="Suggested Systems — run or load a hypothesis first."
-                       Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
+            <DockPanel>
+              <TextBlock x:Name="SystemsHeaderText"
+                         Text="Suggested Systems — run or load a hypothesis first."
+                         Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
+              <Button Content="Save Markdown Overview" Click="OnSaveMarkdownOverviewClick"
+                      Padding="10,4" DockPanel.Dock="Right"/>
+            </DockPanel>
           </Border>
           <ListBox x:Name="SystemsListBox" Background="Transparent"/>
         </DockPanel>
       </TabItem>
 
       <!-- ── Tab 4: High-Value Nodes ────────────────────────────────────── -->
-      <TabItem Header="High-Value Nodes" x:Name="HvnTab">
+      <TabItem Header="Architecture Anchors" x:Name="HvnTab">
         <DockPanel>
           <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
                   BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
@@ -167,8 +176,8 @@
         </DockPanel>
       </TabItem>
 
-      <!-- ── Tab 5: Accept ──────────────────────────────────────────────── -->
-      <TabItem Header="Accept">
+      <!-- ── Tab 5: Confirm & Apply ─────────────────────────────────────── -->
+      <TabItem Header="Confirm &amp; Apply">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Margin="20,16" Spacing="16">
 

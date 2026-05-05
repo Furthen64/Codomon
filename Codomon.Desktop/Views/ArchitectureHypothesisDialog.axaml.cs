@@ -1,4 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
+using System.Text;
+using System.Linq;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Codomon.Desktop.Models;
@@ -45,6 +48,7 @@ public partial class ArchitectureHypothesisDialog : Window
             Dispatcher.UIThread.Post(RebuildHistoryList);
 
         Opened += async (_, _) => await OnDialogOpenedAsync();
+        UpdateWizardButtons();
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
@@ -149,7 +153,14 @@ public partial class ArchitectureHypothesisDialog : Window
     private async void OnRunSynthesisClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await _vm.RunSynthesisAsync();
+        if (_vm.CurrentHypothesis != null)
+        {
+            AutoAcceptRecommended();
+            _vm.StatusMessage = BuildRecommendedStatus();
+            MoveToTab(2);
+        }
         SyncStatusText();
+        UpdateWizardButtons();
     }
 
     private void OnCancelClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -514,6 +525,90 @@ public partial class ArchitectureHypothesisDialog : Window
         Close();
     }
 
+
+    private void AutoAcceptRecommended()
+    {
+        foreach (var sys in _vm.Systems.Where(s => s.Confidence == Models.SystemMap.ConfidenceLevel.Likely))
+            if (!sys.IsAccepted) _vm.AcceptSystem(sys);
+        foreach (var node in _vm.HighValueNodes.Where(n => n.Confidence == Models.SystemMap.ConfidenceLevel.Likely))
+            if (!node.IsAccepted) _vm.AcceptHighValueNode(node);
+    }
+
+    private string BuildRecommendedStatus()
+    {
+        var acceptedSystems = _vm.Systems.Count(s => s.IsAccepted);
+        var acceptedNodes = _vm.HighValueNodes.Count(n => n.IsAccepted);
+        return $"Synthesis complete. {acceptedSystems} recommended systems and {acceptedNodes} recommended nodes are ready to review.";
+    }
+
+    private async void OnSaveMarkdownOverviewClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm.CurrentHypothesis == null)
+        {
+            _vm.StatusMessage = "Run or load a hypothesis first.";
+            SyncStatusText();
+            return;
+        }
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save architecture overview",
+            SuggestedFileName = $"architecture_overview_{DateTime.UtcNow:yyyyMMdd_HHmmss}.md"
+        });
+        if (file == null) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("# Architecture Overview");
+        sb.AppendLine();
+        sb.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine();
+        sb.AppendLine("## Systems");
+        foreach (var s in _vm.Systems)
+        {
+            sb.AppendLine($"- **{s.Name}** ({s.Kind}, {s.Confidence})");
+            foreach (var ev in s.Evidence.Take(5)) sb.AppendLine($"  - Evidence: `{ev}`");
+        }
+        sb.AppendLine();
+        sb.AppendLine("## Architecture Anchors");
+        foreach (var n in _vm.HighValueNodes)
+            sb.AppendLine($"- **{n.Name}** ({n.Signal}, {n.Confidence}) — {n.Reason}");
+
+        await using var stream = await file.OpenWriteAsync();
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(sb.ToString());
+
+        _vm.StatusMessage = $"Saved Markdown overview: {file.Name}";
+        SyncStatusText();
+    }
+
+    private void OnBackStepClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => MoveStep(-1);
+    private void OnNextStepClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => MoveStep(1);
+
+    private void MoveStep(int delta)
+    {
+        var tabs = this.FindControl<TabControl>("WizardTabs");
+        if (tabs == null) return;
+        var target = Math.Clamp(tabs.SelectedIndex + delta, 0, tabs.ItemCount - 1);
+        MoveToTab(target);
+    }
+
+    private void MoveToTab(int index)
+    {
+        var tabs = this.FindControl<TabControl>("WizardTabs");
+        if (tabs == null) return;
+        tabs.SelectedIndex = index;
+        UpdateWizardButtons();
+    }
+
+    private void UpdateWizardButtons()
+    {
+        var tabs = this.FindControl<TabControl>("WizardTabs");
+        var back = this.FindControl<Button>("BackStepButton");
+        var next = this.FindControl<Button>("NextStepButton");
+        if (tabs == null || back == null || next == null) return;
+        back.IsEnabled = tabs.SelectedIndex > 0;
+        next.IsEnabled = tabs.SelectedIndex < tabs.ItemCount - 1;
+    }
     // ── Shared ────────────────────────────────────────────────────────────────
 
     private void SyncStatusText()
