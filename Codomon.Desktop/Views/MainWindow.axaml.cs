@@ -1587,6 +1587,7 @@ public partial class MainWindow : Window
         view.ShowDetailedRelationshipsRequested += OnShowDetailedRelationshipsRequested;
         view.ClearCanvasRequested += OnSystemMapClearCanvasRequested;
         view.LayoutPositionChanged += OnSystemMapLayoutPositionChanged;
+        view.RemoveRelationshipRequested += OnSystemMapRemoveRelationshipRequested;
         host.Content = view;
         AppLogger.Debug("System Map view initialized");
     }
@@ -1625,6 +1626,37 @@ public partial class MainWindow : Window
         _vm.IsDirty = true;
 
         AppLogger.Debug("[SystemMap] Canvas cleared and views refreshed.");
+    }
+
+    private void OnSystemMapRemoveRelationshipRequested(string relationshipId)
+    {
+        if (!_vm.HasWorkspace) return;
+
+        var map = _vm.Workspace.SystemMap;
+        var rel = map.Relationships.FirstOrDefault(r =>
+            string.Equals(r.Id, relationshipId, StringComparison.Ordinal));
+
+        if (rel == null)
+        {
+            AppLogger.Warn($"[SystemMap] RemoveRelationship: relationship '{relationshipId}' not found. Skipped.");
+            return;
+        }
+
+        // Record the override so it survives re-analysis.
+        var override_ = new ManualOverrideModel
+        {
+            Id       = Guid.NewGuid().ToString(),
+            Type     = ManualOverrideType.RemoveRelationship,
+            TargetId = relationshipId,
+        };
+        map.ManualOverrides.Add(override_);
+        map.Relationships.Remove(rel);
+
+        AppLogger.Info($"[SystemMap] Relationship '{rel.FromId}' → '{rel.ToId}' ({rel.Kind}) removed via ManualOverride.");
+
+        _vm.SystemMap.LoadFrom(map, _vm.Workspace.ActiveProfile?.LayoutPositions);
+        _vm.Graph.RefreshFromSystemMap(map);
+        _vm.IsDirty = true;
     }
 
     // ── Timeline ──────────────────────────────────────────────────────────────

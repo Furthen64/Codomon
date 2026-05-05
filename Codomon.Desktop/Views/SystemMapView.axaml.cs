@@ -23,6 +23,7 @@ public partial class SystemMapView : UserControl
     private readonly SystemMapViewModel _vm;
     private DragState? _dragState;
     private bool _showAppLibSeparator;
+    private bool _showLayerBands;
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
     /// currently selected system in Module View.
@@ -38,6 +39,12 @@ public partial class SystemMapView : UserControl
     /// Raised when a System Overview card has been repositioned.
     /// </summary>
     public event Action<string, bool, double, double>? LayoutPositionChanged;
+
+    /// <summary>
+    /// Raised when the user requests deleting a relationship from the System Map.
+    /// The string argument is the relationship ID.
+    /// </summary>
+    public event Action<string>? RemoveRelationshipRequested;
     // ── Active-view button accent colour ─────────────────────────────────
     private static readonly IBrush ActiveButtonBg   = new SolidColorBrush(Color.Parse("#1A4A6A"));
     private static readonly IBrush InactiveButtonBg = new SolidColorBrush(Color.Parse("#1A2435"));
@@ -47,6 +54,10 @@ public partial class SystemMapView : UserControl
     private const double ArrowCardHalfWidth  = 110.0;
     /// <summary>Approximate half-height of a typical system card; used for card-edge intersection.</summary>
     private const double ArrowCardHalfHeight =  65.0;
+    /// <summary>Half of the fixed 180 px external-system card width.</summary>
+    private const double ExternalCardHalfWidth  = 90.0;
+    /// <summary>Approximate half-height of an external system card.</summary>
+    private const double ExternalCardHalfHeight = 50.0;
     /// <summary>Horizontal offset applied when centering the arrow label over its midpoint.</summary>
     private const double ArrowLabelOffsetX   =  20.0;
     /// <summary>Vertical offset applied when centering the arrow label over its midpoint.</summary>
@@ -98,6 +109,7 @@ public partial class SystemMapView : UserControl
         RefreshCodeDetailView();
         RefreshStartupView();
         UpdateInspector();
+        UpdateInspectorActionPanel();
     }
 
     // ── View switching ────────────────────────────────────────────────────
@@ -233,6 +245,15 @@ public partial class SystemMapView : UserControl
                 }
             };
 
+            // Show up to 4 module-kind mini badges as a breakdown row.
+            if (item.ModuleKindCounts.Count > 0)
+            {
+                var kindRow = new WrapPanel { Orientation = Orientation.Horizontal };
+                foreach (var (kind, count) in item.ModuleKindCounts)
+                    kindRow.Children.Add(MakeBadge($"{AbbreviateModuleKind(kind)}×{count}", "#0F1F2A", "#5A8ABF"));
+                moduleInfo.Children.Add(kindRow);
+            }
+
             details.Children.Add(moduleInfo);
         }
 
@@ -308,9 +329,9 @@ public partial class SystemMapView : UserControl
             }
         };
 
-        var externalCanvas = this.FindControl<Canvas>("ExternalSystemsCanvas");
-        if (externalCanvas != null)
-            WireOverviewCardDrag(card, externalCanvas, item.Id, isExternal: true, () => _vm.SelectExternalSystem(item));
+        var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
+        if (systemsCanvas != null)
+            WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: true, () => _vm.SelectExternalSystem(item));
 
         return card;
     }
@@ -504,21 +525,23 @@ public partial class SystemMapView : UserControl
     private void RefreshSystemOverview()
     {
         var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas")!;
-        var externalCanvas = this.FindControl<Canvas>("ExternalSystemsCanvas")!;
         var emptyText  = this.FindControl<TextBlock>("EmptySystemOverviewText")!;
         var sysSection = this.FindControl<StackPanel>("SystemsSection")!;
-        var extSection = this.FindControl<StackPanel>("ExternalSystemsSection")!;
-        var noExtText  = this.FindControl<TextBlock>("NoExternalSystemsText")!;
 
         bool hasSystems = _vm.Systems.Count > 0;
-        bool hasExt     = _vm.ExternalSystems.Count > 0;
+        bool hasExt     = _vm.ShowExternalSystems && _vm.ExternalSystems.Count > 0;
 
         emptyText.IsVisible  = !hasSystems && !hasExt;
-        sysSection.IsVisible = hasSystems;
-        extSection.IsVisible = _vm.ShowExternalSystems;
+        sysSection.IsVisible = hasSystems || hasExt;
 
         systemsCanvas.Children.Clear();
-        DrawRelationshipArrows(systemsCanvas);   // arrows first — cards render on top
+
+        // Draw in z-order: bands → arrows → cards (each layer renders on top of the previous).
+        if (_showLayerBands)
+            DrawLayerBands(systemsCanvas);
+
+        DrawRelationshipArrows(systemsCanvas);
+
         foreach (var system in _vm.Systems)
         {
             if (BuildSystemCard(system, null) is not Border card) continue;
@@ -527,22 +550,23 @@ public partial class SystemMapView : UserControl
             Canvas.SetTop(card, system.Y);
         }
 
-        // Draw the app/library separator when the sort-by-type layout is active.
         if (_showAppLibSeparator)
             AddAppLibrarySeparator(systemsCanvas);
 
-        externalCanvas.Children.Clear();
-        foreach (var external in _vm.ExternalSystems)
+        // External system cards are placed on the same unified canvas, below the system section.
+        if (_vm.ShowExternalSystems && _vm.ExternalSystems.Count > 0)
         {
-            if (BuildExternalSystemCard(external, null) is not Border card) continue;
-            externalCanvas.Children.Add(card);
-            Canvas.SetLeft(card, external.X);
-            Canvas.SetTop(card, external.Y);
+            AddExternalSystemsSectionLabel(systemsCanvas);
+            foreach (var external in _vm.ExternalSystems)
+            {
+                if (BuildExternalSystemCard(external, null) is not Border card) continue;
+                systemsCanvas.Children.Add(card);
+                Canvas.SetLeft(card, external.X);
+                Canvas.SetTop(card, external.Y);
+            }
         }
 
-        UpdateCanvasExtent(systemsCanvas, minimumWidth: 980, minimumHeight: 200);
-        UpdateCanvasExtent(externalCanvas, minimumWidth: 840, minimumHeight: 160);
-        noExtText.IsVisible = _vm.ShowExternalSystems && !hasExt;
+        UpdateCanvasExtent(systemsCanvas, minimumWidth: 980, minimumHeight: 600);
     }
 
     private void RefreshModuleView()
@@ -631,6 +655,13 @@ public partial class SystemMapView : UserControl
 
     // ── VM property change handler ────────────────────────────────────────
 
+    private void UpdateInspectorActionPanel()
+    {
+        var panel = this.FindControl<Border>("InspRelActionPanel");
+        if (panel != null)
+            panel.IsVisible = _vm.SelectedRelationship != null;
+    }
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
@@ -646,6 +677,10 @@ public partial class SystemMapView : UserControl
             case nameof(SystemMapViewModel.InspectorConfidence):
             case nameof(SystemMapViewModel.InspectorDetails):
                 UpdateInspector();
+                break;
+
+            case nameof(SystemMapViewModel.SelectedRelationship):
+                UpdateInspectorActionPanel();
                 break;
 
             case nameof(SystemMapViewModel.SelectedSystemName):
@@ -681,6 +716,7 @@ public partial class SystemMapView : UserControl
     public void OnClearCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _showAppLibSeparator = false;
+        _showLayerBands = false;
         ClearCanvasRequested?.Invoke();
     }
 
@@ -694,6 +730,7 @@ public partial class SystemMapView : UserControl
 
     public void OnSortAppsFromLibrariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        _showLayerBands = false;
         var updates = _vm.SortAppsFromLibraries();
         _showAppLibSeparator = updates.Count > 0;
         foreach (var (id, x, y) in updates)
@@ -704,10 +741,28 @@ public partial class SystemMapView : UserControl
     public void OnArrangeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _showAppLibSeparator = false;
+        _showLayerBands = false;
         var updates = _vm.ArrangeAlphabetically();
         foreach (var (id, x, y) in updates)
             LayoutPositionChanged?.Invoke(id, false, x, y);
         RefreshSystemOverview();
+    }
+
+    public void OnSortByLayersClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _showAppLibSeparator = false;
+        var (updates, hasMultipleLayers) = _vm.SortByLayers();
+        _showLayerBands = hasMultipleLayers;
+        foreach (var (id, x, y) in updates)
+            LayoutPositionChanged?.Invoke(id, false, x, y);
+        RefreshSystemOverview();
+    }
+
+    public void OnRemoveRelationshipClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var rel = _vm.SelectedRelationship;
+        if (rel == null) return;
+        RemoveRelationshipRequested?.Invoke(rel.Id);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -770,6 +825,128 @@ public partial class SystemMapView : UserControl
         Canvas.SetTop(sectionLabel, sepY + 6);
         canvas.Children.Add(sectionLabel);
     }
+
+    /// <summary>
+    /// Draws coloured semi-transparent background bands on <paramref name="canvas"/>,
+    /// one per architectural layer, covering the Y range occupied by systems in that layer.
+    /// Called before arrows and cards so it appears at the lowest z-order.
+    /// </summary>
+    private void DrawLayerBands(Canvas canvas)
+    {
+        if (_vm.Systems.Count == 0) return;
+
+        const double bandPadY = 18.0;
+        // Approximate card height for band sizing — cards vary but this gives consistent-looking bands.
+        const double cardApproxHeight = ArrowCardHalfHeight * 2 + 20;
+        const double bandWidth = 8000;
+
+        var layerColors = new Dictionary<ArchitectureLayerKind, string>
+        {
+            { ArchitectureLayerKind.Presentation,  "#0E1B0E" },
+            { ArchitectureLayerKind.Application,   "#0E0E1B" },
+            { ArchitectureLayerKind.Domain,        "#1B1B0E" },
+            { ArchitectureLayerKind.Infrastructure,"#1B0E1B" }
+        };
+
+        var layerLabels = new Dictionary<ArchitectureLayerKind, string>
+        {
+            { ArchitectureLayerKind.Presentation,  "PRESENTATION" },
+            { ArchitectureLayerKind.Application,   "APPLICATION" },
+            { ArchitectureLayerKind.Domain,        "DOMAIN" },
+            { ArchitectureLayerKind.Infrastructure,"INFRASTRUCTURE" }
+        };
+
+        var layerLabelColors = new Dictionary<ArchitectureLayerKind, string>
+        {
+            { ArchitectureLayerKind.Presentation,  "#1E4A1E" },
+            { ArchitectureLayerKind.Application,   "#1E1E4A" },
+            { ArchitectureLayerKind.Domain,        "#4A4A1E" },
+            { ArchitectureLayerKind.Infrastructure,"#4A1E4A" }
+        };
+
+        foreach (ArchitectureLayerKind layer in Enum.GetValues<ArchitectureLayerKind>())
+        {
+            var systems = _vm.Systems.Where(s => s.LayerKind == layer).ToList();
+            if (systems.Count == 0) continue;
+
+            double minY = systems.Min(s => s.Y) - bandPadY;
+            double maxY = systems.Max(s => s.Y) + cardApproxHeight + bandPadY;
+            double bandHeight = Math.Max(10, maxY - minY);
+
+            var band = new Rectangle
+            {
+                Width  = bandWidth,
+                Height = bandHeight,
+                Fill   = new SolidColorBrush(Color.Parse(layerColors[layer])),
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(band, 0);
+            Canvas.SetTop(band, minY);
+            canvas.Children.Add(band);
+
+            var lbl = new TextBlock
+            {
+                Text          = layerLabels[layer],
+                FontSize      = 8,
+                FontWeight    = FontWeight.Bold,
+                Foreground    = new SolidColorBrush(Color.Parse(layerLabelColors[layer])),
+                LetterSpacing = 1,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(lbl, 4);
+            Canvas.SetTop(lbl, minY + 4);
+            canvas.Children.Add(lbl);
+        }
+    }
+
+    /// <summary>
+    /// Adds an "EXTERNAL SYSTEMS" section header and a horizontal rule to the unified canvas
+    /// just above the topmost external system card.
+    /// </summary>
+    private void AddExternalSystemsSectionLabel(Canvas canvas)
+    {
+        if (_vm.ExternalSystems.Count == 0) return;
+
+        double minExtY = _vm.ExternalSystems.Min(e => e.Y);
+        double sepY = minExtY - 24;
+
+        var line = new Border
+        {
+            Height     = 1,
+            Width      = 4000,
+            Background = new SolidColorBrush(Color.Parse("#2A3F5A")),
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(line, 0);
+        Canvas.SetTop(line, sepY);
+        canvas.Children.Add(line);
+
+        var lbl = new TextBlock
+        {
+            Text          = "EXTERNAL SYSTEMS",
+            FontSize      = 9,
+            FontWeight    = FontWeight.Bold,
+            Foreground    = new SolidColorBrush(Color.Parse("#4A6A8A")),
+            LetterSpacing = 1,
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(lbl, 24);
+        Canvas.SetTop(lbl, sepY + 6);
+        canvas.Children.Add(lbl);
+    }
+
+    private static string AbbreviateModuleKind(string kind) => kind switch
+    {
+        "Presentation"   => "Pres",
+        "BusinessLogic"  => "Logic",
+        "DataAccess"     => "Data",
+        "Infrastructure" => "Infra",
+        "Api"            => "API",
+        "Configuration"  => "Cfg",
+        "Utility"        => "Util",
+        "Integration"    => "Integ",
+        _ => kind.Length > 5 ? kind[..5] : kind
+    };
 
     private static Control BuildModuleSizeIndicator(int moduleCount)
     {
@@ -910,6 +1087,8 @@ public partial class SystemMapView : UserControl
             _vm.SetOverviewPosition(dragState.ItemId, x, y, dragState.IsExternal);
             LayoutPositionChanged?.Invoke(dragState.ItemId, dragState.IsExternal, x, y);
             UpdateCanvasExtent(dragState.Canvas, minimumWidth: 720, minimumHeight: 140);
+            // Manual drag invalidates the layer band layout.
+            _showLayerBands = false;
             // Redraw arrows from the updated card positions.
             RefreshSystemOverview();
         }
@@ -951,28 +1130,40 @@ public partial class SystemMapView : UserControl
 
     /// <summary>
     /// Draws typed directional arrows for all <see cref="SystemMapViewModel.VisibleRelationships"/>
-    /// whose both endpoints are Systems on this canvas.  Arrows are added before cards so that
-    /// cards always render on top in canvas z-order.
+    /// on the unified canvas.  Arrows are added before cards so cards always render on top.
+    /// Same-direction relationships between the same pair of endpoints are bundled into one
+    /// arrow with a combined label to avoid overlapping lines.
     /// </summary>
     private void DrawRelationshipArrows(Canvas canvas)
     {
         if (_vm.VisibleRelationships.Count == 0)
             return;
 
-        // Index the centre-point of every visible System card.
-        var systemCenters = _vm.Systems.ToDictionary(
-            s => s.Id,
-            s => new Point(s.X + ArrowCardHalfWidth, s.Y + ArrowCardHalfHeight),
-            StringComparer.Ordinal);
+        // Build a center-point lookup for all entities (systems + external systems).
+        var centers = new Dictionary<string, Point>(StringComparer.Ordinal);
+        var halfDims = new Dictionary<string, (double Hw, double Hh)>(StringComparer.Ordinal);
 
-        foreach (var rel in _vm.VisibleRelationships)
+        foreach (var s in _vm.Systems)
         {
-            if (rel.FromId == rel.ToId) continue;   // skip self-loops
+            centers[s.Id]  = new Point(s.X + ArrowCardHalfWidth, s.Y + ArrowCardHalfHeight);
+            halfDims[s.Id] = (ArrowCardHalfWidth, ArrowCardHalfHeight);
+        }
+        foreach (var e in _vm.ExternalSystems)
+        {
+            centers[e.Id]  = new Point(e.X + ExternalCardHalfWidth, e.Y + ExternalCardHalfHeight);
+            halfDims[e.Id] = (ExternalCardHalfWidth, ExternalCardHalfHeight);
+        }
 
-            // Only draw arrows between Systems on this canvas; skip External↔External
-            // and System↔External (which are on a separate canvas).
-            if (!systemCenters.TryGetValue(rel.FromId, out var fromCenter)) continue;
-            if (!systemCenters.TryGetValue(rel.ToId,   out var toCenter))   continue;
+        // Bundle same-direction relationships between the same pair into one arrow.
+        var grouped = _vm.VisibleRelationships
+            .Where(r => r.FromId != r.ToId)
+            .GroupBy(r => (r.FromId, r.ToId));
+
+        foreach (var group in grouped)
+        {
+            var rels = group.ToList();
+            if (!centers.TryGetValue(rels[0].FromId, out var fromCenter)) continue;
+            if (!centers.TryGetValue(rels[0].ToId,   out var toCenter))   continue;
 
             double dx  = toCenter.X - fromCenter.X;
             double dy  = toCenter.Y - fromCenter.Y;
@@ -982,12 +1173,17 @@ public partial class SystemMapView : UserControl
             double ux = dx / len;
             double uy = dy / len;
 
-            // Exit point on the source card's border, entry point on the target card's border.
-            var fromPt = ComputeCardEdge(fromCenter,  ux,  uy, ArrowCardHalfWidth, ArrowCardHalfHeight);
-            var toPt   = ComputeCardEdge(toCenter,   -ux, -uy, ArrowCardHalfWidth, ArrowCardHalfHeight);
+            var (fromHw, fromHh) = halfDims[rels[0].FromId];
+            var (toHw,   toHh)   = halfDims[rels[0].ToId];
 
-            var brush = new SolidColorBrush(Color.Parse(RelationshipColor(rel.Kind)));
-            AddArrowToCanvas(canvas, fromPt, toPt, brush, rel.Label, rel);
+            var fromPt = ComputeCardEdge(fromCenter,  ux,  uy, fromHw, fromHh);
+            var toPt   = ComputeCardEdge(toCenter,   -ux, -uy, toHw,   toHh);
+
+            // Use the colour of the first relationship; build a combined label.
+            var brush = new SolidColorBrush(Color.Parse(RelationshipColor(rels[0].Kind)));
+            string label = string.Join(", ", rels.Select(r => r.Label).Distinct());
+            // For the inspector, clicking the arrow selects the first relationship in the group.
+            AddArrowToCanvas(canvas, fromPt, toPt, brush, label, rels[0]);
         }
     }
 

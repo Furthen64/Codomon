@@ -27,6 +27,9 @@ public class SystemItemVm
     public int ModuleCount         { get; init; }
     public double X                { get; set; }
     public double Y                { get; set; }
+    public ArchitectureLayerKind LayerKind { get; init; }
+    /// <summary>Top module kinds for this system, in descending order of count.</summary>
+    public IReadOnlyList<(string Kind, int Count)> ModuleKindCounts { get; init; } = Array.Empty<(string, int)>();
 
     /// <summary>True when this system is a class-library rather than a runnable app.</summary>
     public bool IsLibrary =>
@@ -84,6 +87,15 @@ public class StartupItemVm
     public List<string> EntryPoints { get; init; } = new();
 }
 
+/// <summary>The architectural tier a System belongs to in the layered architecture view.</summary>
+public enum ArchitectureLayerKind
+{
+    Presentation,
+    Application,
+    Domain,
+    Infrastructure
+}
+
 /// <summary>
 /// Item view-model for a visible typed relationship between two top-level entities
 /// (System → System, System → External System, or External System → System).
@@ -113,6 +125,11 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private const double CardGapX = 248;
     private const double CardGapY = 148;
     private const int CardsPerRow = 4;
+    /// <summary>
+    /// Default base row for external system card layout on the unified canvas.
+    /// Keeps externals below the typical system area without hard-coding a pixel offset.
+    /// </summary>
+    internal const int ExternalBaseRow = 4;
 
     /// <summary>Characters treated as token separators when parsing names in CleanupNames.</summary>
     private static readonly char[] NameSeparators = { '.', '-', '_', ' ' };
@@ -127,6 +144,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private SystemMapViewKind _activeView = SystemMapViewKind.SystemOverview;
     private SystemItemVm? _selectedSystem;
     private ModuleItemVm? _selectedModule;
+    private RelationshipItemVm? _selectedRelationship;
     private bool _showExternalSystems    = true;
     private bool _showStartupRelationships = false;
     private bool _showLowConfidenceItems = true;
@@ -227,6 +245,13 @@ public class SystemMapViewModel : INotifyPropertyChanged
     public string SelectedSystemName => _selectedSystem?.Name ?? "(none selected)";
     public string SelectedModuleName => _selectedModule?.Name ?? "(none selected)";
 
+    /// <summary>The relationship currently shown in the inspector, or null if none selected.</summary>
+    public RelationshipItemVm? SelectedRelationship
+    {
+        get => _selectedRelationship;
+        private set { _selectedRelationship = value; OnPropertyChanged(); }
+    }
+
     // ── Inspector ──────────────────────────────────────────────────────────
 
     private string       _inspectorName       = "Nothing selected";
@@ -280,23 +305,34 @@ public class SystemMapViewModel : INotifyPropertyChanged
     {
         SelectedSystem = sys;
         SelectedModule = null;
+        SelectedRelationship = null;
         UpdateInspectorForSystem(sys);
     }
 
     public void SelectModule(ModuleItemVm? mod)
     {
         SelectedModule = mod;
+        SelectedRelationship = null;
         UpdateInspectorForModule(mod);
     }
 
     public void SelectExternalSystem(ExternalSystemItemVm? ext)
-        => UpdateInspectorForExternalSystem(ext);
+    {
+        SelectedRelationship = null;
+        UpdateInspectorForExternalSystem(ext);
+    }
 
     public void SelectCodeNode(CodeNodeItemVm? node)
-        => UpdateInspectorForCodeNode(node);
+    {
+        SelectedRelationship = null;
+        UpdateInspectorForCodeNode(node);
+    }
 
     public void SelectRelationship(RelationshipItemVm rel)
-        => UpdateInspectorForRelationship(rel);
+    {
+        SelectedRelationship = rel;
+        UpdateInspectorForRelationship(rel);
+    }
 
     /// <summary>
     /// Rebuilds all collections from <paramref name="model"/>.
@@ -320,6 +356,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 StartupMechanism = s.StartupMechanism,
                 Confidence       = s.Confidence,
                 ModuleCount      = CountModulesForSystem(model, s),
+                LayerKind        = ClassifySystemLayer(s.Kind, s.StartupMechanism),
+                ModuleKindCounts = GetModuleKindCounts(model, s),
                 X                = position.X,
                 Y                = position.Y
             };
@@ -423,8 +461,10 @@ public class SystemMapViewModel : INotifyPropertyChanged
         // Reset selection state.
         _selectedSystem = null;
         _selectedModule = null;
+        _selectedRelationship = null;
         OnPropertyChanged(nameof(SelectedSystemName));
         OnPropertyChanged(nameof(SelectedModuleName));
+        OnPropertyChanged(nameof(SelectedRelationship));
 
         ClearInspector();
         ApplyFilters();
@@ -654,6 +694,53 @@ public class SystemMapViewModel : INotifyPropertyChanged
         return updates;
     }
 
+    /// <summary>
+    /// Sorts system cards into four architectural layer rows
+    /// (Presentation → Application → Domain → Infrastructure), each layer occupying
+    /// its own row group separated by a blank row.
+    /// Returns (position updates, whether two or more distinct layers are present).
+    /// </summary>
+    public (List<(string Id, double X, double Y)> Updates, bool HasMultipleLayers) SortByLayers()
+    {
+        var layerOrder = new[]
+        {
+            ArchitectureLayerKind.Presentation,
+            ArchitectureLayerKind.Application,
+            ArchitectureLayerKind.Domain,
+            ArchitectureLayerKind.Infrastructure
+        };
+
+        var updates = new List<(string Id, double X, double Y)>();
+        int currentBaseRow = 0;
+        int nonEmptyLayerCount = 0;
+
+        foreach (var layer in layerOrder)
+        {
+            var systemsInLayer = _allSystems
+                .Where(s => s.LayerKind == layer)
+                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (systemsInLayer.Count == 0) continue;
+            nonEmptyLayerCount++;
+
+            for (int i = 0; i < systemsInLayer.Count; i++)
+            {
+                var pos = CreateGridPosition(i, baseRow: currentBaseRow);
+                systemsInLayer[i].X = pos.X;
+                systemsInLayer[i].Y = pos.Y;
+                updates.Add((systemsInLayer[i].Id, pos.X, pos.Y));
+            }
+
+            // Advance past this layer's rows and leave one blank row as a visual gap.
+            int rowsUsed = (systemsInLayer.Count + CardsPerRow - 1) / CardsPerRow;
+            currentBaseRow += rowsUsed + 1;
+        }
+
+        ApplyFilters();
+        return (updates, nonEmptyLayerCount > 1);
+    }
+
     public void SetOverviewPosition(string itemId, double x, double y, bool isExternal)
     {
         if (isExternal)
@@ -692,6 +779,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 : new List<ExternalSystemItemVm>());
 
         // Relationships are visible when both endpoints are in the currently visible sets.
+        // Depends-kind relationships are treated as "startup edges" and hidden unless
+        // the ShowStartupRelationships filter is active (avoids cluttering the canvas by default).
         var visibleSystemIds   = Systems.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
         var visibleExternalIds = ExternalSystems.Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
 
@@ -699,7 +788,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
             _allRelationships
                 .Where(r =>
                     (visibleSystemIds.Contains(r.FromId) || visibleExternalIds.Contains(r.FromId)) &&
-                    (visibleSystemIds.Contains(r.ToId)   || visibleExternalIds.Contains(r.ToId)))
+                    (visibleSystemIds.Contains(r.ToId)   || visibleExternalIds.Contains(r.ToId))   &&
+                    (ShowStartupRelationships || r.Kind != RelationshipKind.Depends))
                 .ToList());
 
         SyncCollection(StartupItems,
@@ -783,9 +873,16 @@ public class SystemMapViewModel : INotifyPropertyChanged
         int index)
     {
         if (TryGetSavedPosition(GetLayoutPositionKey(externalSystemId, isExternal: true), layoutPositions, out var saved))
+        {
+            // If the saved Y is below the external baseline, it was saved before the unified
+            // canvas migration.  Shift it into the external zone so it no longer overlaps systems.
+            double threshold = ExternalBaseRow * CardGapY;
+            if (saved.Y < threshold)
+                return new LayoutPosition { X = saved.X, Y = saved.Y + threshold };
             return saved;
+        }
 
-        return CreateGridPosition(index, baseRow: 0);
+        return CreateGridPosition(index, baseRow: ExternalBaseRow);
     }
 
     private static bool TryGetSavedPosition(
@@ -943,6 +1040,43 @@ public class SystemMapViewModel : INotifyPropertyChanged
         }
 
         return systemIds;
+    }
+
+    /// <summary>Maps a system's <see cref="SystemKind"/> to its architectural layer tier.</summary>
+    private static ArchitectureLayerKind ClassifySystemLayer(SystemKind kind, string startupMechanism)
+    {
+        if (string.Equals(startupMechanism, "Class Library", StringComparison.OrdinalIgnoreCase))
+            return ArchitectureLayerKind.Infrastructure;
+
+        return kind switch
+        {
+            SystemKind.DesktopApp or SystemKind.WebApp or SystemKind.CliTool
+                => ArchitectureLayerKind.Presentation,
+            SystemKind.BackendService or SystemKind.WorkerService or SystemKind.ScheduledJob
+                => ArchitectureLayerKind.Application,
+            SystemKind.DatabaseProcess or SystemKind.LibraryOnly
+                => ArchitectureLayerKind.Infrastructure,
+            _ => ArchitectureLayerKind.Domain
+        };
+    }
+
+    /// <summary>
+    /// Returns the top module kinds for a system in descending order of count.
+    /// At most four distinct kinds are returned.
+    /// </summary>
+    private static IReadOnlyList<(string Kind, int Count)> GetModuleKindCounts(
+        SystemMapModel map, SystemModel system)
+    {
+        var relevant = map.AllModules.Where(m =>
+            system.Modules.Any(sm => string.Equals(sm.Id, m.Id, StringComparison.Ordinal)) ||
+            m.SystemIds.Any(sid => string.Equals(sid, system.Id, StringComparison.Ordinal)));
+
+        return relevant
+            .GroupBy(m => m.Kind.ToString())
+            .OrderByDescending(g => g.Count())
+            .Take(4)
+            .Select(g => (g.Key, g.Count()))
+            .ToList();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
