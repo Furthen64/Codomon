@@ -24,6 +24,7 @@ public partial class SystemMapView : UserControl
     private DragState? _dragState;
     private bool _showAppLibSeparator;
     private bool _showLayerBands;
+    private double _zoomLevel = 1.0;
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
     /// currently selected system in Module View.
@@ -89,6 +90,7 @@ public partial class SystemMapView : UserControl
 
         WireFilterCheckBoxes();
         WireViewButtons();
+        WireZoomButtons();
         SetupItemTemplates();
 
         _vm.PropertyChanged   += OnViewModelPropertyChanged;
@@ -125,6 +127,32 @@ public partial class SystemMapView : UserControl
         btnModule.Click   += (_, _) => _vm.SetActiveView(SystemMapViewKind.ModuleView);
         btnCode.Click     += (_, _) => _vm.SetActiveView(SystemMapViewKind.CodeDetailView);
         btnStartup.Click  += (_, _) => _vm.SetActiveView(SystemMapViewKind.StartupView);
+    }
+
+    // ── Zoom controls ─────────────────────────────────────────────────────
+
+    private void WireZoomButtons()
+    {
+        var zoomIn    = this.FindControl<Button>("ZoomInButton")!;
+        var zoomOut   = this.FindControl<Button>("ZoomOutButton")!;
+        var zoomReset = this.FindControl<Button>("ZoomResetButton")!;
+
+        zoomIn.Click    += (_, _) => SetZoom(Math.Min(3.0, _zoomLevel + 0.25));
+        zoomOut.Click   += (_, _) => SetZoom(Math.Max(0.25, _zoomLevel - 0.25));
+        zoomReset.Click += (_, _) => SetZoom(1.0);
+    }
+
+    private void SetZoom(double level)
+    {
+        _zoomLevel = level;
+
+        var zoomText = this.FindControl<TextBlock>("ZoomLevelText");
+        if (zoomText != null)
+            zoomText.Text = $"{(int)Math.Round(_zoomLevel * 100)}%";
+
+        var zoomCtrl = this.FindControl<LayoutTransformControl>("CanvasZoomControl");
+        if (zoomCtrl != null)
+            zoomCtrl.LayoutTransform = new ScaleTransform(_zoomLevel, _zoomLevel);
     }
 
     private void ShowView(SystemMapViewKind view)
@@ -566,6 +594,7 @@ public partial class SystemMapView : UserControl
             }
         }
 
+        DrawMapLegend(systemsCanvas);
         UpdateCanvasExtent(systemsCanvas, minimumWidth: 980, minimumHeight: 600);
     }
 
@@ -842,10 +871,18 @@ public partial class SystemMapView : UserControl
 
         var layerColors = new Dictionary<ArchitectureLayerKind, string>
         {
-            { ArchitectureLayerKind.Presentation,  "#0E1B0E" },
-            { ArchitectureLayerKind.Application,   "#0E0E1B" },
-            { ArchitectureLayerKind.Domain,        "#1B1B0E" },
-            { ArchitectureLayerKind.Infrastructure,"#1B0E1B" }
+            { ArchitectureLayerKind.Presentation,  "#0C1E0C" },
+            { ArchitectureLayerKind.Application,   "#0A0C22" },
+            { ArchitectureLayerKind.Domain,        "#1E1C08" },
+            { ArchitectureLayerKind.Infrastructure,"#1C0A1C" }
+        };
+
+        var layerBorderColors = new Dictionary<ArchitectureLayerKind, string>
+        {
+            { ArchitectureLayerKind.Presentation,  "#1E6A1E" },
+            { ArchitectureLayerKind.Application,   "#1E1E6A" },
+            { ArchitectureLayerKind.Domain,        "#6A6A1E" },
+            { ArchitectureLayerKind.Infrastructure,"#6A1E6A" }
         };
 
         var layerLabels = new Dictionary<ArchitectureLayerKind, string>
@@ -858,10 +895,10 @@ public partial class SystemMapView : UserControl
 
         var layerLabelColors = new Dictionary<ArchitectureLayerKind, string>
         {
-            { ArchitectureLayerKind.Presentation,  "#1E4A1E" },
-            { ArchitectureLayerKind.Application,   "#1E1E4A" },
-            { ArchitectureLayerKind.Domain,        "#4A4A1E" },
-            { ArchitectureLayerKind.Infrastructure,"#4A1E4A" }
+            { ArchitectureLayerKind.Presentation,  "#3ABF3A" },
+            { ArchitectureLayerKind.Application,   "#3A7FFF" },
+            { ArchitectureLayerKind.Domain,        "#DFAA44" },
+            { ArchitectureLayerKind.Infrastructure,"#BF44BF" }
         };
 
         foreach (ArchitectureLayerKind layer in Enum.GetValues<ArchitectureLayerKind>())
@@ -873,11 +910,14 @@ public partial class SystemMapView : UserControl
             double maxY = systems.Max(s => s.Y) + cardApproxHeight + bandPadY;
             double bandHeight = Math.Max(10, maxY - minY);
 
-            var band = new Rectangle
+            var band = new Border
             {
-                Width  = bandWidth,
-                Height = bandHeight,
-                Fill   = new SolidColorBrush(Color.Parse(layerColors[layer])),
+                Width           = bandWidth,
+                Height          = bandHeight,
+                Background      = new SolidColorBrush(Color.Parse(layerColors[layer])),
+                BorderBrush     = new SolidColorBrush(Color.Parse(layerBorderColors[layer])),
+                BorderThickness = new Avalonia.Thickness(1.5),
+                CornerRadius    = new Avalonia.CornerRadius(6),
                 IsHitTestVisible = false
             };
             Canvas.SetLeft(band, 0);
@@ -887,14 +927,14 @@ public partial class SystemMapView : UserControl
             var lbl = new TextBlock
             {
                 Text          = layerLabels[layer],
-                FontSize      = 8,
+                FontSize      = 10,
                 FontWeight    = FontWeight.Bold,
                 Foreground    = new SolidColorBrush(Color.Parse(layerLabelColors[layer])),
-                LetterSpacing = 1,
+                LetterSpacing = 1.5,
                 IsHitTestVisible = false
             };
-            Canvas.SetLeft(lbl, 4);
-            Canvas.SetTop(lbl, minY + 4);
+            Canvas.SetLeft(lbl, 8);
+            Canvas.SetTop(lbl, minY + 6);
             canvas.Children.Add(lbl);
         }
     }
@@ -933,6 +973,74 @@ public partial class SystemMapView : UserControl
         Canvas.SetLeft(lbl, 24);
         Canvas.SetTop(lbl, sepY + 6);
         canvas.Children.Add(lbl);
+    }
+
+    /// <summary>
+    /// Draws a legend strip at the bottom of the canvas showing entity card types
+    /// and all relationship kinds with their associated colours.
+    /// Called before <see cref="UpdateCanvasExtent"/> so the legend is included in the
+    /// scroll range.
+    /// </summary>
+    private void DrawMapLegend(Canvas canvas)
+    {
+        const double legendX          = 24.0;
+        const double padBelowY        = 32.0;
+        // Card row height used to ensure the legend clears the last card row.
+        // Matches the SystemMapViewModel.CardGapY value (220 px).
+        const double systemCardRowH   = 220.0;
+        // Approximate height of a compact external-system card plus its padding.
+        const double externalCardRowH = 140.0;
+
+        // Position the legend below the lowest card currently on the canvas.
+        double legendY = padBelowY;
+        if (_vm.Systems.Count > 0)
+            legendY = Math.Max(legendY, _vm.Systems.Max(s => s.Y) + systemCardRowH);
+        if (_vm.ExternalSystems.Count > 0)
+            legendY = Math.Max(legendY, _vm.ExternalSystems.Max(e => e.Y) + externalCardRowH);
+
+        var title = new TextBlock
+        {
+            Text          = "LEGEND",
+            FontSize      = 9,
+            FontWeight    = FontWeight.Bold,
+            Foreground    = new SolidColorBrush(Color.Parse("#4A6A8A")),
+            LetterSpacing = 1,
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(title, legendX);
+        Canvas.SetTop(title, legendY);
+        canvas.Children.Add(title);
+
+        var row = new StackPanel
+        {
+            Orientation      = Orientation.Horizontal,
+            Spacing          = 6,
+            IsHitTestVisible = false
+        };
+
+        // Entity-type entries.
+        row.Children.Add(MakeBadge("□ System",   "#1A2A3A", "#AABBCC"));
+        row.Children.Add(MakeBadge("◇ External", "#1A2A1A", "#4ABF7A"));
+
+        // Thin separator between entity types and relationship kinds.
+        row.Children.Add(new Border
+        {
+            Width            = 1,
+            Background       = new SolidColorBrush(Color.Parse("#2A3F5A")),
+            Margin           = new Avalonia.Thickness(4, 0),
+            IsHitTestVisible = false
+        });
+
+        // One badge per relationship kind (excluding the generic catch-all).
+        foreach (RelationshipKind kind in Enum.GetValues<RelationshipKind>())
+        {
+            if (kind == RelationshipKind.Other) continue;
+            row.Children.Add(MakeBadge($"→ {kind}", "#0F141E", RelationshipColor(kind)));
+        }
+
+        Canvas.SetLeft(row, legendX);
+        Canvas.SetTop(row, legendY + 18);
+        canvas.Children.Add(row);
     }
 
     private static string AbbreviateModuleKind(string kind) => kind switch
