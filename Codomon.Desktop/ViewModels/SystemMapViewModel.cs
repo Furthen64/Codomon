@@ -85,6 +85,23 @@ public class StartupItemVm
 }
 
 /// <summary>
+/// Item view-model for a visible typed relationship between two top-level entities
+/// (System → System, System → External System, or External System → System).
+/// </summary>
+public class RelationshipItemVm
+{
+    public string Id             { get; init; } = string.Empty;
+    public string FromId         { get; init; } = string.Empty;
+    public string ToId           { get; init; } = string.Empty;
+    public RelationshipKind Kind { get; init; }
+    public string Label          { get; init; } = string.Empty;
+    public ConfidenceLevel Confidence { get; init; }
+    public string Notes          { get; init; } = string.Empty;
+    public string FromName       { get; init; } = string.Empty;
+    public string ToName         { get; init; } = string.Empty;
+}
+
+/// <summary>
 /// View-model that drives the four System Map views (System Overview, Module View,
 /// Code Detail View, Startup View) and their shared inspector panel and filters.
 /// </summary>
@@ -121,6 +138,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private List<ModuleItemVm>         _allModules         = new();
     private List<CodeNodeItemVm>       _allCodeNodes       = new();
     private List<StartupItemVm>        _allStartupItems    = new();
+    private List<RelationshipItemVm>   _allRelationships   = new();
 
     // ── Collections bound to the view ─────────────────────────────────────
 
@@ -129,6 +147,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     public ObservableCollection<ModuleItemVm>         ModulesForSelectedSystem   { get; } = new();
     public ObservableCollection<CodeNodeItemVm>       CodeNodesForSelectedScope  { get; } = new();
     public ObservableCollection<StartupItemVm>        StartupItems               { get; } = new();
+    public ObservableCollection<RelationshipItemVm>   VisibleRelationships       { get; } = new();
 
     // ── Active view ────────────────────────────────────────────────────────
 
@@ -276,6 +295,9 @@ public class SystemMapViewModel : INotifyPropertyChanged
     public void SelectCodeNode(CodeNodeItemVm? node)
         => UpdateInspectorForCodeNode(node);
 
+    public void SelectRelationship(RelationshipItemVm rel)
+        => UpdateInspectorForRelationship(rel);
+
     /// <summary>
     /// Rebuilds all collections from <paramref name="model"/>.
     /// Call this whenever the workspace's <see cref="SystemMapModel"/> changes.
@@ -368,6 +390,35 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 EntryPoints      = s.EntryPointCandidates.Take(3).ToList()
             };
         }).OrderBy(i => i.StartOrder).ToList();
+
+        // Build relationship view-models for System↔System and System↔ExternalSystem pairs.
+        var systemIdSet   = _allSystems.ToLookup(s => s.Id, StringComparer.Ordinal);
+        var externalIdSet = _allExternalSystems.ToLookup(e => e.Id, StringComparer.Ordinal);
+
+        _allRelationships = model.Relationships
+            .Where(r => (systemIdSet.Contains(r.FromId)   || externalIdSet.Contains(r.FromId)) &&
+                        (systemIdSet.Contains(r.ToId)     || externalIdSet.Contains(r.ToId)))
+            .Select(r =>
+            {
+                string fromName = systemIdSet[r.FromId].FirstOrDefault()?.Name
+                    ?? externalIdSet[r.FromId].FirstOrDefault()?.Name
+                    ?? r.FromId;
+                string toName   = systemIdSet[r.ToId].FirstOrDefault()?.Name
+                    ?? externalIdSet[r.ToId].FirstOrDefault()?.Name
+                    ?? r.ToId;
+                return new RelationshipItemVm
+                {
+                    Id         = r.Id,
+                    FromId     = r.FromId,
+                    ToId       = r.ToId,
+                    Kind       = r.Kind,
+                    Label      = r.Kind.ToString(),
+                    Confidence = r.Confidence,
+                    Notes      = r.Notes,
+                    FromName   = fromName,
+                    ToName     = toName
+                };
+            }).ToList();
 
         // Reset selection state.
         _selectedSystem = null;
@@ -640,6 +691,17 @@ public class SystemMapViewModel : INotifyPropertyChanged
                     .ToList()
                 : new List<ExternalSystemItemVm>());
 
+        // Relationships are visible when both endpoints are in the currently visible sets.
+        var visibleSystemIds   = Systems.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
+        var visibleExternalIds = ExternalSystems.Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
+
+        SyncCollection(VisibleRelationships,
+            _allRelationships
+                .Where(r =>
+                    (visibleSystemIds.Contains(r.FromId) || visibleExternalIds.Contains(r.FromId)) &&
+                    (visibleSystemIds.Contains(r.ToId)   || visibleExternalIds.Contains(r.ToId)))
+                .ToList());
+
         SyncCollection(StartupItems,
             _allStartupItems
                 .Where(s =>
@@ -838,6 +900,20 @@ public class SystemMapViewModel : INotifyPropertyChanged
         InspectorDetails    = !string.IsNullOrEmpty(node.FullName)
             ? new List<string> { node.FullName }
             : new List<string>();
+    }
+
+    private void UpdateInspectorForRelationship(RelationshipItemVm rel)
+    {
+        InspectorName       = $"{rel.FromName} → {rel.ToName}";
+        InspectorType       = "Relationship";
+        InspectorKind       = rel.Kind.ToString();
+        InspectorNotes      = rel.Notes;
+        InspectorConfidence = rel.Confidence.ToString();
+        InspectorDetails    = new List<string>
+        {
+            $"From: {rel.FromName}",
+            $"To: {rel.ToName}"
+        };
     }
 
     private static int CountModulesForSystem(SystemMapModel map, SystemModel system)

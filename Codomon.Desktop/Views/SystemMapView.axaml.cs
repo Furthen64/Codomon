@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.ViewModels;
 using System;
 using System.ComponentModel;
@@ -36,10 +38,21 @@ public partial class SystemMapView : UserControl
     /// Raised when a System Overview card has been repositioned.
     /// </summary>
     public event Action<string, bool, double, double>? LayoutPositionChanged;
-
     // ── Active-view button accent colour ─────────────────────────────────
     private static readonly IBrush ActiveButtonBg   = new SolidColorBrush(Color.Parse("#1A4A6A"));
     private static readonly IBrush InactiveButtonBg = new SolidColorBrush(Color.Parse("#1A2435"));
+
+    // ── Arrow rendering constants ─────────────────────────────────────────
+    /// <summary>Half of the fixed 220 px card width; used for card-edge intersection.</summary>
+    private const double ArrowCardHalfWidth  = 110.0;
+    /// <summary>Approximate half-height of a typical system card; used for card-edge intersection.</summary>
+    private const double ArrowCardHalfHeight =  65.0;
+    /// <summary>Horizontal offset applied when centering the arrow label over its midpoint.</summary>
+    private const double ArrowLabelOffsetX   =  20.0;
+    /// <summary>Vertical offset applied when centering the arrow label over its midpoint.</summary>
+    private const double ArrowLabelOffsetY   =   8.0;
+    /// <summary>Canvas background colour; reused as the label backing colour so labels look inset.</summary>
+    private const string CanvasBgHex = "#0F141E";
 
     private sealed class DragState
     {
@@ -74,6 +87,7 @@ public partial class SystemMapView : UserControl
             RefreshSystemOverview();
         };
         _vm.ExternalSystems.CollectionChanged   += (_, _) => RefreshSystemOverview();
+        _vm.VisibleRelationships.CollectionChanged += (_, _) => RefreshSystemOverview();
         _vm.ModulesForSelectedSystem.CollectionChanged += (_, _) => RefreshModuleView();
         _vm.CodeNodesForSelectedScope.CollectionChanged += (_, _) => RefreshCodeDetailView();
         _vm.StartupItems.CollectionChanged      += (_, _) => RefreshStartupView();
@@ -504,6 +518,7 @@ public partial class SystemMapView : UserControl
         extSection.IsVisible = _vm.ShowExternalSystems;
 
         systemsCanvas.Children.Clear();
+        DrawRelationshipArrows(systemsCanvas);   // arrows first — cards render on top
         foreach (var system in _vm.Systems)
         {
             if (BuildSystemCard(system, null) is not Border card) continue;
@@ -895,6 +910,8 @@ public partial class SystemMapView : UserControl
             _vm.SetOverviewPosition(dragState.ItemId, x, y, dragState.IsExternal);
             LayoutPositionChanged?.Invoke(dragState.ItemId, dragState.IsExternal, x, y);
             UpdateCanvasExtent(dragState.Canvas, minimumWidth: 720, minimumHeight: 140);
+            // Redraw arrows from the updated card positions.
+            RefreshSystemOverview();
         }
         else
         {
@@ -929,6 +946,169 @@ public partial class SystemMapView : UserControl
         canvas.Width = maxRight;
         canvas.Height = maxBottom;
     }
+
+    // ── Relationship arrow drawing ─────────────────────────────────────────
+
+    /// <summary>
+    /// Draws typed directional arrows for all <see cref="SystemMapViewModel.VisibleRelationships"/>
+    /// whose both endpoints are Systems on this canvas.  Arrows are added before cards so that
+    /// cards always render on top in canvas z-order.
+    /// </summary>
+    private void DrawRelationshipArrows(Canvas canvas)
+    {
+        if (_vm.VisibleRelationships.Count == 0)
+            return;
+
+        // Index the centre-point of every visible System card.
+        var systemCenters = _vm.Systems.ToDictionary(
+            s => s.Id,
+            s => new Point(s.X + ArrowCardHalfWidth, s.Y + ArrowCardHalfHeight),
+            StringComparer.Ordinal);
+
+        foreach (var rel in _vm.VisibleRelationships)
+        {
+            if (rel.FromId == rel.ToId) continue;   // skip self-loops
+
+            // Only draw arrows between Systems on this canvas; skip External↔External
+            // and System↔External (which are on a separate canvas).
+            if (!systemCenters.TryGetValue(rel.FromId, out var fromCenter)) continue;
+            if (!systemCenters.TryGetValue(rel.ToId,   out var toCenter))   continue;
+
+            double dx  = toCenter.X - fromCenter.X;
+            double dy  = toCenter.Y - fromCenter.Y;
+            double len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 20) continue;
+
+            double ux = dx / len;
+            double uy = dy / len;
+
+            // Exit point on the source card's border, entry point on the target card's border.
+            var fromPt = ComputeCardEdge(fromCenter,  ux,  uy, ArrowCardHalfWidth, ArrowCardHalfHeight);
+            var toPt   = ComputeCardEdge(toCenter,   -ux, -uy, ArrowCardHalfWidth, ArrowCardHalfHeight);
+
+            var brush = new SolidColorBrush(Color.Parse(RelationshipColor(rel.Kind)));
+            AddArrowToCanvas(canvas, fromPt, toPt, brush, rel.Label, rel);
+        }
+    }
+
+    /// <summary>
+    /// Returns the point on a card's bounding-box border in direction (ux, uy) from the card centre.
+    /// Uses the axis-aligned bounding-box intersection formula with the given half-dimensions.
+    /// </summary>
+    private static Point ComputeCardEdge(Point center, double ux, double uy, double hw, double hh)
+    {
+        double tx = Math.Abs(ux) > 1e-9 ? hw / Math.Abs(ux) : double.MaxValue;
+        double ty = Math.Abs(uy) > 1e-9 ? hh / Math.Abs(uy) : double.MaxValue;
+        double t  = Math.Min(tx, ty);
+        return new Point(center.X + ux * t, center.Y + uy * t);
+    }
+
+    /// <summary>Draws a directed arrow with an optional kind label between two canvas points.</summary>
+    private void AddArrowToCanvas(Canvas canvas, Point from, Point to, IBrush brush, string label, RelationshipItemVm rel)
+    {
+        double dx  = to.X - from.X;
+        double dy  = to.Y - from.Y;
+        double len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 10) return;
+
+        double ux = dx / len;
+        double uy = dy / len;
+        double px = -uy;   // perpendicular unit vector
+        double py =  ux;
+
+        const double headLen  = 10.0;
+        const double headHalf =  5.0;
+
+        // Arrowhead: tip is `to`; wings branch from a point `headLen` back along the shaft.
+        var wingBase = new Point(to.X - ux * headLen, to.Y - uy * headLen);
+        var wing1End = new Point(wingBase.X + px * headHalf, wingBase.Y + py * headHalf);
+        var wing2End = new Point(wingBase.X - px * headHalf, wingBase.Y - py * headHalf);
+
+        // Shaft line stops at the wing base so it doesn't overdraw the arrowhead.
+        var shaft = new Line
+        {
+            StartPoint      = from,
+            EndPoint        = wingBase,
+            Stroke          = brush,
+            StrokeThickness = 1.5,
+            Opacity         = 0.7
+        };
+        canvas.Children.Add(shaft);
+
+        var wing1 = new Line { StartPoint = to, EndPoint = wing1End, Stroke = brush, StrokeThickness = 1.5, Opacity = 0.7 };
+        var wing2 = new Line { StartPoint = to, EndPoint = wing2End, Stroke = brush, StrokeThickness = 1.5, Opacity = 0.7 };
+        canvas.Children.Add(wing1);
+        canvas.Children.Add(wing2);
+
+        // Small label at the midpoint of the shaft.
+        if (!string.IsNullOrEmpty(label))
+        {
+            double midX = (from.X + wingBase.X) / 2.0;
+            double midY = (from.Y + wingBase.Y) / 2.0;
+
+            var lbl = new Border
+            {
+                Background   = new SolidColorBrush(Color.Parse(CanvasBgHex)),
+                CornerRadius = new Avalonia.CornerRadius(3),
+                Padding      = new Avalonia.Thickness(3, 1),
+                Cursor       = new Cursor(StandardCursorType.Hand),
+                Child = new TextBlock
+                {
+                    Text          = label,
+                    FontSize      = 9,
+                    Foreground    = brush,
+                    FontWeight    = FontWeight.Bold,
+                    LetterSpacing = 0.3
+                }
+            };
+            lbl.PointerPressed += (_, e) =>
+            {
+                if (e.GetCurrentPoint(lbl).Properties.IsLeftButtonPressed)
+                {
+                    _vm.SelectRelationship(rel);
+                    e.Handled = true;
+                }
+            };
+
+            Canvas.SetLeft(lbl, midX - ArrowLabelOffsetX);
+            Canvas.SetTop(lbl, midY - ArrowLabelOffsetY);
+            canvas.Children.Add(lbl);
+        }
+
+        // Hit-transparent overlay on the shaft so clicking the line also opens the inspector.
+        var hitArea = new Line
+        {
+            StartPoint      = from,
+            EndPoint        = to,
+            Stroke          = Brushes.Transparent,
+            StrokeThickness = 8,
+            Cursor          = new Cursor(StandardCursorType.Hand)
+        };
+        hitArea.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(hitArea).Properties.IsLeftButtonPressed)
+            {
+                _vm.SelectRelationship(rel);
+                e.Handled = true;
+            }
+        };
+        canvas.Children.Add(hitArea);
+    }
+
+    private static string RelationshipColor(RelationshipKind kind) => kind switch
+    {
+        RelationshipKind.Calls      => "#4ABF8A",
+        RelationshipKind.Imports    => "#66AABB",
+        RelationshipKind.Depends    => "#4A7FBF",
+        RelationshipKind.Configures => "#AA88CC",
+        RelationshipKind.Logs       => "#778899",
+        RelationshipKind.Publishes  => "#DFAA44",
+        RelationshipKind.Subscribes => "#DF8844",
+        RelationshipKind.Reads      => "#88AACC",
+        RelationshipKind.Writes     => "#CC8888",
+        RelationshipKind.Hosts      => "#88CC88",
+        _                           => "#778899"
+    };
 
     private static string ConfidenceColor(Models.SystemMap.ConfidenceLevel c) => c switch
     {
