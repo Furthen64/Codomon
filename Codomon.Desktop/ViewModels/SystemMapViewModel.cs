@@ -874,11 +874,13 @@ public class SystemMapViewModel : INotifyPropertyChanged
     {
         if (TryGetSavedPosition(GetLayoutPositionKey(externalSystemId, isExternal: true), layoutPositions, out var saved))
         {
-            // If the saved Y is below the external baseline, it was saved before the unified
-            // canvas migration.  Shift it into the external zone so it no longer overlaps systems.
-            double threshold = ExternalBaseRow * CardGapY;
-            if (saved.Y < threshold)
-                return new LayoutPosition { X = saved.X, Y = saved.Y + threshold };
+            // A position saved before the unified-canvas migration would have a small Y value
+            // (it was relative to the now-removed ExternalSystemsCanvas, which started at row 0).
+            // Detect this by checking whether Y is below the external baseline, and if so, add
+            // the baseline offset so the card lands in the external zone on the unified canvas.
+            double baseline = ExternalBaseRow * CardGapY;
+            if (saved.Y < baseline)
+                return new LayoutPosition { X = saved.X, Y = saved.Y + baseline };
             return saved;
         }
 

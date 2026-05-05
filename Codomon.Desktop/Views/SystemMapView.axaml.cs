@@ -945,7 +945,7 @@ public partial class SystemMapView : UserControl
         "Configuration"  => "Cfg",
         "Utility"        => "Util",
         "Integration"    => "Integ",
-        _ => kind.Length > 5 ? kind[..5] : kind
+        _ => kind    // return the full kind name rather than a potentially misleading truncation
     };
 
     private static Control BuildModuleSizeIndicator(int moduleCount)
@@ -1193,8 +1193,10 @@ public partial class SystemMapView : UserControl
     /// </summary>
     private static Point ComputeCardEdge(Point center, double ux, double uy, double hw, double hh)
     {
-        double tx = Math.Abs(ux) > 1e-9 ? hw / Math.Abs(ux) : double.MaxValue;
-        double ty = Math.Abs(uy) > 1e-9 ? hh / Math.Abs(uy) : double.MaxValue;
+        // Guard against near-zero direction components to avoid division by zero.
+        const double Epsilon = 1e-9;
+        double tx = Math.Abs(ux) > Epsilon ? hw / Math.Abs(ux) : double.MaxValue;
+        double ty = Math.Abs(uy) > Epsilon ? hh / Math.Abs(uy) : double.MaxValue;
         double t  = Math.Min(tx, ty);
         return new Point(center.X + ux * t, center.Y + uy * t);
     }
