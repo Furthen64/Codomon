@@ -123,7 +123,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private const double CardStartX = 24;
     private const double CardStartY = 18;
     private const double CardGapX = 248;
-    private const double CardGapY = 148;
+    private const double CardGapY = 220;
     private const int CardsPerRow = 4;
     /// <summary>
     /// Default base row for external system card layout on the unified canvas.
@@ -467,6 +467,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SelectedRelationship));
 
         ClearInspector();
+        CleanupNames(applyFiltersAfter: false); // strip common prefix before first render
         ApplyFilters();
 
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom completed. VisibleSystems={Systems.Count}, CachedModules={_allModules.Count}, CachedCodeNodes={_allCodeNodes.Count}, VisibleExternalSystems={ExternalSystems.Count}, VisibleStartupItems={StartupItems.Count}");
@@ -481,7 +482,12 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// stripping) is removed.  Typical use-case: a company prefix such as
     /// <c>LTD.Customer.Simulation.App</c> → <c>Customer.Simulation.App</c>.
     /// </summary>
-    public void CleanupNames()
+    /// <param name="applyFiltersAfter">
+    /// When <c>true</c> (the default), <see cref="ApplyFilters"/> is called after renaming
+    /// so the UI collections reflect the cleaned names immediately.  Pass <c>false</c> when
+    /// called from <see cref="LoadFrom"/> to avoid a redundant extra filter pass.
+    /// </param>
+    public void CleanupNames(bool applyFiltersAfter = true)
     {
         AppLogger.Debug("[SystemMapViewModel.CleanupNames] Starting cleanup. " +
             $"Systems={_allSystems.Count}, ExternalSystems={_allExternalSystems.Count}, Modules={_allModules.Count}");
@@ -554,7 +560,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
             AppLogger.Info($"[SystemMapViewModel.CleanupNames] Done. Renamed {renamed} item(s) by stripping prefix \"{prefixLabel}\".");
 
-            ApplyFilters();
+            if (applyFiltersAfter)
+                ApplyFilters();
         }
         catch (Exception ex)
         {
@@ -876,11 +883,12 @@ public class SystemMapViewModel : INotifyPropertyChanged
         {
             // A position saved before the unified-canvas migration would have a small Y value
             // (it was relative to the now-removed ExternalSystemsCanvas, which started at row 0).
-            // Detect this by checking whether Y is below the external baseline, and if so, add
-            // the baseline offset so the card lands in the external zone on the unified canvas.
-            double baseline = ExternalBaseRow * CardGapY;
-            if (saved.Y < baseline)
-                return new LayoutPosition { X = saved.X, Y = saved.Y + baseline };
+            // Use the original pre-migration baseline as the threshold so that positions saved
+            // with any later CardGapY value are not incorrectly shifted.
+            // Value = ExternalBaseRow (4) × original CardGapY (148) = 592.
+            const double migrationBaseline = 592.0;
+            if (saved.Y < migrationBaseline)
+                return new LayoutPosition { X = saved.X, Y = saved.Y + (ExternalBaseRow * CardGapY) };
             return saved;
         }
 

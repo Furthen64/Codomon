@@ -64,15 +64,30 @@
 
               <DockPanel>
                 <TextBlock Text="CANVAS ACTIONS" FontSize="9" FontWeight="Bold"
-                           Foreground="#4A6A8A" LetterSpacing="1" VerticalAlignment="Center"/>
-                <Button x:Name="ClearCanvasButton"
-                        DockPanel.Dock="Right"
-                        Content="Clear Canvas"
-                        Click="OnClearCanvasClick"
-                        Padding="10,4"
-                        Background="#3A1A1A"
-                        Foreground="#FFAAAA"
-                        ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
+                           Foreground="#4A6A8A" LetterSpacing="1" VerticalAlignment="Center"
+                           DockPanel.Dock="Left"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="ZOOM:" VerticalAlignment="Center"
+                             Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
+                             LetterSpacing="1" Margin="0,0,2,0"/>
+                  <Button x:Name="ZoomOutButton" Content="−" Width="28" Padding="4,2"
+                          ToolTip.Tip="Zoom out"/>
+                  <TextBlock x:Name="ZoomLevelText" Text="100%"
+                             VerticalAlignment="Center" Foreground="#AABBCC"
+                             FontSize="11" Width="38" TextAlignment="Center"/>
+                  <Button x:Name="ZoomInButton" Content="+" Width="28" Padding="4,2"
+                          ToolTip.Tip="Zoom in"/>
+                  <Button x:Name="ZoomResetButton" Content="Reset" Padding="8,2"
+                          ToolTip.Tip="Reset zoom to 100%"/>
+                  <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
+                  <Button x:Name="ClearCanvasButton"
+                          Content="Clear Canvas"
+                          Click="OnClearCanvasClick"
+                          Padding="10,4"
+                          Background="#3A1A1A"
+                          Foreground="#FFAAAA"
+                          ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
+                </StackPanel>
               </DockPanel>
 
               <TextBlock x:Name="EmptySystemOverviewText"
@@ -83,9 +98,11 @@
               <StackPanel x:Name="SystemsSection" Spacing="10">
                 <TextBlock Text="SYSTEMS" FontSize="9" FontWeight="Bold"
                            Foreground="#4A6A8A" LetterSpacing="1"/>
-                <Border Background="Transparent" MinHeight="600">
-                  <Canvas x:Name="SystemsCanvas"/>
-                </Border>
+                <LayoutTransformControl x:Name="CanvasZoomControl">
+                  <Border Background="Transparent" MinHeight="600">
+                    <Canvas x:Name="SystemsCanvas"/>
+                  </Border>
+                </LayoutTransformControl>
               </StackPanel>
 
             </StackPanel>
