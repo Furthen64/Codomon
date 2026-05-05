@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -385,49 +386,85 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// </summary>
     public void CleanupNames()
     {
-        // Gather all current display names.
-        var allNames = _allSystems.Select(s => s.Name)
-            .Concat(_allExternalSystems.Select(e => e.Name))
-            .Concat(_allModules.Select(m => m.Name))
-            .Where(n => !string.IsNullOrEmpty(n))
-            .ToList();
+        AppLogger.Debug("[SystemMapViewModel.CleanupNames] Starting cleanup. " +
+            $"Systems={_allSystems.Count}, ExternalSystems={_allExternalSystems.Count}, Modules={_allModules.Count}");
 
-        if (allNames.Count < 2)
-            return;
-
-        string prefix = FindCommonPrefix(allNames);
-        if (string.IsNullOrEmpty(prefix))
-            return;
-
-        foreach (var item in _allSystems)
+        try
         {
-            if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
-                if (!string.IsNullOrWhiteSpace(trimmed))
-                    item.Name = trimmed;
-            }
-        }
-        foreach (var item in _allExternalSystems)
-        {
-            if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
-                if (!string.IsNullOrWhiteSpace(trimmed))
-                    item.Name = trimmed;
-            }
-        }
-        foreach (var item in _allModules)
-        {
-            if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
-                if (!string.IsNullOrWhiteSpace(trimmed))
-                    item.Name = trimmed;
-            }
-        }
+            // Gather all current display names.
+            var allNames = _allSystems.Select(s => s.Name)
+                .Concat(_allExternalSystems.Select(e => e.Name))
+                .Concat(_allModules.Select(m => m.Name))
+                .Where(n => !string.IsNullOrEmpty(n))
+                .ToList();
 
-        ApplyFilters();
+            AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Total non-empty names collected: {allNames.Count}");
+
+            if (allNames.Count < 2)
+            {
+                AppLogger.Info("[SystemMapViewModel.CleanupNames] Fewer than 2 names — nothing to clean up.");
+                return;
+            }
+
+            string prefix = FindCommonPrefix(allNames);
+            AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Common prefix detected: \"{prefix}\"");
+
+            if (string.IsNullOrEmpty(prefix))
+            {
+                AppLogger.Info("[SystemMapViewModel.CleanupNames] No common prefix found — nothing to strip.");
+                return;
+            }
+
+            int renamed = 0;
+
+            foreach (var item in _allSystems)
+            {
+                if (item.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        AppLogger.Debug($"[SystemMapViewModel.CleanupNames] System rename: \"{item.Name}\" → \"{trimmed}\"");
+                        item.Name = trimmed;
+                        renamed++;
+                    }
+                }
+            }
+            foreach (var item in _allExternalSystems)
+            {
+                if (item.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        AppLogger.Debug($"[SystemMapViewModel.CleanupNames] ExternalSystem rename: \"{item.Name}\" → \"{trimmed}\"");
+                        item.Name = trimmed;
+                        renamed++;
+                    }
+                }
+            }
+            foreach (var item in _allModules)
+            {
+                if (item.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                    if (!string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Module rename: \"{item.Name}\" → \"{trimmed}\"");
+                        item.Name = trimmed;
+                        renamed++;
+                    }
+                }
+            }
+
+            AppLogger.Info($"[SystemMapViewModel.CleanupNames] Done. Renamed {renamed} item(s) by stripping prefix \"{prefix}\".");
+
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"[SystemMapViewModel.CleanupNames] Unexpected error: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -442,19 +479,33 @@ public class SystemMapViewModel : INotifyPropertyChanged
         // Threshold: at least half of all names must share the prefix.
         int threshold = Math.Max(2, names.Count / 2);
 
-        // Try progressively shorter prefixes of the first name until
-        // at least `threshold` names share it.
-        string first = names[0];
-        for (int len = first.Length; len >= minLen; len--)
+        string bestPrefix = string.Empty;
+
+        // Try progressively shorter prefixes of EVERY name so that an outlier at
+        // position 0 can no longer prevent the common prefix from being found.
+        foreach (string name in names)
         {
-            string candidate = first[..len];
-            int count = names.Count(n =>
-                n.StartsWith(candidate, StringComparison.OrdinalIgnoreCase));
-            if (count >= threshold)
-                return candidate;
+            for (int len = name.Length; len >= minLen; len--)
+            {
+                string candidate = name[..len];
+
+                // Short-circuit: this candidate is no longer than the best we
+                // already have, so there is nothing to gain from this name.
+                if (candidate.Length <= bestPrefix.Length)
+                    break;
+
+                int count = names.Count(n =>
+                    n.StartsWith(candidate, StringComparison.OrdinalIgnoreCase));
+
+                if (count >= threshold)
+                {
+                    bestPrefix = candidate;
+                    break; // longest qualifying prefix for this name found
+                }
+            }
         }
 
-        return string.Empty;
+        return bestPrefix;
     }
 
     /// <summary>
