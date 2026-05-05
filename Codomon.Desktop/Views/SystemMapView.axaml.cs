@@ -33,6 +33,12 @@ public partial class SystemMapView : UserControl
     public event Action? ClearCanvasRequested;
 
     /// <summary>
+    /// Raised after Cleanup Names runs, carrying the stripped prefix and the number
+    /// of items that were renamed.  Subscribe to update StatusMessage / IsDirty.
+    /// </summary>
+    public event Action<string, int>? CleanupNamesCompleted;
+
+    /// <summary>
     /// Raised when a System Overview card has been repositioned.
     /// </summary>
     public event Action<string, bool, double, double>? LayoutPositionChanged;
@@ -662,10 +668,11 @@ public partial class SystemMapView : UserControl
 
     public void OnCleanupNamesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _vm.CleanupNames();
+        var (prefix, count) = _vm.CleanupNames();
         // Rebuild the canvases so the renamed cards are re-drawn.
         RefreshSystemOverview();
         RefreshModuleView();
+        CleanupNamesCompleted?.Invoke(prefix, count);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

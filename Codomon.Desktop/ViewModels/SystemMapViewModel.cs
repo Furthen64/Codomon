@@ -106,6 +106,9 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private bool _showLowConfidenceItems = true;
     private bool _showOnlyHighValueCodeNodes = false;
 
+    // Reference to the workspace model — kept so CleanupNames can write back to it.
+    private SystemMapModel? _model;
+
     // Full unfiltered data — kept so filters can be re-applied without a full reload.
     private List<SystemItemVm>         _allSystems         = new();
     private List<ExternalSystemItemVm> _allExternalSystems = new();
@@ -275,6 +278,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
     {
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom starting. Systems={model.Systems.Count}, Modules={model.AllModules.Count()}, CodeNodes={model.AllCodeNodes.Count()}, ExternalSystems={model.ExternalSystems.Count}, Relationships={model.Relationships.Count}");
 
+        _model = model;
+
         int topLaneIndex = 0;
         int lowerLaneIndex = 0;
 
@@ -378,7 +383,11 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// carries it.  Typical use-case: a company name or namespace that was included
     /// as a prefix on every generated name.
     /// </summary>
-    public void CleanupNames()
+    /// <returns>
+    /// A tuple of the prefix that was stripped and the number of items renamed.
+    /// Both are empty/zero when no common prefix was found.
+    /// </returns>
+    public (string Prefix, int Count) CleanupNames()
     {
         // Gather all current display names.
         var allNames = _allSystems.Select(s => s.Name)
@@ -387,12 +396,24 @@ public class SystemMapViewModel : INotifyPropertyChanged
             .Where(n => !string.IsNullOrEmpty(n))
             .ToList();
 
+        AppLogger.Debug($"[CleanupNames] Called. Total named items: Systems={_allSystems.Count}, ExternalSystems={_allExternalSystems.Count}, Modules={_allModules.Count} → {allNames.Count} non-empty name(s).");
+
         if (allNames.Count < 2)
-            return;
+        {
+            AppLogger.Debug("[CleanupNames] Skipped — fewer than 2 names available; nothing to compare.");
+            return (string.Empty, 0);
+        }
 
         string prefix = FindCommonPrefix(allNames);
         if (string.IsNullOrEmpty(prefix))
-            return;
+        {
+            AppLogger.Debug("[CleanupNames] No common prefix found; names are already clean or share no repeated prefix.");
+            return (string.Empty, 0);
+        }
+
+        AppLogger.Debug($"[CleanupNames] Common prefix detected: '{prefix}' (length {prefix.Length}). Stripping from matching names…");
+
+        int changed = 0;
 
         foreach (var item in _allSystems)
         {
@@ -400,7 +421,14 @@ public class SystemMapViewModel : INotifyPropertyChanged
             {
                 string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
                 if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    AppLogger.Debug($"[CleanupNames] System   '{item.Name}' → '{trimmed}'");
                     item.Name = trimmed;
+                    // Write back to the underlying model so the change persists on save.
+                    var modelItem = _model?.Systems.FirstOrDefault(s => s.Id == item.Id);
+                    if (modelItem != null) modelItem.Name = trimmed;
+                    changed++;
+                }
             }
         }
         foreach (var item in _allExternalSystems)
@@ -409,7 +437,13 @@ public class SystemMapViewModel : INotifyPropertyChanged
             {
                 string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
                 if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    AppLogger.Debug($"[CleanupNames] External '{item.Name}' → '{trimmed}'");
                     item.Name = trimmed;
+                    var modelItem = _model?.ExternalSystems.FirstOrDefault(e => e.Id == item.Id);
+                    if (modelItem != null) modelItem.Name = trimmed;
+                    changed++;
+                }
             }
         }
         foreach (var item in _allModules)
@@ -418,11 +452,20 @@ public class SystemMapViewModel : INotifyPropertyChanged
             {
                 string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
                 if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    AppLogger.Debug($"[CleanupNames] Module   '{item.Name}' → '{trimmed}'");
                     item.Name = trimmed;
+                    var modelItem = _model?.AllModules.FirstOrDefault(m => m.Id == item.Id);
+                    if (modelItem != null) modelItem.Name = trimmed;
+                    changed++;
+                }
             }
         }
 
+        AppLogger.Info($"[CleanupNames] Done. Stripped prefix '{prefix}' from {changed} item(s).");
+
         ApplyFilters();
+        return (prefix, changed);
     }
 
     /// <summary>

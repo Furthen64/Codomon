@@ -355,6 +355,19 @@ public class MainViewModel : INotifyPropertyChanged
         StatusMessage = "System Map layout updated.";
     }
 
+    /// <summary>
+    /// Called after Cleanup Names completes to update the workspace dirty flag,
+    /// timestamp, and status bar message.
+    /// </summary>
+    public void MarkCleanupNamesApplied(string prefix, int count)
+    {
+        Workspace.SystemMap.UpdatedAt = DateTime.UtcNow;
+        IsDirty = true;
+        StatusMessage = count > 0
+            ? $"Names cleaned up: stripped '{prefix}' from {count} item(s)."
+            : "Cleanup Names: no common prefix found — names are already clean.";
+    }
+
     // ── Workspace operations ─────────────────────────────────────────────────
 
     public async Task NewWorkspaceAsync(

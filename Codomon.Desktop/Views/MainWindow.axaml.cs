@@ -1587,6 +1587,7 @@ public partial class MainWindow : Window
         view.ShowDetailedRelationshipsRequested += OnShowDetailedRelationshipsRequested;
         view.ClearCanvasRequested += OnSystemMapClearCanvasRequested;
         view.LayoutPositionChanged += OnSystemMapLayoutPositionChanged;
+        view.CleanupNamesCompleted += OnCleanupNamesCompleted;
         host.Content = view;
         AppLogger.Debug("System Map view initialized");
     }
@@ -1595,6 +1596,12 @@ public partial class MainWindow : Window
     {
         if (!_vm.HasWorkspace) return;
         _vm.SaveSystemMapLayoutPosition(itemId, isExternal, x, y);
+    }
+
+    private void OnCleanupNamesCompleted(string prefix, int count)
+    {
+        if (!_vm.HasWorkspace) return;
+        _vm.MarkCleanupNamesApplied(prefix, count);
     }
 
     private void OnShowDetailedRelationshipsRequested(SystemItemVm system)
