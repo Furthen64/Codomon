@@ -195,6 +195,20 @@
                       Padding="8,4"
                       ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
 
+              <Button x:Name="SortAppsFromLibrariesButton"
+                      Content="Sort Apps from Libraries"
+                      Click="OnSortAppsFromLibrariesClick"
+                      HorizontalAlignment="Stretch"
+                      Padding="8,4"
+                      ToolTip.Tip="Move app-type systems (Desktop, Web, Backend, etc.) to the top rows and class libraries to the bottom, with a separator between them."/>
+
+              <Button x:Name="ArrangeButton"
+                      Content="Arrange"
+                      Click="OnArrangeClick"
+                      HorizontalAlignment="Stretch"
+                      Padding="8,4"
+                      ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
+
             </StackPanel>
           </Border>
 
