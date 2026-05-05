@@ -463,7 +463,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            AppLogger.Error($"[SystemMapViewModel.CleanupNames] Unexpected error: {ex.GetType().Name}: {ex.Message}");
+            AppLogger.Error($"[SystemMapViewModel.CleanupNames] Unexpected error: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
         }
     }
 
@@ -487,12 +487,12 @@ public class SystemMapViewModel : INotifyPropertyChanged
         {
             for (int len = name.Length; len >= minLen; len--)
             {
-                string candidate = name[..len];
-
-                // Short-circuit: this candidate is no longer than the best we
-                // already have, so there is nothing to gain from this name.
-                if (candidate.Length <= bestPrefix.Length)
+                // Short-circuit before allocating the substring: this candidate
+                // can't beat the current best, so skip the rest of this name.
+                if (len <= bestPrefix.Length)
                     break;
+
+                string candidate = name[..len];
 
                 int count = names.Count(n =>
                     n.StartsWith(candidate, StringComparison.OrdinalIgnoreCase));
