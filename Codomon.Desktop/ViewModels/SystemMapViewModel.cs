@@ -97,6 +97,9 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private const double CardGapY = 148;
     private const int CardsPerRow = 4;
 
+    /// <summary>Characters treated as token separators when parsing names in CleanupNames.</summary>
+    private static readonly char[] NameSeparators = { '.', '-', '_', ' ' };
+
     // High-value code node kinds shown when ShowOnlyHighValueCodeNodes is active.
     private static readonly HashSet<CodeNodeKind> HighValueKinds = new()
     {
@@ -379,10 +382,13 @@ public class SystemMapViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Detects the most common repeating prefix substring across all card names
-    /// (Systems, External Systems and Modules) and strips it from every name that
-    /// carries it.  Typical use-case: a company name or namespace that was included
-    /// as a prefix on every generated name.
+    /// Detects common leading token(s) shared across all card names
+    /// (Systems, External Systems and Modules) and strips them from every name that
+    /// carries them.  Names are first split into tokens on the separators
+    /// <c>.</c>, <c>-</c>, <c>_</c> and <c> </c>, and any leading token that
+    /// appears identically in every name (that still has remaining tokens after
+    /// stripping) is removed.  Typical use-case: a company prefix such as
+    /// <c>LTD.Customer.Simulation.App</c> → <c>Customer.Simulation.App</c>.
     /// </summary>
     public void CleanupNames()
     {
@@ -406,58 +412,56 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 return;
             }
 
-            string prefix = FindCommonPrefix(allNames);
-            AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Common prefix detected: \"{prefix}\"");
+            // Tokenise every name and find how many leading tokens are universal.
+            var tokenRows = allNames.Select(TokenizeName).ToList();
+            int prefixTokenCount = FindCommonPrefixTokenCount(tokenRows);
 
-            if (string.IsNullOrEmpty(prefix))
+            if (prefixTokenCount == 0)
             {
-                AppLogger.Info("[SystemMapViewModel.CleanupNames] No common prefix found — nothing to strip.");
+                AppLogger.Info("[SystemMapViewModel.CleanupNames] No common prefix tokens found — nothing to strip.");
                 return;
             }
+
+            // Build a human-readable representation of the tokens being stripped.
+            string prefixLabel = tokenRows.Count > 0
+                ? string.Join(".", tokenRows[0].Take(prefixTokenCount))
+                : string.Empty;
+            AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Common prefix token(s) detected: \"{prefixLabel}\" ({prefixTokenCount} token(s))");
 
             int renamed = 0;
 
             foreach (var item in _allSystems)
             {
-                if (item.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                string trimmed = StripLeadingTokens(item.Name, prefixTokenCount);
+                if (!string.IsNullOrWhiteSpace(trimmed) && trimmed != item.Name)
                 {
-                    string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
-                    if (!string.IsNullOrWhiteSpace(trimmed))
-                    {
-                        AppLogger.Debug($"[SystemMapViewModel.CleanupNames] System rename: \"{item.Name}\" → \"{trimmed}\"");
-                        item.Name = trimmed;
-                        renamed++;
-                    }
+                    AppLogger.Debug($"[SystemMapViewModel.CleanupNames] System rename: \"{item.Name}\" → \"{trimmed}\"");
+                    item.Name = trimmed;
+                    renamed++;
                 }
             }
             foreach (var item in _allExternalSystems)
             {
-                if (item.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                string trimmed = StripLeadingTokens(item.Name, prefixTokenCount);
+                if (!string.IsNullOrWhiteSpace(trimmed) && trimmed != item.Name)
                 {
-                    string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
-                    if (!string.IsNullOrWhiteSpace(trimmed))
-                    {
-                        AppLogger.Debug($"[SystemMapViewModel.CleanupNames] ExternalSystem rename: \"{item.Name}\" → \"{trimmed}\"");
-                        item.Name = trimmed;
-                        renamed++;
-                    }
+                    AppLogger.Debug($"[SystemMapViewModel.CleanupNames] ExternalSystem rename: \"{item.Name}\" → \"{trimmed}\"");
+                    item.Name = trimmed;
+                    renamed++;
                 }
             }
             foreach (var item in _allModules)
             {
-                if (item.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                string trimmed = StripLeadingTokens(item.Name, prefixTokenCount);
+                if (!string.IsNullOrWhiteSpace(trimmed) && trimmed != item.Name)
                 {
-                    string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
-                    if (!string.IsNullOrWhiteSpace(trimmed))
-                    {
-                        AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Module rename: \"{item.Name}\" → \"{trimmed}\"");
-                        item.Name = trimmed;
-                        renamed++;
-                    }
+                    AppLogger.Debug($"[SystemMapViewModel.CleanupNames] Module rename: \"{item.Name}\" → \"{trimmed}\"");
+                    item.Name = trimmed;
+                    renamed++;
                 }
             }
 
-            AppLogger.Info($"[SystemMapViewModel.CleanupNames] Done. Renamed {renamed} item(s) by stripping prefix \"{prefix}\".");
+            AppLogger.Info($"[SystemMapViewModel.CleanupNames] Done. Renamed {renamed} item(s) by stripping prefix \"{prefixLabel}\".");
 
             ApplyFilters();
         }
@@ -468,44 +472,73 @@ public class SystemMapViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Finds the longest prefix string that appears at the start of at least half
-    /// the supplied names (minimum 3 characters).
+    /// Splits a name into tokens by breaking on the separators
+    /// <c>.</c>, <c>-</c>, <c>_</c> and <c> </c>.
     /// </summary>
-    private static string FindCommonPrefix(List<string> names)
+    private static string[] TokenizeName(string name) =>
+        name.Split(NameSeparators, StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>
+    /// Returns how many leading token positions are identical (case-insensitive)
+    /// across all rows that have at least one further token remaining after that
+    /// position (to avoid stripping a name down to nothing).  Requires at least
+    /// two such eligible rows to agree before a position is counted.
+    /// </summary>
+    private static int FindCommonPrefixTokenCount(List<string[]> tokenRows)
     {
-        if (names.Count == 0) return string.Empty;
+        if (tokenRows.Count == 0) return 0;
 
-        const int minLen = 3;
-        // Threshold: at least half of all names must share the prefix.
-        int threshold = Math.Max(2, names.Count / 2);
-
-        string bestPrefix = string.Empty;
-
-        // Try progressively shorter prefixes of EVERY name so that an outlier at
-        // position 0 can no longer prevent the common prefix from being found.
-        foreach (string name in names)
+        int common = 0;
+        while (true)
         {
-            for (int len = name.Length; len >= minLen; len--)
-            {
-                // Short-circuit before allocating the substring: this candidate
-                // can't beat the current best, so skip the rest of this name.
-                if (len <= bestPrefix.Length)
-                    break;
+            int position = common;
 
-                string candidate = name[..len];
+            // Eligible rows: have a token at 'position' AND at least one more token
+            // after it, so stripping won't leave the name empty.
+            var eligible = tokenRows
+                .Where(r => r.Length > position + 1)
+                .ToList();
 
-                int count = names.Count(n =>
-                    n.StartsWith(candidate, StringComparison.OrdinalIgnoreCase));
+            if (eligible.Count < 2) break;
 
-                if (count >= threshold)
-                {
-                    bestPrefix = candidate;
-                    break; // longest qualifying prefix for this name found
-                }
-            }
+            // All eligible names must share the same token at this position.
+            string first = eligible[0][position];
+            bool allMatch = eligible.All(r =>
+                string.Equals(r[position], first, StringComparison.OrdinalIgnoreCase));
+
+            if (allMatch)
+                common++;
+            else
+                break;
         }
 
-        return bestPrefix;
+        return common;
+    }
+
+    /// <summary>
+    /// Removes the first <paramref name="tokenCount"/> token(s) from the start of
+    /// <paramref name="name"/>, together with the separator characters that
+    /// immediately follow each token.  The original separators within the remaining
+    /// portion of the name are preserved unchanged.
+    /// </summary>
+    private static string StripLeadingTokens(string name, int tokenCount)
+    {
+        if (tokenCount <= 0) return name;
+
+        int tokensRemoved = 0;
+        int i = 0;
+        while (i < name.Length && tokensRemoved < tokenCount)
+        {
+            // Advance past the current token characters.
+            while (i < name.Length && Array.IndexOf(NameSeparators, name[i]) < 0)
+                i++;
+            tokensRemoved++;
+            // Advance past any trailing separator(s).
+            while (i < name.Length && Array.IndexOf(NameSeparators, name[i]) >= 0)
+                i++;
+        }
+
+        return i < name.Length ? name[i..] : string.Empty;
     }
 
     /// <summary>
