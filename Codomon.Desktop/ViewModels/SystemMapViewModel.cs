@@ -415,6 +415,14 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
         int changed = 0;
 
+        // Build Id→model lookups once so the write-back is O(1) per item.
+        var systemsById       = _model?.Systems.ToDictionary(s => s.Id, StringComparer.Ordinal)
+                                ?? new Dictionary<string, SystemModel>();
+        var externalSystemsById = _model?.ExternalSystems.ToDictionary(e => e.Id, StringComparer.Ordinal)
+                                ?? new Dictionary<string, ExternalSystemModel>();
+        var modulesById       = _model?.AllModules.ToDictionary(m => m.Id, StringComparer.Ordinal)
+                                ?? new Dictionary<string, ModuleModel>();
+
         foreach (var item in _allSystems)
         {
             if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
@@ -425,8 +433,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
                     AppLogger.Debug($"[CleanupNames] System   '{item.Name}' → '{trimmed}'");
                     item.Name = trimmed;
                     // Write back to the underlying model so the change persists on save.
-                    var modelItem = _model?.Systems.FirstOrDefault(s => s.Id == item.Id);
-                    if (modelItem != null) modelItem.Name = trimmed;
+                    if (systemsById.TryGetValue(item.Id, out var modelItem)) modelItem.Name = trimmed;
                     changed++;
                 }
             }
@@ -440,8 +447,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 {
                     AppLogger.Debug($"[CleanupNames] External '{item.Name}' → '{trimmed}'");
                     item.Name = trimmed;
-                    var modelItem = _model?.ExternalSystems.FirstOrDefault(e => e.Id == item.Id);
-                    if (modelItem != null) modelItem.Name = trimmed;
+                    if (externalSystemsById.TryGetValue(item.Id, out var modelItem)) modelItem.Name = trimmed;
                     changed++;
                 }
             }
@@ -455,8 +461,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 {
                     AppLogger.Debug($"[CleanupNames] Module   '{item.Name}' → '{trimmed}'");
                     item.Name = trimmed;
-                    var modelItem = _model?.AllModules.FirstOrDefault(m => m.Id == item.Id);
-                    if (modelItem != null) modelItem.Name = trimmed;
+                    if (modulesById.TryGetValue(item.Id, out var modelItem)) modelItem.Name = trimmed;
                     changed++;
                 }
             }
