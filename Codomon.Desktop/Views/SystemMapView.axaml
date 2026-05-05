@@ -83,20 +83,9 @@
               <StackPanel x:Name="SystemsSection" Spacing="10">
                 <TextBlock Text="SYSTEMS" FontSize="9" FontWeight="Bold"
                            Foreground="#4A6A8A" LetterSpacing="1"/>
-                <Border Background="Transparent" MinHeight="180">
+                <Border Background="Transparent" MinHeight="600">
                   <Canvas x:Name="SystemsCanvas"/>
                 </Border>
-              </StackPanel>
-
-              <StackPanel x:Name="ExternalSystemsSection" Spacing="10">
-                <TextBlock Text="EXTERNAL SYSTEMS" FontSize="9" FontWeight="Bold"
-                           Foreground="#4A6A8A" LetterSpacing="1"/>
-                <Border Background="Transparent" MinHeight="160">
-                  <Canvas x:Name="ExternalSystemsCanvas"/>
-                </Border>
-                <TextBlock x:Name="NoExternalSystemsText"
-                           Text="No external systems defined."
-                           Foreground="#445566" FontSize="11" IsVisible="False"/>
               </StackPanel>
 
             </StackPanel>
@@ -209,6 +198,13 @@
                       Padding="8,4"
                       ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
 
+              <Button x:Name="SortByLayersButton"
+                      Content="Sort by Layers"
+                      Click="OnSortByLayersClick"
+                      HorizontalAlignment="Stretch"
+                      Padding="8,4"
+                      ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
+
             </StackPanel>
           </Border>
 
@@ -261,6 +257,21 @@
 
             </StackPanel>
           </ScrollViewer>
+
+          <!-- Action buttons for the currently selected item -->
+          <Border x:Name="InspRelActionPanel" IsVisible="False"
+                  Background="#141C28"
+                  BorderThickness="0,1,0,0" BorderBrush="#2A3F5A"
+                  Padding="8,6">
+            <Button x:Name="RemoveRelationshipButton"
+                    Content="Delete Relationship"
+                    Click="OnRemoveRelationshipClick"
+                    HorizontalAlignment="Stretch"
+                    Padding="8,4"
+                    Background="#3A1A1A"
+                    Foreground="#FFAAAA"
+                    ToolTip.Tip="Permanently remove this relationship from the System Map."/>
+          </Border>
 
         </DockPanel>
       </Border>
