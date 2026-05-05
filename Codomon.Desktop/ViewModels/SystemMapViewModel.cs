@@ -442,27 +442,12 @@ public class SystemMapViewModel : INotifyPropertyChanged
         // Threshold: at least half of all names must share the prefix.
         int threshold = Math.Max(2, names.Count / 2);
 
-        // Collect the full LCP of all names as the upper bound candidate.
-        string lcp = names[0];
-        foreach (var n in names)
-        {
-            int len = 0;
-            while (len < lcp.Length && len < n.Length &&
-                   char.ToUpperInvariant(lcp[len]) == char.ToUpperInvariant(n[len]))
-                len++;
-            lcp = lcp[..len];
-            if (lcp.Length < minLen) return string.Empty;
-        }
-
-        // Full LCP is common to ALL names; check if it meets the threshold and length.
-        if (lcp.Length >= minLen && names.Count >= threshold)
-            return lcp;
-
-        // Fallback: try progressively shorter prefixes of the first name until
+        // Try progressively shorter prefixes of the first name until
         // at least `threshold` names share it.
-        for (int len = lcp.Length; len >= minLen; len--)
+        string first = names[0];
+        for (int len = first.Length; len >= minLen; len--)
         {
-            string candidate = lcp[..len];
+            string candidate = first[..len];
             int count = names.Count(n =>
                 n.StartsWith(candidate, StringComparison.OrdinalIgnoreCase));
             if (count >= threshold)
