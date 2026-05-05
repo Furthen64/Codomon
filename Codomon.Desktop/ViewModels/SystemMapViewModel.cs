@@ -26,6 +26,11 @@ public class SystemItemVm
     public int ModuleCount         { get; init; }
     public double X                { get; set; }
     public double Y                { get; set; }
+
+    /// <summary>True when this system is a class-library rather than a runnable app.</summary>
+    public bool IsLibrary =>
+        string.Equals(KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal) ||
+        string.Equals(StartupMechanism, "Class Library", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>Item view-model for an External System.</summary>
@@ -465,6 +470,68 @@ public class SystemMapViewModel : INotifyPropertyChanged
         }
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Rearranges system card positions so that app-type systems occupy the top rows
+    /// and LibraryOnly systems are placed below them (separated by one empty row).
+    /// Returns the list of (id, newX, newY) updates so the caller can persist them.
+    /// </summary>
+    public List<(string Id, double X, double Y)> SortAppsFromLibraries()
+    {
+        var apps      = _allSystems.Where(s => !s.IsLibrary).ToList();
+        var libraries = _allSystems.Where(s =>  s.IsLibrary).ToList();
+
+        var updates = new List<(string, double, double)>();
+
+        int appIndex = 0;
+        foreach (var app in apps)
+        {
+            var pos = CreateGridPosition(appIndex++, baseRow: 0);
+            app.X = pos.X;
+            app.Y = pos.Y;
+            updates.Add((app.Id, app.X, app.Y));
+        }
+
+        // Leave one blank row as a visual gap before the library section.
+        int appRowCount    = apps.Count == 0 ? 0 : (apps.Count + CardsPerRow - 1) / CardsPerRow;
+        int libraryBaseRow = appRowCount + 1;
+
+        int libIndex = 0;
+        foreach (var lib in libraries)
+        {
+            var pos = CreateGridPosition(libIndex++, baseRow: libraryBaseRow);
+            lib.X = pos.X;
+            lib.Y = pos.Y;
+            updates.Add((lib.Id, lib.X, lib.Y));
+        }
+
+        ApplyFilters();
+        return updates;
+    }
+
+    /// <summary>
+    /// Sorts all system cards alphabetically by name and reassigns their grid positions
+    /// in that order.  Returns the list of (id, newX, newY) updates for persistence.
+    /// </summary>
+    public List<(string Id, double X, double Y)> ArrangeAlphabetically()
+    {
+        var sorted = _allSystems
+            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var updates = new List<(string, double, double)>();
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            var pos = CreateGridPosition(i, baseRow: 0);
+            sorted[i].X = pos.X;
+            sorted[i].Y = pos.Y;
+            updates.Add((sorted[i].Id, sorted[i].X, sorted[i].Y));
+        }
+
+        ApplyFilters();
+        return updates;
     }
 
     public void SetOverviewPosition(string itemId, double x, double y, bool isExternal)

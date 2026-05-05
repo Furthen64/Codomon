@@ -20,7 +20,7 @@ public partial class SystemMapView : UserControl
 {
     private readonly SystemMapViewModel _vm;
     private DragState? _dragState;
-
+    private bool _showAppLibSeparator;
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
     /// currently selected system in Module View.
@@ -68,7 +68,11 @@ public partial class SystemMapView : UserControl
         SetupItemTemplates();
 
         _vm.PropertyChanged   += OnViewModelPropertyChanged;
-        _vm.Systems.CollectionChanged           += (_, _) => RefreshSystemOverview();
+        _vm.Systems.CollectionChanged           += (_, _) =>
+        {
+            if (_vm.Systems.Count == 0) _showAppLibSeparator = false;
+            RefreshSystemOverview();
+        };
         _vm.ExternalSystems.CollectionChanged   += (_, _) => RefreshSystemOverview();
         _vm.ModulesForSelectedSystem.CollectionChanged += (_, _) => RefreshModuleView();
         _vm.CodeNodesForSelectedScope.CollectionChanged += (_, _) => RefreshCodeDetailView();
@@ -508,6 +512,10 @@ public partial class SystemMapView : UserControl
             Canvas.SetTop(card, system.Y);
         }
 
+        // Draw the app/library separator when the sort-by-type layout is active.
+        if (_showAppLibSeparator)
+            AddAppLibrarySeparator(systemsCanvas);
+
         externalCanvas.Children.Clear();
         foreach (var external in _vm.ExternalSystems)
         {
@@ -657,6 +665,7 @@ public partial class SystemMapView : UserControl
 
     public void OnClearCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        _showAppLibSeparator = false;
         ClearCanvasRequested?.Invoke();
     }
 
@@ -666,6 +675,24 @@ public partial class SystemMapView : UserControl
         // Rebuild the canvases so the renamed cards are re-drawn.
         RefreshSystemOverview();
         RefreshModuleView();
+    }
+
+    public void OnSortAppsFromLibrariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var updates = _vm.SortAppsFromLibraries();
+        _showAppLibSeparator = updates.Count > 0;
+        foreach (var (id, x, y) in updates)
+            LayoutPositionChanged?.Invoke(id, false, x, y);
+        RefreshSystemOverview();
+    }
+
+    public void OnArrangeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _showAppLibSeparator = false;
+        var updates = _vm.ArrangeAlphabetically();
+        foreach (var (id, x, y) in updates)
+            LayoutPositionChanged?.Invoke(id, false, x, y);
+        RefreshSystemOverview();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -686,6 +713,47 @@ public partial class SystemMapView : UserControl
                 LetterSpacing = 0.5
             }
         };
+    }
+
+    /// <summary>
+    /// Adds a horizontal separator line and a "CLASS LIBRARIES" section header to the
+    /// canvas when systems from both groups are present.
+    /// </summary>
+    private void AddAppLibrarySeparator(Canvas canvas)
+    {
+        var apps = _vm.Systems.Where(s => !s.IsLibrary).ToList();
+        var libs = _vm.Systems.Where(s =>  s.IsLibrary).ToList();
+
+        if (apps.Count == 0 || libs.Count == 0)
+            return;
+
+        double libMinY = libs.Min(s => s.Y);
+        double appMaxY = apps.Max(s => s.Y);
+
+        // Place the separator line halfway between the last app row and first library row.
+        double sepY = appMaxY + (libMinY - appMaxY) / 2.0;
+
+        var separatorLine = new Border
+        {
+            Height     = 1,
+            Width      = 2000,
+            Background = new SolidColorBrush(Color.Parse("#2A3F5A"))
+        };
+        Canvas.SetLeft(separatorLine, 0);
+        Canvas.SetTop(separatorLine, sepY);
+        canvas.Children.Add(separatorLine);
+
+        var sectionLabel = new TextBlock
+        {
+            Text          = "CLASS LIBRARIES",
+            FontSize      = 9,
+            FontWeight    = FontWeight.Bold,
+            Foreground    = new SolidColorBrush(Color.Parse("#4A6A8A")),
+            LetterSpacing = 1
+        };
+        Canvas.SetLeft(sectionLabel, 24);
+        Canvas.SetTop(sectionLabel, sepY + 6);
+        canvas.Children.Add(sectionLabel);
     }
 
     private static Control BuildModuleSizeIndicator(int moduleCount)
