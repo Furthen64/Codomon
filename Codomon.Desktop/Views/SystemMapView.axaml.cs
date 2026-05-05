@@ -660,6 +660,14 @@ public partial class SystemMapView : UserControl
         ClearCanvasRequested?.Invoke();
     }
 
+    public void OnCleanupNamesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _vm.CleanupNames();
+        // Rebuild the canvases so the renamed cards are re-drawn.
+        RefreshSystemOverview();
+        RefreshModuleView();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private static Border MakeBadge(string text, string bgHex, string fgHex)

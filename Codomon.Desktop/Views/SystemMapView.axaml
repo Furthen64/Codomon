@@ -180,6 +180,24 @@
               BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
         <DockPanel>
 
+          <!-- ── Organize panel (above Inspector) ─────────────────────────── -->
+          <Border DockPanel.Dock="Top" Background="#141C28"
+                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+            <StackPanel Margin="8,8,8,8" Spacing="6">
+
+              <TextBlock Text="ORGANIZE" FontSize="9" FontWeight="Bold"
+                         Foreground="#4A6A8A" LetterSpacing="1"/>
+
+              <Button x:Name="CleanupNamesButton"
+                      Content="Cleanup Names"
+                      Click="OnCleanupNamesClick"
+                      HorizontalAlignment="Stretch"
+                      Padding="8,4"
+                      ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
+
+            </StackPanel>
+          </Border>
+
           <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435"
                   BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
             <TextBlock Text="Inspector" FontWeight="Bold" Foreground="#AABBCC"/>

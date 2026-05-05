@@ -19,7 +19,7 @@ public enum SystemMapViewKind
 public class SystemItemVm
 {
     public string Id               { get; init; } = string.Empty;
-    public string Name             { get; init; } = string.Empty;
+    public string Name             { get; set; }  = string.Empty;
     public string KindLabel        { get; init; } = string.Empty;
     public string StartupMechanism { get; init; } = string.Empty;
     public ConfidenceLevel Confidence { get; init; }
@@ -32,7 +32,7 @@ public class SystemItemVm
 public class ExternalSystemItemVm
 {
     public string Id   { get; init; } = string.Empty;
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; set; }  = string.Empty;
     public string Kind { get; init; } = string.Empty;
     public ConfidenceLevel Confidence { get; init; }
     public double X { get; set; }
@@ -43,7 +43,7 @@ public class ExternalSystemItemVm
 public class ModuleItemVm
 {
     public string Id           { get; init; } = string.Empty;
-    public string Name         { get; init; } = string.Empty;
+    public string Name         { get; set; }  = string.Empty;
     public string KindLabel    { get; init; } = string.Empty;
     public ConfidenceLevel Confidence { get; init; }
     public int CodeNodeCount   { get; init; }
@@ -370,6 +370,101 @@ public class SystemMapViewModel : INotifyPropertyChanged
         ApplyFilters();
 
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom completed. VisibleSystems={Systems.Count}, CachedModules={_allModules.Count}, CachedCodeNodes={_allCodeNodes.Count}, VisibleExternalSystems={ExternalSystems.Count}, VisibleStartupItems={StartupItems.Count}");
+    }
+
+    /// <summary>
+    /// Detects the most common repeating prefix substring across all card names
+    /// (Systems, External Systems and Modules) and strips it from every name that
+    /// carries it.  Typical use-case: a company name or namespace that was included
+    /// as a prefix on every generated name.
+    /// </summary>
+    public void CleanupNames()
+    {
+        // Gather all current display names.
+        var allNames = _allSystems.Select(s => s.Name)
+            .Concat(_allExternalSystems.Select(e => e.Name))
+            .Concat(_allModules.Select(m => m.Name))
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        if (allNames.Count < 2)
+            return;
+
+        string prefix = FindCommonPrefix(allNames);
+        if (string.IsNullOrEmpty(prefix))
+            return;
+
+        foreach (var item in _allSystems)
+        {
+            if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    item.Name = trimmed;
+            }
+        }
+        foreach (var item in _allExternalSystems)
+        {
+            if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    item.Name = trimmed;
+            }
+        }
+        foreach (var item in _allModules)
+        {
+            if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    item.Name = trimmed;
+            }
+        }
+
+        ApplyFilters();
+    }
+
+    /// <summary>
+    /// Finds the longest prefix string that appears at the start of at least half
+    /// the supplied names (minimum 3 characters).
+    /// </summary>
+    private static string FindCommonPrefix(List<string> names)
+    {
+        if (names.Count == 0) return string.Empty;
+
+        const int minLen = 3;
+        // Threshold: at least half of all names must share the prefix.
+        int threshold = Math.Max(2, names.Count / 2);
+
+        // Collect the full LCP of all names as the upper bound candidate.
+        string lcp = names[0];
+        foreach (var n in names)
+        {
+            int len = 0;
+            while (len < lcp.Length && len < n.Length &&
+                   char.ToUpperInvariant(lcp[len]) == char.ToUpperInvariant(n[len]))
+                len++;
+            lcp = lcp[..len];
+            if (lcp.Length < minLen) return string.Empty;
+        }
+
+        // Full LCP is common to ALL names; check if it meets the threshold and length.
+        if (lcp.Length >= minLen && names.Count >= threshold)
+            return lcp;
+
+        // Fallback: try progressively shorter prefixes of the first name until
+        // at least `threshold` names share it.
+        for (int len = lcp.Length; len >= minLen; len--)
+        {
+            string candidate = lcp[..len];
+            int count = names.Count(n =>
+                n.StartsWith(candidate, StringComparison.OrdinalIgnoreCase));
+            if (count >= threshold)
+                return candidate;
+        }
+
+        return string.Empty;
     }
 
     public void SetOverviewPosition(string itemId, double x, double y, bool isExternal)
