@@ -397,17 +397,29 @@ public class SystemMapViewModel : INotifyPropertyChanged
         foreach (var item in _allSystems)
         {
             if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
-                item.Name = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+            {
+                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    item.Name = trimmed;
+            }
         }
         foreach (var item in _allExternalSystems)
         {
             if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
-                item.Name = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+            {
+                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    item.Name = trimmed;
+            }
         }
         foreach (var item in _allModules)
         {
             if (item.Name.StartsWith(prefix, StringComparison.Ordinal))
-                item.Name = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+            {
+                string trimmed = item.Name[prefix.Length..].TrimStart('.', '-', '_', ' ');
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    item.Name = trimmed;
+            }
         }
 
         ApplyFilters();
@@ -419,8 +431,11 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// </summary>
     private static string FindCommonPrefix(List<string> names)
     {
+        if (names.Count == 0) return string.Empty;
+
         const int minLen = 3;
-        int threshold = Math.Max(2, (names.Count + 1) / 2);   // majority
+        // Threshold: at least half of all names must share the prefix.
+        int threshold = Math.Max(2, names.Count / 2);
 
         // Collect the full LCP of all names as the upper bound candidate.
         string lcp = names[0];
