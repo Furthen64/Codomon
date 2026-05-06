@@ -69,6 +69,13 @@ public partial class SystemMapView : UserControl
     private const double ArrowLabelOffsetY   =   8.0;
     /// <summary>Canvas background colour; reused as the label backing colour so labels look inset.</summary>
     private const string CanvasBgHex = "#0F141E";
+    /// <summary>Default foreground colour for secondary/muted text on cards.</summary>
+    private const string CardSecondaryFgHex = "#AABBCC";
+    /// <summary>
+    /// Half-height of a typical layer-band label TextBlock (font-size 10, ~16 px line height),
+    /// used to vertically centre the label within its band.
+    /// </summary>
+    private const double LayerLabelHalfHeight = 8.0;
 
     private sealed class DragState
     {
@@ -948,7 +955,7 @@ public partial class SystemMapView : UserControl
             body.Children.Add(new TextBlock
             {
                 Text         = item.Description,
-                Foreground   = new SolidColorBrush(Color.Parse("#AABBCC")),
+                Foreground   = new SolidColorBrush(Color.Parse(CardSecondaryFgHex)),
                 FontSize     = 11,
                 TextWrapping = TextWrapping.Wrap,
                 MaxLines     = 2
@@ -1085,7 +1092,7 @@ public partial class SystemMapView : UserControl
                 IsHitTestVisible = false
             };
             Canvas.SetLeft(lbl, 12);
-            Canvas.SetTop(lbl, minY + bandHeight / 2.0 - 8.0);
+            Canvas.SetTop(lbl, minY + bandHeight / 2.0 - LayerLabelHalfHeight);
             canvas.Children.Add(lbl);
         }
     }
