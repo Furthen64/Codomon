@@ -125,7 +125,7 @@
 
         <!-- ── Step 3: Timestamp & Timezone ─────────────────────────────────── -->
         <StackPanel x:Name="Step3Panel" Spacing="10" Margin="0,36,0,0" IsVisible="False">
-          <TextBlock Text="Tell Codomon where to find the timestamp and how to interpret it."
+          <TextBlock Text="Tell codomon where to find the timestamp and how to interpret it."
                      Foreground="#AABBCC" TextWrapping="Wrap"/>
 
           <!-- Timestamp column -->

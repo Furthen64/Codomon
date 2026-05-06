@@ -425,7 +425,7 @@ public static class WorkspaceSerializer
         if (missing.Count > 0)
         {
             throw new InvalidOperationException(
-                $"The selected folder is not a valid Codomon workspace. " +
+                $"The selected folder is not a valid codomon workspace. " +
                 $"Missing required files: {string.Join(", ", missing)}");
         }
     }

@@ -10,6 +10,17 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://Nodify/Theme.axaml"/>
       </ResourceDictionary.MergedDictionaries>
+
+      <!-- Architecture layer accent colours -->
+      <Color x:Key="LayerPresentationColor">#9B59B6</Color>
+      <Color x:Key="LayerApplicationColor">#27AE60</Color>
+      <Color x:Key="LayerDomainColor">#F39C12</Color>
+      <Color x:Key="LayerInfrastructureColor">#2980B9</Color>
+
+      <SolidColorBrush x:Key="LayerPresentationBrush" Color="{StaticResource LayerPresentationColor}"/>
+      <SolidColorBrush x:Key="LayerApplicationBrush"  Color="{StaticResource LayerApplicationColor}"/>
+      <SolidColorBrush x:Key="LayerDomainBrush"       Color="{StaticResource LayerDomainColor}"/>
+      <SolidColorBrush x:Key="LayerInfrastructureBrush" Color="{StaticResource LayerInfrastructureColor}"/>
     </ResourceDictionary>
   </Application.Resources>
 </Application>
