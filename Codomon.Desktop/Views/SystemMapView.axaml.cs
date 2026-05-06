@@ -20,10 +20,14 @@ namespace Codomon.Desktop.Views;
 /// </summary>
 public partial class SystemMapView : UserControl
 {
+    private enum LayoutViewMode { Layered, Flat, Compact }
+
     private readonly SystemMapViewModel _vm;
     private DragState? _dragState;
     private bool _showAppLibSeparator;
     private bool _showLayerBands;
+    private LayoutViewMode _layoutViewMode = LayoutViewMode.Flat;
+    private bool _suppressLayoutComboChange;
     private double _zoomLevel = 1.0;
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
@@ -91,6 +95,7 @@ public partial class SystemMapView : UserControl
         WireFilterCheckBoxes();
         WireViewButtons();
         WireZoomButtons();
+        WireLayoutComboBox();
         SetupItemTemplates();
 
         _vm.PropertyChanged   += OnViewModelPropertyChanged;
@@ -153,6 +158,56 @@ public partial class SystemMapView : UserControl
         var zoomCtrl = this.FindControl<LayoutTransformControl>("CanvasZoomControl");
         if (zoomCtrl != null)
             zoomCtrl.LayoutTransform = new ScaleTransform(_zoomLevel, _zoomLevel);
+    }
+
+    // ── Layout ComboBox ───────────────────────────────────────────────────
+
+    private void WireLayoutComboBox()
+    {
+        var combo = this.FindControl<ComboBox>("LayoutViewComboBox");
+        if (combo == null) return;
+        combo.SelectionChanged += OnLayoutComboSelectionChanged;
+    }
+
+    private void OnLayoutComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressLayoutComboChange) return;
+        var combo = sender as ComboBox;
+        if (combo == null) return;
+
+        _layoutViewMode = combo.SelectedIndex switch
+        {
+            0 => LayoutViewMode.Layered,
+            2 => LayoutViewMode.Compact,
+            _ => LayoutViewMode.Flat
+        };
+
+        if (_layoutViewMode == LayoutViewMode.Layered)
+        {
+            _showAppLibSeparator = false;
+            var (updates, hasMultipleLayers) = _vm.SortByLayers();
+            _showLayerBands = hasMultipleLayers;
+            foreach (var (id, x, y) in updates)
+                LayoutPositionChanged?.Invoke(id, false, x, y);
+        }
+        else
+        {
+            _showLayerBands = false;
+        }
+
+        RefreshSystemOverview();
+    }
+
+    /// <summary>
+    /// Syncs the Layout ComboBox to the given index without triggering the
+    /// SelectionChanged handler (re-entry guard via <see cref="_suppressLayoutComboChange"/>).
+    /// </summary>
+    private void SyncLayoutCombo(int index)
+    {
+        _suppressLayoutComboChange = true;
+        var combo = this.FindControl<ComboBox>("LayoutViewComboBox");
+        if (combo != null) combo.SelectedIndex = index;
+        _suppressLayoutComboChange = false;
     }
 
     private void ShowView(SystemMapViewKind view)
@@ -572,7 +627,9 @@ public partial class SystemMapView : UserControl
 
         foreach (var system in _vm.Systems)
         {
-            if (BuildSystemCard(system, null) is not Border card) continue;
+            var card = _layoutViewMode == LayoutViewMode.Layered
+                ? BuildLayeredSystemCard(system, null)
+                : BuildSystemCard(system, null);
             systemsCanvas.Children.Add(card);
             Canvas.SetLeft(card, system.X);
             Canvas.SetTop(card, system.Y);
@@ -746,6 +803,8 @@ public partial class SystemMapView : UserControl
     {
         _showAppLibSeparator = false;
         _showLayerBands = false;
+        _layoutViewMode = LayoutViewMode.Flat;
+        SyncLayoutCombo(1);
         ClearCanvasRequested?.Invoke();
     }
 
@@ -760,6 +819,8 @@ public partial class SystemMapView : UserControl
     public void OnSortAppsFromLibrariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _showLayerBands = false;
+        _layoutViewMode = LayoutViewMode.Flat;
+        SyncLayoutCombo(1);
         var updates = _vm.SortAppsFromLibraries();
         _showAppLibSeparator = updates.Count > 0;
         foreach (var (id, x, y) in updates)
@@ -771,6 +832,8 @@ public partial class SystemMapView : UserControl
     {
         _showAppLibSeparator = false;
         _showLayerBands = false;
+        _layoutViewMode = LayoutViewMode.Flat;
+        SyncLayoutCombo(1);
         var updates = _vm.ArrangeAlphabetically();
         foreach (var (id, x, y) in updates)
             LayoutPositionChanged?.Invoke(id, false, x, y);
@@ -782,6 +845,11 @@ public partial class SystemMapView : UserControl
         _showAppLibSeparator = false;
         var (updates, hasMultipleLayers) = _vm.SortByLayers();
         _showLayerBands = hasMultipleLayers;
+        if (hasMultipleLayers)
+        {
+            _layoutViewMode = LayoutViewMode.Layered;
+            SyncLayoutCombo(0);
+        }
         foreach (var (id, x, y) in updates)
             LayoutPositionChanged?.Invoke(id, false, x, y);
         RefreshSystemOverview();
@@ -812,6 +880,109 @@ public partial class SystemMapView : UserControl
                 LetterSpacing = 0.5
             }
         };
+    }
+
+    /// <summary>Returns the vision accent colour for a given architectural layer.</summary>
+    private static string LayerAccentColor(ArchitectureLayerKind layer) => layer switch
+    {
+        ArchitectureLayerKind.Presentation  => "#9B59B6",
+        ArchitectureLayerKind.Application   => "#27AE60",
+        ArchitectureLayerKind.Domain        => "#F39C12",
+        ArchitectureLayerKind.Infrastructure=> "#2980B9",
+        _                                   => "#4A6A8A"
+    };
+
+    /// <summary>Returns a dark tinted header-strip background for a card in Layered View.</summary>
+    private static string LayerHeaderBgColor(ArchitectureLayerKind layer) => layer switch
+    {
+        ArchitectureLayerKind.Presentation  => "#231540",
+        ArchitectureLayerKind.Application   => "#102518",
+        ArchitectureLayerKind.Domain        => "#251A08",
+        ArchitectureLayerKind.Infrastructure=> "#0E1C2A",
+        _                                   => "#141C28"
+    };
+
+    /// <summary>Returns the subtle background tint colour used for a layer band.</summary>
+    private static string LayerBandBgColor(ArchitectureLayerKind layer) => layer switch
+    {
+        ArchitectureLayerKind.Presentation  => "#160E20",
+        ArchitectureLayerKind.Application   => "#0D1810",
+        ArchitectureLayerKind.Domain        => "#1A1408",
+        ArchitectureLayerKind.Infrastructure=> "#0A1018",
+        _                                   => "#0F141E"
+    };
+
+    /// <summary>
+    /// Builds a simplified Layered-View card: accent-coloured border and header strip,
+    /// optional description text, and a single module-count badge.
+    /// </summary>
+    private Control BuildLayeredSystemCard(SystemItemVm? item, INameScope? _scope)
+    {
+        if (item == null) return new Border();
+
+        string accentColor   = LayerAccentColor(item.LayerKind);
+        string headerBgColor = LayerHeaderBgColor(item.LayerKind);
+
+        var header = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse(headerBgColor)),
+            Padding    = new Avalonia.Thickness(14, 8),
+            Child = new TextBlock
+            {
+                Text         = item.Name,
+                Foreground   = Brushes.White,
+                FontWeight   = FontWeight.Bold,
+                FontSize     = 14,
+                TextWrapping = TextWrapping.Wrap
+            }
+        };
+
+        var body = new StackPanel
+        {
+            Margin  = new Avalonia.Thickness(14, 8),
+            Spacing = 6
+        };
+
+        if (!string.IsNullOrEmpty(item.Description))
+        {
+            body.Children.Add(new TextBlock
+            {
+                Text         = item.Description,
+                Foreground   = new SolidColorBrush(Color.Parse("#AABBCC")),
+                FontSize     = 11,
+                TextWrapping = TextWrapping.Wrap,
+                MaxLines     = 2
+            });
+        }
+
+        if (item.ModuleCount > 0)
+        {
+            body.Children.Add(MakeBadge($"⚙ {item.ModuleCount}", "#1A2A3A", accentColor));
+        }
+
+        var card = new Border
+        {
+            Background      = new SolidColorBrush(Color.Parse("#141C28")),
+            BorderBrush     = new SolidColorBrush(Color.Parse(accentColor)),
+            BorderThickness = new Avalonia.Thickness(1.5),
+            CornerRadius    = new Avalonia.CornerRadius(8),
+            Width           = 220,
+            ClipToBounds    = true,
+            Cursor          = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+            Child           = new StackPanel { Children = { header, body } }
+        };
+
+        var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
+        if (systemsCanvas != null)
+        {
+            WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
+            {
+                _vm.SelectSystem(item);
+                _vm.SetActiveView(SystemMapViewKind.ModuleView);
+            });
+        }
+
+        return card;
     }
 
     /// <summary>
@@ -869,36 +1040,12 @@ public partial class SystemMapView : UserControl
         const double cardApproxHeight = ArrowCardHalfHeight * 2 + 20;
         const double bandWidth = 8000;
 
-        var layerColors = new Dictionary<ArchitectureLayerKind, string>
-        {
-            { ArchitectureLayerKind.Presentation,  "#0C1E0C" },
-            { ArchitectureLayerKind.Application,   "#0A0C22" },
-            { ArchitectureLayerKind.Domain,        "#1E1C08" },
-            { ArchitectureLayerKind.Infrastructure,"#1C0A1C" }
-        };
-
-        var layerBorderColors = new Dictionary<ArchitectureLayerKind, string>
-        {
-            { ArchitectureLayerKind.Presentation,  "#1E6A1E" },
-            { ArchitectureLayerKind.Application,   "#1E1E6A" },
-            { ArchitectureLayerKind.Domain,        "#6A6A1E" },
-            { ArchitectureLayerKind.Infrastructure,"#6A1E6A" }
-        };
-
         var layerLabels = new Dictionary<ArchitectureLayerKind, string>
         {
-            { ArchitectureLayerKind.Presentation,  "PRESENTATION" },
-            { ArchitectureLayerKind.Application,   "APPLICATION" },
-            { ArchitectureLayerKind.Domain,        "DOMAIN" },
-            { ArchitectureLayerKind.Infrastructure,"INFRASTRUCTURE" }
-        };
-
-        var layerLabelColors = new Dictionary<ArchitectureLayerKind, string>
-        {
-            { ArchitectureLayerKind.Presentation,  "#3ABF3A" },
-            { ArchitectureLayerKind.Application,   "#3A7FFF" },
-            { ArchitectureLayerKind.Domain,        "#DFAA44" },
-            { ArchitectureLayerKind.Infrastructure,"#BF44BF" }
+            { ArchitectureLayerKind.Presentation,  "PRESENTATION LAYER" },
+            { ArchitectureLayerKind.Application,   "APPLICATION LAYER" },
+            { ArchitectureLayerKind.Domain,        "DOMAIN LAYER" },
+            { ArchitectureLayerKind.Infrastructure,"INFRASTRUCTURE LAYER" }
         };
 
         foreach (ArchitectureLayerKind layer in Enum.GetValues<ArchitectureLayerKind>())
@@ -910,12 +1057,15 @@ public partial class SystemMapView : UserControl
             double maxY = systems.Max(s => s.Y) + cardApproxHeight + bandPadY;
             double bandHeight = Math.Max(10, maxY - minY);
 
+            string accentColor  = LayerAccentColor(layer);
+            string bandBgColor  = LayerBandBgColor(layer);
+
             var band = new Border
             {
                 Width           = bandWidth,
                 Height          = bandHeight,
-                Background      = new SolidColorBrush(Color.Parse(layerColors[layer])),
-                BorderBrush     = new SolidColorBrush(Color.Parse(layerBorderColors[layer])),
+                Background      = new SolidColorBrush(Color.Parse(bandBgColor)),
+                BorderBrush     = new SolidColorBrush(Color.Parse(accentColor)),
                 BorderThickness = new Avalonia.Thickness(1.5),
                 CornerRadius    = new Avalonia.CornerRadius(6),
                 IsHitTestVisible = false
@@ -924,17 +1074,18 @@ public partial class SystemMapView : UserControl
             Canvas.SetTop(band, minY);
             canvas.Children.Add(band);
 
+            // Label on the left edge, vertically centred within the band.
             var lbl = new TextBlock
             {
                 Text          = layerLabels[layer],
                 FontSize      = 10,
                 FontWeight    = FontWeight.Bold,
-                Foreground    = new SolidColorBrush(Color.Parse(layerLabelColors[layer])),
+                Foreground    = new SolidColorBrush(Color.Parse(accentColor)),
                 LetterSpacing = 1.5,
                 IsHitTestVisible = false
             };
-            Canvas.SetLeft(lbl, 8);
-            Canvas.SetTop(lbl, minY + 6);
+            Canvas.SetLeft(lbl, 12);
+            Canvas.SetTop(lbl, minY + bandHeight / 2.0 - 8.0);
             canvas.Children.Add(lbl);
         }
     }
@@ -1197,6 +1348,8 @@ public partial class SystemMapView : UserControl
             UpdateCanvasExtent(dragState.Canvas, minimumWidth: 720, minimumHeight: 140);
             // Manual drag invalidates the layer band layout.
             _showLayerBands = false;
+            _layoutViewMode = LayoutViewMode.Flat;
+            SyncLayoutCombo(1);
             // Redraw arrows from the updated card positions.
             RefreshSystemOverview();
         }
