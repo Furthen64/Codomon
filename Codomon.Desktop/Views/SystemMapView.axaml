@@ -12,7 +12,7 @@
             Padding="6,4">
       <DockPanel>
 
-        <!-- View buttons -->
+        <!-- View buttons + Layout dropdown -->
         <StackPanel Orientation="Horizontal" Spacing="4">
           <TextBlock Text="VIEW:" VerticalAlignment="Center"
                      Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
@@ -21,6 +21,15 @@
           <Button x:Name="BtnModuleView"      Content="Modules"         Padding="8,3"/>
           <Button x:Name="BtnCodeDetailView"  Content="Code Detail"     Padding="8,3"/>
           <Button x:Name="BtnStartupView"     Content="Startup"         Padding="8,3"/>
+          <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
+          <TextBlock Text="LAYOUT:" VerticalAlignment="Center"
+                     Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
+                     LetterSpacing="1" Margin="4,0,4,0"/>
+          <ComboBox x:Name="LayoutViewComboBox" SelectedIndex="1" MaxHeight="28" MinWidth="120">
+            <ComboBoxItem Content="Layered View"/>
+            <ComboBoxItem Content="Flat View"/>
+            <ComboBoxItem Content="Compact View"/>
+          </ComboBox>
         </StackPanel>
 
         <!-- Filters -->
@@ -61,34 +70,6 @@
                         HorizontalScrollBarVisibility="Auto"
                         VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="16,12" Spacing="16">
-
-              <DockPanel>
-                <TextBlock Text="CANVAS ACTIONS" FontSize="9" FontWeight="Bold"
-                           Foreground="#4A6A8A" LetterSpacing="1" VerticalAlignment="Center"
-                           DockPanel.Dock="Left"/>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-                  <TextBlock Text="ZOOM:" VerticalAlignment="Center"
-                             Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
-                             LetterSpacing="1" Margin="0,0,2,0"/>
-                  <Button x:Name="ZoomOutButton" Content="−" Width="28" Padding="4,2"
-                          ToolTip.Tip="Zoom out"/>
-                  <TextBlock x:Name="ZoomLevelText" Text="100%"
-                             VerticalAlignment="Center" Foreground="#AABBCC"
-                             FontSize="11" Width="38" TextAlignment="Center"/>
-                  <Button x:Name="ZoomInButton" Content="+" Width="28" Padding="4,2"
-                          ToolTip.Tip="Zoom in"/>
-                  <Button x:Name="ZoomResetButton" Content="Reset" Padding="8,2"
-                          ToolTip.Tip="Reset zoom to 100%"/>
-                  <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
-                  <Button x:Name="ClearCanvasButton"
-                          Content="Clear Canvas"
-                          Click="OnClearCanvasClick"
-                          Padding="10,4"
-                          Background="#3A1A1A"
-                          Foreground="#FFAAAA"
-                          ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
-                </StackPanel>
-              </DockPanel>
 
               <TextBlock x:Name="EmptySystemOverviewText"
                          Text="No Systems found. Use Architecture Hypothesis to detect systems from your codebase."
@@ -178,6 +159,26 @@
             </StackPanel>
           </ScrollViewer>
 
+          <!-- Zoom overlay — absolutely positioned top-right of content area -->
+          <Border x:Name="CanvasZoomOverlay"
+                  HorizontalAlignment="Right" VerticalAlignment="Top"
+                  Margin="8" Padding="6,4"
+                  Background="#CC1A2435"
+                  CornerRadius="4"
+                  IsHitTestVisible="True">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <Button x:Name="ZoomOutButton" Content="−" Width="28" Padding="4,2"
+                      ToolTip.Tip="Zoom out"/>
+              <TextBlock x:Name="ZoomLevelText" Text="100%"
+                         VerticalAlignment="Center" Foreground="#AABBCC"
+                         FontSize="11" Width="38" TextAlignment="Center"/>
+              <Button x:Name="ZoomInButton" Content="+" Width="28" Padding="4,2"
+                      ToolTip.Tip="Zoom in"/>
+              <Button x:Name="ZoomResetButton" Content="Reset" Padding="8,2"
+                      ToolTip.Tip="Reset zoom to 100%"/>
+            </StackPanel>
+          </Border>
+
         </Grid>
       </Border>
 
@@ -221,6 +222,15 @@
                       HorizontalAlignment="Stretch"
                       Padding="8,4"
                       ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
+
+              <Button x:Name="ClearCanvasButton"
+                      Content="Clear Canvas"
+                      Click="OnClearCanvasClick"
+                      HorizontalAlignment="Stretch"
+                      Padding="8,4"
+                      Background="#3A1A1A"
+                      Foreground="#FFAAAA"
+                      ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
 
             </StackPanel>
           </Border>

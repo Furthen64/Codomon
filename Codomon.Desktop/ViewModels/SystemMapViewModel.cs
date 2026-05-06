@@ -28,6 +28,8 @@ public class SystemItemVm
     public double X                { get; set; }
     public double Y                { get; set; }
     public ArchitectureLayerKind LayerKind { get; init; }
+    /// <summary>Short human-readable description sourced from the system's Notes field.</summary>
+    public string Description { get; init; } = string.Empty;
     /// <summary>Top module kinds for this system, in descending order of count.</summary>
     public IReadOnlyList<(string Kind, int Count)> ModuleKindCounts { get; init; } = Array.Empty<(string, int)>();
 
@@ -369,6 +371,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 ModuleCount      = CountModulesForSystem(model, s),
                 LayerKind        = ClassifySystemLayer(s.Kind, s.StartupMechanism),
                 ModuleKindCounts = GetModuleKindCounts(model, s),
+                Description      = s.Notes,
                 X                = position.X,
                 Y                = position.Y
             };
