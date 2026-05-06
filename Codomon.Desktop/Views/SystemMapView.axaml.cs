@@ -5,6 +5,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.ViewModels;
 using System;
@@ -29,6 +30,8 @@ public partial class SystemMapView : UserControl
     private LayoutViewMode _layoutViewMode = LayoutViewMode.Flat;
     private bool _suppressLayoutComboChange;
     private double _zoomLevel = 1.0;
+    private double _zoomTarget = 1.0;
+    private DispatcherTimer? _zoomAnimTimer;
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
     /// currently selected system in Module View.
@@ -149,18 +152,53 @@ public partial class SystemMapView : UserControl
         var zoomOut   = this.FindControl<Button>("ZoomOutButton")!;
         var zoomReset = this.FindControl<Button>("ZoomResetButton")!;
 
-        zoomIn.Click    += (_, _) => SetZoom(Math.Min(3.0, _zoomLevel + 0.25));
-        zoomOut.Click   += (_, _) => SetZoom(Math.Max(0.25, _zoomLevel - 0.25));
+        zoomIn.Click    += (_, _) => SetZoom(Math.Min(3.0, _zoomTarget + 0.25));
+        zoomOut.Click   += (_, _) => SetZoom(Math.Max(0.25, _zoomTarget - 0.25));
         zoomReset.Click += (_, _) => SetZoom(1.0);
     }
 
     private void SetZoom(double level)
     {
-        _zoomLevel = level;
+        _zoomTarget = level;
 
+        // Update the zoom label immediately to the target level for responsive feedback.
         var zoomText = this.FindControl<TextBlock>("ZoomLevelText");
         if (zoomText != null)
-            zoomText.Text = $"{(int)Math.Round(_zoomLevel * 100)}%";
+            zoomText.Text = $"{(int)Math.Round(_zoomTarget * 100)}%";
+
+        // Start (or restart) the smooth-zoom animation timer if not already animating.
+        if (_zoomAnimTimer == null)
+        {
+            _zoomAnimTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(16) // ~60 fps
+            };
+            _zoomAnimTimer.Tick += OnZoomAnimTick;
+        }
+
+        if (!_zoomAnimTimer.IsEnabled)
+            _zoomAnimTimer.Start();
+    }
+
+    private void OnZoomAnimTick(object? sender, EventArgs e)
+    {
+        // Stop animating once the remaining distance is imperceptible (sub-pixel).
+        const double snapThreshold = 0.002;
+        // Fraction of remaining distance closed per 16 ms tick (~60 fps).
+        // At 0.18 the zoom reaches 95% of its target in roughly 300 ms (ease-out feel).
+        const double lerpFactor = 0.18;
+
+        double delta = _zoomTarget - _zoomLevel;
+
+        if (Math.Abs(delta) < snapThreshold)
+        {
+            _zoomLevel = _zoomTarget;
+            _zoomAnimTimer?.Stop();
+        }
+        else
+        {
+            _zoomLevel += delta * lerpFactor;
+        }
 
         var zoomCtrl = this.FindControl<LayoutTransformControl>("CanvasZoomControl");
         if (zoomCtrl != null)

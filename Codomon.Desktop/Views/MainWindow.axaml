@@ -162,11 +162,11 @@
 
                 <!-- Watch / Pause / Stop controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <Button x:Name="WatchLogButton"     Content="📡 Watch…" Padding="6,2" FontSize="11"
+                  <Button x:Name="WatchLogButton"     Content="📡 Watch"   Padding="6,2" FontSize="11"
                           Click="OnWatchLogClick"    IsEnabled="False"/>
                   <Button x:Name="LogStreamPauseBtn" Content="⏸ Pause"   Padding="6,2" FontSize="11"
                           Click="OnLogStreamPauseClick" IsEnabled="False"/>
-                  <Button x:Name="StopWatchButton"   Content="⏹ Stop"    Padding="6,2" FontSize="11"
+                  <Button x:Name="StopWatchButton"   Content="■ Stop"     Padding="6,2" FontSize="11"
                           Click="OnStopWatchClick"   IsEnabled="False"/>
                 </StackPanel>
               </Grid>

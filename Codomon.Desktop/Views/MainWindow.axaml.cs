@@ -291,7 +291,7 @@ public partial class MainWindow : Window
 
         var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Open Codomon Workspace Folder",
+            Title = "Open codomon Workspace Folder",
             AllowMultiple = false
         });
 
