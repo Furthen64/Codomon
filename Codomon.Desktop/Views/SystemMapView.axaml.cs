@@ -282,6 +282,44 @@ public partial class SystemMapView : UserControl
                 TextWrapping = TextWrapping.Wrap
             };
         }, supportsRecycling: false);
+
+        // Connections tab — outbound list
+        var outboundCtrl = this.FindControl<ItemsControl>("CompOutboundItemsControl")!;
+        outboundCtrl.ItemTemplate = new FuncDataTemplate<RelationshipItemVm>(BuildConnectionRow, supportsRecycling: false);
+
+        // Connections tab — inbound list
+        var inboundCtrl = this.FindControl<ItemsControl>("CompInboundItemsControl")!;
+        inboundCtrl.ItemTemplate = new FuncDataTemplate<RelationshipItemVm>(BuildConnectionRow, supportsRecycling: false);
+
+        // Component tab — responsibilities list
+        var respCtrl = this.FindControl<ItemsControl>("CompResponsibilitiesItemsControl")!;
+        respCtrl.ItemTemplate = new FuncDataTemplate<string>((s, _) =>
+        {
+            if (s == null) return new TextBlock();
+            return new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "•",
+                        Foreground = new SolidColorBrush(Color.Parse("#4A6A8A")),
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Avalonia.Thickness(0, 1, 0, 0)
+                    },
+                    new TextBlock
+                    {
+                        Text = s,
+                        Foreground = new SolidColorBrush(Color.Parse("#AABBCC")),
+                        FontSize = 11,
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                }
+            };
+        }, supportsRecycling: false);
     }
 
     // ── Card / row builders ───────────────────────────────────────────────
@@ -713,6 +751,7 @@ public partial class SystemMapView : UserControl
 
     private void UpdateInspector()
     {
+        // ── Properties tab (existing fields) ──────────────────────────────
         var nameText   = this.FindControl<TextBlock>("InspNameText")!;
         var typePanel  = this.FindControl<StackPanel>("InspTypePanel")!;
         var typeText   = this.FindControl<TextBlock>("InspTypeText")!;
@@ -739,11 +778,158 @@ public partial class SystemMapView : UserControl
         notesPanel.IsVisible = hasNotes;
         detPanel.IsVisible   = hasDetail;
 
-        if (hasType)  typeText.Text  = _vm.InspectorType;
-        if (hasKind)  kindText.Text  = _vm.InspectorKind;
-        if (hasConf)  confText.Text  = _vm.InspectorConfidence;
-        if (hasNotes) notesText.Text = _vm.InspectorNotes;
+        if (hasType)   typeText.Text  = _vm.InspectorType;
+        if (hasKind)   kindText.Text  = _vm.InspectorKind;
+        if (hasConf)   confText.Text  = _vm.InspectorConfidence;
+        if (hasNotes)  notesText.Text = _vm.InspectorNotes;
         if (hasDetail) detCtrl.ItemsSource = _vm.InspectorDetails;
+
+        // ── Component tab ─────────────────────────────────────────────────
+        UpdateComponentTab();
+
+        // ── Connections tab ───────────────────────────────────────────────
+        UpdateConnectionsTab();
+    }
+
+    private void UpdateComponentTab()
+    {
+        var compName        = this.FindControl<TextBlock>("CompNameText");
+        var compBadges      = this.FindControl<StackPanel>("CompBadgesPanel");
+        var compLayerBorder = this.FindControl<Border>("CompLayerTagBorder");
+        var compLayerText   = this.FindControl<TextBlock>("CompLayerTagText");
+        var compDesc        = this.FindControl<TextBlock>("CompDescText");
+        var compSource      = this.FindControl<StackPanel>("CompSourcePanel");
+        var compSourceFile  = this.FindControl<TextBlock>("CompSourceFileText");
+        var compSourceLines = this.FindControl<TextBlock>("CompSourceLinesText");
+        var compResp        = this.FindControl<StackPanel>("CompResponsibilitiesPanel");
+        var compRespCtrl    = this.FindControl<ItemsControl>("CompResponsibilitiesItemsControl");
+        var compActivity    = this.FindControl<StackPanel>("CompActivityPanel");
+
+        if (compName == null) return;
+
+        compName.Text = _vm.InspectorName;
+
+        bool hasSelection = !string.IsNullOrEmpty(_vm.InspectorType);
+        bool isSystem     = _vm.InspectorIsSystemSelected;
+
+        // Badge row
+        if (compBadges != null)
+            compBadges.IsVisible = isSystem;
+
+        if (isSystem && compLayerBorder != null && compLayerText != null)
+        {
+            var layerColor = Color.Parse(_vm.InspectorLayerColor);
+            compLayerText.Text       = _vm.InspectorLayerLabel;
+            compLayerText.Foreground = new SolidColorBrush(layerColor);
+            compLayerBorder.Background = new SolidColorBrush(
+                new Color(40, layerColor.R, layerColor.G, layerColor.B));
+        }
+
+        // Description
+        bool hasDesc = !string.IsNullOrEmpty(_vm.InspectorDescription);
+        if (compDesc != null)
+        {
+            compDesc.Text      = _vm.InspectorDescription;
+            compDesc.IsVisible = hasDesc;
+        }
+
+        // Source
+        bool hasSourceFile  = !string.IsNullOrEmpty(_vm.InspectorSourceFile);
+        bool hasSourceLines = !string.IsNullOrEmpty(_vm.InspectorSourceLineRange);
+        if (compSource != null)
+            compSource.IsVisible = hasSourceFile;
+        if (compSourceFile != null)
+            compSourceFile.Text  = _vm.InspectorSourceFile;
+        if (compSourceLines != null)
+        {
+            compSourceLines.Text      = _vm.InspectorSourceLineRange;
+            compSourceLines.IsVisible = hasSourceLines;
+        }
+
+        // Responsibilities
+        bool hasResp = _vm.InspectorResponsibilities.Count > 0;
+        if (compResp != null)
+            compResp.IsVisible = hasResp;
+        if (compRespCtrl != null && hasResp)
+            compRespCtrl.ItemsSource = _vm.InspectorResponsibilities;
+
+        // Recent Activity placeholder — show when system is selected
+        if (compActivity != null)
+            compActivity.IsVisible = isSystem;
+    }
+
+    private void UpdateConnectionsTab()
+    {
+        var nothingText  = this.FindControl<TextBlock>("CompConnNothingText");
+        var outboundPanel = this.FindControl<StackPanel>("CompOutboundPanel");
+        var outboundCtrl  = this.FindControl<ItemsControl>("CompOutboundItemsControl");
+        var inboundPanel  = this.FindControl<StackPanel>("CompInboundPanel");
+        var inboundCtrl   = this.FindControl<ItemsControl>("CompInboundItemsControl");
+
+        if (nothingText == null) return;
+
+        bool hasOutbound = _vm.InspectorOutboundConnections.Count > 0;
+        bool hasInbound  = _vm.InspectorInboundConnections.Count  > 0;
+        bool hasAny      = hasOutbound || hasInbound;
+
+        nothingText.IsVisible = !hasAny;
+
+        if (outboundPanel != null) outboundPanel.IsVisible = hasOutbound;
+        if (inboundPanel  != null) inboundPanel.IsVisible  = hasInbound;
+
+        if (outboundCtrl != null && hasOutbound)
+            outboundCtrl.ItemsSource = _vm.InspectorOutboundConnections;
+        if (inboundCtrl  != null && hasInbound)
+            inboundCtrl.ItemsSource  = _vm.InspectorInboundConnections;
+    }
+
+    /// <summary>Builds a single row in the Connections tab for a relationship.</summary>
+    private Control BuildConnectionRow(RelationshipItemVm? rel, INameScope? _scope)
+    {
+        if (rel == null) return new Border();
+
+        var kindColor = rel.Kind switch
+        {
+            RelationshipKind.Calls     => "#27AE60",
+            RelationshipKind.Publishes => "#9B59B6",
+            RelationshipKind.Subscribes => "#F39C12",
+            RelationshipKind.Reads     => "#2980B9",
+            RelationshipKind.Writes    => "#E74C3C",
+            RelationshipKind.Depends   => "#4A6A8A",
+            _                          => "#4A6A8A"
+        };
+
+        // Show the other endpoint's name relative to the selected system.
+        string otherName = string.IsNullOrEmpty(_vm.SelectedSystem?.Id)
+            ? $"{rel.FromName} → {rel.ToName}"
+            : string.Equals(rel.FromId, _vm.SelectedSystem.Id, StringComparison.Ordinal)
+                ? rel.ToName
+                : rel.FromName;
+
+        return new Border
+        {
+            Background   = new SolidColorBrush(Color.Parse("#1A2435")),
+            CornerRadius = new Avalonia.CornerRadius(4),
+            Padding      = new Avalonia.Thickness(8, 5),
+            Margin       = new Avalonia.Thickness(0, 2),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing     = 8,
+                Children    =
+                {
+                    MakeBadge(rel.Kind.ToString(), "#0F141E", kindColor),
+                    new TextBlock
+                    {
+                        Text       = otherName,
+                        Foreground = Brushes.White,
+                        FontSize   = 12,
+                        TextWrapping = TextWrapping.Wrap,
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                }
+            }
+        };
     }
 
     // ── VM property change handler ────────────────────────────────────────
@@ -769,6 +955,15 @@ public partial class SystemMapView : UserControl
             case nameof(SystemMapViewModel.InspectorNotes):
             case nameof(SystemMapViewModel.InspectorConfidence):
             case nameof(SystemMapViewModel.InspectorDetails):
+            case nameof(SystemMapViewModel.InspectorIsSystemSelected):
+            case nameof(SystemMapViewModel.InspectorLayerLabel):
+            case nameof(SystemMapViewModel.InspectorLayerColor):
+            case nameof(SystemMapViewModel.InspectorDescription):
+            case nameof(SystemMapViewModel.InspectorSourceFile):
+            case nameof(SystemMapViewModel.InspectorSourceLineRange):
+            case nameof(SystemMapViewModel.InspectorResponsibilities):
+            case nameof(SystemMapViewModel.InspectorInboundConnections):
+            case nameof(SystemMapViewModel.InspectorOutboundConnections):
                 UpdateInspector();
                 break;
 
