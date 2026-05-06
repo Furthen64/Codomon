@@ -264,10 +264,16 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 
         var (system, isNew) = SystemMapUpsertService.UpsertSystem(_workspace.SystemMap, suggestion);
 
+        // Upsert the modules the LLM suggested for this system so that the canvas reflects
+        // the hypothesis-defined module structure rather than showing empty systems.
+        foreach (var moduleSuggestion in suggestion.Modules)
+            SystemMapUpsertService.UpsertModule(_workspace.SystemMap, moduleSuggestion, system);
+
         if (isNew) AcceptedCount++;
         AppliedSuggestionCount++;
         HasCanvasChanges = true;
-        AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} system: {system.Name}");
+        AppLogger.Info($"[Hypothesis] {(isNew ? "Accepted" : "Merged")} system: {system.Name}" +
+                       (suggestion.Modules.Count > 0 ? $" (+{suggestion.Modules.Count} module suggestion(s))" : string.Empty));
         ReapplyManualOverrides();
         SystemMapValidator.Validate(_workspace.SystemMap);
 
