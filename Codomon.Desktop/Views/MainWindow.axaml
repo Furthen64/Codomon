@@ -1,77 +1,79 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Codomon.Desktop.Views.MainWindow"
-        Title="Codomon"
+        Title="codomon"
         Width="1280" Height="800"
         MinWidth="800" MinHeight="600"
         WindowStartupLocation="CenterScreen">
 
   <DockPanel LastChildFill="True">
 
-    <!-- Top Toolbar — three labelled panel groups -->
-    <Border DockPanel.Dock="Top" Background="#1E2A3A" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="6,4">
-      <StackPanel Orientation="Horizontal" Spacing="8">
+    <!-- Top Toolbar — slim nav bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+      <Grid Height="44">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- ── Workspace group ───────────────────────────── -->
-        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
-          <StackPanel Spacing="4">
-            <TextBlock Text="WORKSPACE" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
-                       LetterSpacing="1" HorizontalAlignment="Center"/>
+        <!-- Left: codomon wordmark + workspace dropdown -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
+                    VerticalAlignment="Center" Margin="10,0,0,0">
+          <TextBlock Text="◈" FontSize="18" Foreground="#4A90D9" VerticalAlignment="Center"/>
+          <TextBlock Text="codomon" FontSize="13" FontWeight="Bold" Foreground="#8AB4D4"
+                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <!-- Workspace name dropdown -->
+          <Button x:Name="WorkspaceDropBtn" Padding="8,3" VerticalAlignment="Center">
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <MenuItem Header="New Workspace"     Click="OnNewWorkspaceClick"/>
+                <MenuItem Header="Open Workspace…"   Click="OnOpenWorkspaceClick"/>
+                <MenuItem Header="Save"              Click="OnSaveWorkspaceClick"/>
+                <MenuItem Header="Save As…"          Click="OnSaveAsWorkspaceClick"/>
+                <MenuItem Header="Load Autosave…"    Click="OnLoadAutosaveClick"/>
+                <Separator/>
+                <MenuItem Header="New Profile"       Click="OnNewProfileClick"/>
+                <MenuItem Header="Rename Profile"    Click="OnRenameProfileClick"/>
+                <MenuItem Header="Duplicate Profile" Click="OnDuplicateProfileClick"/>
+                <MenuItem Header="Delete Profile"    Click="OnDeleteProfileClick"/>
+              </MenuFlyout>
+            </Button.Flyout>
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="New"      Click="OnNewWorkspaceClick"    Padding="8,3"/>
-              <Button Content="Open"     Click="OnOpenWorkspaceClick"   Padding="8,3"/>
-              <Button Content="Save"     Click="OnSaveWorkspaceClick"   Padding="8,3"/>
-              <Button Content="Save As…" Click="OnSaveAsWorkspaceClick" Padding="8,3"/>
-              <Button Content="Autosave" Click="OnLoadAutosaveClick"    Padding="8,3"/>
+              <TextBlock x:Name="WorkspaceNameText" Text="No Workspace" VerticalAlignment="Center"/>
+              <TextBlock Text="▾" VerticalAlignment="Center" Opacity="0.6" FontSize="10"/>
             </StackPanel>
-          </StackPanel>
-        </Border>
+          </Button>
+        </StackPanel>
 
-        <!-- ── Profiles group ────────────────────────────── -->
-        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
-          <StackPanel Spacing="4">
-            <TextBlock Text="PROFILES" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
-                       LetterSpacing="1" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <ComboBox x:Name="ProfileComboBox" Width="150" Padding="6,2" VerticalAlignment="Center"
-                        SelectionChanged="OnProfileComboBoxSelectionChanged"/>
-              <Button Content="New"       Click="OnNewProfileClick"       Padding="8,3"/>
-              <Button Content="Rename"    Click="OnRenameProfileClick"    Padding="8,3"/>
-              <Button Content="Duplicate" Click="OnDuplicateProfileClick" Padding="8,3"/>
-              <Button Content="Delete"    Click="OnDeleteProfileClick"    Padding="8,3"
-                      Background="#3A1A1A" Foreground="#FF7070"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
+        <!-- Center: five navigation tabs -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                    Spacing="2" VerticalAlignment="Center">
+          <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"/>
+          <Button x:Name="NavScanBtn"    Content="Scan"    Tag="Scan"    Click="OnNavTabClick" Padding="14,5"/>
+          <Button x:Name="NavMonitorBtn" Content="Monitor" Tag="Monitor" Click="OnNavTabClick" Padding="14,5"/>
+          <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"/>
+          <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"/>
+        </StackPanel>
 
-        <!-- ── Devtools group ────────────────────────────── -->
-        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
-          <StackPanel Spacing="4">
-            <TextBlock Text="DEVTOOLS" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
-                       LetterSpacing="1" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="Scan"         Click="OnScanClick"    Padding="8,3"/>
-              <Button Content="Run"          Padding="8,3"/>
-              <Button Content="Summaries"    Click="OnSummariesClick" Padding="8,3"/>
-              <Button Content="Architecture" Click="OnHypothesisClick" Padding="8,3"/>
-              <Button Content="Replay Logs"  Click="OnImportLogClick" Padding="8,3"/>
-              <Button Content="Dev Console"  Click="OnDevConsoleClick" Padding="8,3"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
+        <!-- Right: running indicator + stop button + settings gear -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                    VerticalAlignment="Center" Margin="0,0,10,0">
+          <Border x:Name="RunningIndicatorBorder" Background="#152A15" CornerRadius="10"
+                  Padding="8,3" IsVisible="False">
+            <TextBlock Text="● Running" Foreground="#44CC44" FontSize="11" VerticalAlignment="Center"/>
+          </Border>
+          <Button x:Name="TopBarStopBtn" Content="■ Stop" Click="OnStopWatchClick"
+                  IsVisible="False" Padding="8,3"/>
+          <Button x:Name="TopBarSettingsBtn" Content="⚙" Click="OnSettingsClick"
+                  Padding="8,5" FontSize="14" ToolTip.Tip="Settings"/>
+        </StackPanel>
 
-        <!-- ── Settings group ───────────────────────────── -->
-        <Border BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4" Padding="8,4">
-          <StackPanel Spacing="4">
-            <TextBlock Text="APP" FontSize="9" FontWeight="Bold" Foreground="#4A6A8A"
-                       LetterSpacing="1" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <Button Content="⚙ Settings" Click="OnSettingsClick" Padding="8,3"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
+        <!-- Hidden ProfileComboBox retained for code-behind compatibility -->
+        <ComboBox x:Name="ProfileComboBox" IsVisible="False" Width="0" Grid.Column="0"
+                  SelectionChanged="OnProfileComboBoxSelectionChanged"/>
 
-      </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Status Bar -->
@@ -157,6 +159,33 @@
 
       <!-- Main Content rows (row 0) -->
       <Grid Grid.Row="0">
+
+      <!-- ── Design tab placeholder ─── -->
+      <Grid x:Name="DesignPanel" IsVisible="False" Background="#0F141E">
+        <TextBlock Text="Design" FontSize="24" Foreground="#4A6A8A"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Grid>
+
+      <!-- ── Scan tab panel (devtools) ─── -->
+      <Grid x:Name="ScanPanel" IsVisible="False" Background="#0F141E">
+        <DockPanel Margin="40,32">
+          <TextBlock DockPanel.Dock="Top" Text="Scan" FontSize="18" FontWeight="Bold"
+                     Foreground="#AABBCC" Margin="0,0,0,20"/>
+          <StackPanel Spacing="8" DockPanel.Dock="Top">
+            <Button Content="Run Scan"           Click="OnScanClick"       Padding="14,6" HorizontalAlignment="Left"/>
+            <Button Content="LLM Summaries"      Click="OnSummariesClick"  Padding="14,6" HorizontalAlignment="Left"/>
+            <Button Content="Architecture"       Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left"/>
+            <Button Content="Replay Logs"        Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left"/>
+            <Button Content="Dev Console"        Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left"/>
+          </StackPanel>
+        </DockPanel>
+      </Grid>
+
+      <!-- ── Docs tab placeholder ─── -->
+      <Grid x:Name="DocsPanel" IsVisible="False" Background="#0F141E">
+        <TextBlock Text="Docs" FontSize="24" Foreground="#4A6A8A"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Grid>
 
       <!-- ── 3-column workspace layout ─── -->
       <Grid x:Name="WorkspaceGrid" IsVisible="False">
@@ -283,7 +312,7 @@
 
           <!-- Header row -->
           <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,28">
-            <TextBlock Text="Codomon" FontSize="32" FontWeight="Bold" Foreground="#AABBCC"/>
+            <TextBlock Text="codomon" FontSize="32" FontWeight="Bold" Foreground="#AABBCC"/>
             <TextBlock Text="Recent Workspaces" FontSize="20" Foreground="#778899"/>
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,12,0,0">
               <Button Content="✚  New Workspace"  Click="OnNewWorkspaceClick"  Padding="14,6" FontSize="13"/>
