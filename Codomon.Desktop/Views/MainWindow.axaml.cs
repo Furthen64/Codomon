@@ -1314,7 +1314,29 @@ public partial class MainWindow : Window
         if (hypothesisVm.HasCanvasChanges || !string.Equals(systemMapBefore, systemMapAfter, StringComparison.Ordinal))
             _vm.IsDirty = true;
 
-        AppLogger.Debug($"[Hypothesis] Apply-to-canvas flow finished. IsDirty={_vm.IsDirty}; Final System Map: {systemMapAfter}");
+        // Re-apply the latest saved Roslyn scan (if any) so that actual code-analysis
+        // data — modules, code nodes, relationships — flows into the hypothesis-defined
+        // systems.  This enriches the canvas without requiring the user to manually
+        // re-run the scan after every Architecture hypothesis pass.
+        if (hypothesisVm.HasCanvasChanges && !string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath))
+        {
+            var savedScans = RoslynScanService.ListSavedScans(_vm.WorkspaceFolderPath);
+            if (savedScans.Count > 0)
+            {
+                AppLogger.Info("[Hypothesis] Re-applying latest saved Roslyn scan to coordinate code analysis with hypothesis systems.");
+                await ExecuteSafeAsync(async () =>
+                {
+                    var latestScan = await RoslynScanService.LoadAsync(savedScans[0].FilePath);
+                    if (latestScan != null)
+                    {
+                        await _vm.ApplyRoslynScanAsync(latestScan);
+                        AppLogger.Info("[Hypothesis] Roslyn scan re-applied — canvas enriched with code analysis data.");
+                    }
+                });
+            }
+        }
+
+        AppLogger.Debug($"[Hypothesis] Apply-to-canvas flow finished. IsDirty={_vm.IsDirty}; Final System Map: {DescribeSystemMap(_vm.Workspace.SystemMap)}");
     }
 
     private static string DescribeSystemMap(SystemMapModel map)
