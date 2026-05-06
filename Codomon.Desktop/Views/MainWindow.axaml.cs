@@ -44,6 +44,9 @@ public partial class MainWindow : Window
     private bool _firstRunConfigCheckDone;
     private bool _updatingAutoAlignPreset;
 
+    // Tracks the currently active navigation tab.
+    private string _activeNavTab = "Monitor";
+
     public MainWindow()
     {
         InitializeComponent();
@@ -52,7 +55,7 @@ public partial class MainWindow : Window
         DataContext = _vm;
 
         // Set the window title with version and build date embedded at build time.
-        Title = $"Codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
+        Title = $"codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
 
         SetupCanvas();
         SetupTreeView();
@@ -66,6 +69,10 @@ public partial class MainWindow : Window
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         SubscribeToLogReplay(_vm.LogReplay);
         SubscribeToLiveMonitor(_vm.LiveMonitor);
+
+        // Apply initial nav tab state.
+        UpdateNavTabStyles();
+        UpdateWorkspaceNameDisplay();
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
@@ -93,12 +100,9 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.HasWorkspace))
         {
-            var workspaceGrid = this.FindControl<Grid>("WorkspaceGrid");
-            var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
-            bool has = _vm.HasWorkspace;
-            if (workspaceGrid != null) workspaceGrid.IsVisible = has;
-            if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has;
+            UpdateMainContentVisibility();
             UpdateWindowTitle();
+            UpdateWorkspaceNameDisplay();
             RefreshLiveMonitorPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.Workspace))
@@ -108,6 +112,7 @@ public partial class MainWindow : Window
             SetupTreeView();
             RefreshProfileComboBox();
             RefreshRoslynConnectionsPanel();
+            UpdateWorkspaceNameDisplay();
         }
         else if (e.PropertyName == nameof(MainViewModel.Timeline))
         {
@@ -147,6 +152,95 @@ public partial class MainWindow : Window
             _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
             RebuildTimeline();
         }
+    }
+
+    // ── Navigation tabs ─────────────────────────────────────────────────────
+
+    private void OnNavTabClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        var tab = btn.Tag?.ToString() ?? "Monitor";
+        SetActiveNavTab(tab);
+    }
+
+    private void SetActiveNavTab(string tab)
+    {
+        _activeNavTab = tab;
+        UpdateMainContentVisibility();
+        UpdateNavTabStyles();
+    }
+
+    /// <summary>
+    /// Shows the correct main content panel for the active workspace + nav tab state.
+    /// Called whenever workspace open/close state or active nav tab changes.
+    /// </summary>
+    private void UpdateMainContentVisibility()
+    {
+        var workspaceGrid  = this.FindControl<Grid>("WorkspaceGrid");
+        var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
+        var designPanel    = this.FindControl<Grid>("DesignPanel");
+        var scanPanel      = this.FindControl<Grid>("ScanPanel");
+        var docsPanel      = this.FindControl<Grid>("DocsPanel");
+
+        bool has = _vm.HasWorkspace;
+
+        if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
+        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Docs";
+        if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
+        if (scanPanel      != null) scanPanel.IsVisible      = _activeNavTab == "Scan";
+        if (docsPanel      != null) docsPanel.IsVisible      = has && _activeNavTab == "Docs";
+
+        // Synchronise the CenterTabControl index when on Monitor or Graph nav tab.
+        if (has && workspaceGrid?.IsVisible == true)
+        {
+            var centerTabs = this.FindControl<TabControl>("CenterTabControl");
+            if (centerTabs != null)
+                centerTabs.SelectedIndex = _activeNavTab == "Graph" ? 1 : 0;
+        }
+    }
+
+    private const string NavTabActiveBackground = "#2A4A6A";
+    private const string NavTabInactiveForeground = "#88AABB";
+
+    /// <summary>Applies active/inactive visual styling to the five nav tab buttons.</summary>
+    private void UpdateNavTabStyles()
+    {
+        var navTabs = new[]
+        {
+            ("NavDesignBtn",  "Design"),
+            ("NavScanBtn",    "Scan"),
+            ("NavMonitorBtn", "Monitor"),
+            ("NavGraphBtn",   "Graph"),
+            ("NavDocsBtn",    "Docs"),
+        };
+
+        foreach (var (name, tabName) in navTabs)
+        {
+            var btn = this.FindControl<Button>(name);
+            if (btn == null) continue;
+
+            if (tabName == _activeNavTab)
+            {
+                btn.Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse(NavTabActiveBackground));
+                btn.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Colors.White);
+            }
+            else
+            {
+                btn.Background = Avalonia.Media.Brushes.Transparent;
+                btn.Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.Parse(NavTabInactiveForeground));
+            }
+        }
+    }
+
+    /// <summary>Refreshes the workspace name displayed in the top-bar dropdown button.</summary>
+    private void UpdateWorkspaceNameDisplay()
+    {
+        var nameText = this.FindControl<TextBlock>("WorkspaceNameText");
+        if (nameText != null)
+            nameText.Text = _vm.HasWorkspace ? _vm.Workspace.WorkspaceName : "No Workspace";
     }
 
     // ── Toolbar handlers ────────────────────────────────────────────────────
@@ -1191,6 +1285,12 @@ public partial class MainWindow : Window
                     Avalonia.Media.Color.Parse("#556677"));
             }
         }
+
+        // Update top-bar running indicator.
+        var runIndicator = this.FindControl<Border>("RunningIndicatorBorder");
+        var topStopBtn   = this.FindControl<Button>("TopBarStopBtn");
+        if (runIndicator != null) runIndicator.IsVisible = isWatching;
+        if (topStopBtn   != null) topStopBtn.IsVisible   = isWatching;
     }
 
     private async void RebuildLiveTimeline()
@@ -1569,7 +1669,7 @@ public partial class MainWindow : Window
 
     private void UpdateWindowTitle()
     {
-        var baseTitle = $"Codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
+        var baseTitle = $"codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
         if (_vm.HasWorkspace)
         {
             var dirty = _vm.IsDirty ? " *" : string.Empty;
@@ -1629,9 +1729,8 @@ public partial class MainWindow : Window
         AppLogger.Debug($"[SystemMap] Opening module relationship graph for system '{system.Name}' ({system.Id}).");
         _vm.Graph.RefreshModuleRelationshipsForSystem(_vm.Workspace.SystemMap, system.Id);
 
-        var tabs = this.FindControl<TabControl>("CenterTabControl");
-        if (tabs != null)
-            tabs.SelectedIndex = 1; // Graph tab
+        // Switch to the Graph nav tab (which sets CenterTabControl to the Graph sub-tab).
+        SetActiveNavTab("Graph");
     }
 
     private void OnSystemMapClearCanvasRequested()
