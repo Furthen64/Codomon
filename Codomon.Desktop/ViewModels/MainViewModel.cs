@@ -8,6 +8,9 @@ using System.Runtime.CompilerServices;
 
 namespace Codomon.Desktop.ViewModels;
 
+/// <summary>The current state of the last Roslyn scan.</summary>
+public enum ScanStatusKind { Idle, InProgress, Completed }
+
 public class MainViewModel : INotifyPropertyChanged
 {
     private WorkspaceModel _workspace = new WorkspaceModel();
@@ -15,6 +18,14 @@ public class MainViewModel : INotifyPropertyChanged
     private string _statusMessage = "Ready";
     private bool _isDirty = false;
     private bool _hasWorkspace = false;
+
+    // ── Scan stats ────────────────────────────────────────────────────────────
+    private int _fileCount;
+    private int _classCount;
+    private int _methodCount;
+    private int _logPointCount;
+    private ScanStatusKind _scanStatus = ScanStatusKind.Idle;
+    private int _totalEventCount;
 
     /// <summary>Periodic autosave timer -- fires every 5 minutes while a workspace is open.</summary>
     private System.Timers.Timer? _autosaveTimer;
@@ -650,6 +661,8 @@ public class MainViewModel : INotifyPropertyChanged
         SystemMap.LoadFrom(Workspace.SystemMap, Workspace.ActiveProfile?.LayoutPositions);
         Graph.RefreshFromSystemMap(Workspace.SystemMap);
 
+        UpdateScanStats(scanResult);
+
         IsDirty = true;
         StatusMessage =
             $"Roslyn scan applied: +{added} system(s), +{addedModules} module(s), +{addedCodeNodes} code node(s) " +
@@ -954,6 +967,78 @@ public class MainViewModel : INotifyPropertyChanged
 
     private static string NormalizePath(string path)
         => (path ?? string.Empty).Replace('\\', '/');
+
+    // ── Scan stats (public properties) ───────────────────────────────────────
+
+    /// <summary>Number of C# source files found in the last completed scan.</summary>
+    public int FileCount
+    {
+        get => _fileCount;
+        private set { _fileCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Number of classes/types found in the last completed scan.</summary>
+    public int ClassCount
+    {
+        get => _classCount;
+        private set { _classCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Number of methods found in the last completed scan.</summary>
+    public int MethodCount
+    {
+        get => _methodCount;
+        private set { _methodCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Number of logging call sites found in the last completed scan.</summary>
+    public int LogPointCount
+    {
+        get => _logPointCount;
+        private set { _logPointCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Status of the last (or ongoing) Roslyn scan.</summary>
+    public ScanStatusKind ScanStatus
+    {
+        get => _scanStatus;
+        set { _scanStatus = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Total number of log events loaded — either from replay or live monitoring.
+    /// Updated externally by the view when the underlying entry collections change.
+    /// </summary>
+    public int TotalEventCount
+    {
+        get => _totalEventCount;
+        set { _totalEventCount = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Computes and stores scan statistics from a completed <see cref="RoslynScanResult"/>.
+    /// Also sets <see cref="ScanStatus"/> to <see cref="ScanStatusKind.Completed"/>.
+    /// </summary>
+    internal void UpdateScanStats(RoslynScanResult scanResult)
+    {
+        int classCount = 0, methodCount = 0, logPointCount = 0;
+        foreach (var file in scanResult.Files)
+        {
+            classCount += file.Classes.Count;
+            foreach (var cls in file.Classes)
+            {
+                methodCount += cls.Methods.Count;
+                foreach (var method in cls.Methods)
+                    logPointCount += method.LoggingCalls.Count;
+            }
+        }
+
+        FileCount    = scanResult.Files.Count;
+        ClassCount   = classCount;
+        MethodCount  = methodCount;
+        LogPointCount = logPointCount;
+        ScanStatus   = ScanStatusKind.Completed;
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

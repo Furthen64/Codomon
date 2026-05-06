@@ -38,6 +38,12 @@ public partial class MainWindow : Window
     // Tracks whether the log list is currently bound to live-monitor entries.
     private bool _logListShowingLive;
 
+    // Tracks whether the live log stream is paused (auto-scroll suppressed).
+    private bool _logStreamPaused;
+
+    // Tracks when live monitoring started, for the status bar runtime display.
+    private DateTimeOffset? _liveMonitorStartTime;
+
     // Throttles timeline rebuilds during live monitoring (max once per LiveTimelineRebuildThrottleSeconds).
     private const double LiveTimelineRebuildThrottleSeconds = 2.0;
     private DateTimeOffset _lastLiveTimelineRebuild = DateTimeOffset.MinValue;
@@ -140,6 +146,15 @@ public partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.IsDirty))
         {
             UpdateWindowTitle();
+        }
+        else if (e.PropertyName is nameof(MainViewModel.FileCount)
+                                or nameof(MainViewModel.ClassCount)
+                                or nameof(MainViewModel.MethodCount)
+                                or nameof(MainViewModel.LogPointCount)
+                                or nameof(MainViewModel.ScanStatus)
+                                or nameof(MainViewModel.TotalEventCount))
+        {
+            RefreshStatusBar();
         }
         else if (e.PropertyName == nameof(MainViewModel.Profiles))
         {
@@ -1068,20 +1083,94 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Log column widths (must match the header in MainWindow.axaml) ─────────
+    private const int LogColTime   = 80;
+    private const int LogColLevel  = 52;
+    private const int LogColSource = 140;
+
+    // ── Log row background colours by level ──────────────────────────────────
+    private static readonly Avalonia.Media.Color LogRowBgError   = Avalonia.Media.Color.Parse("#1A0808");
+    private static readonly Avalonia.Media.Color LogRowBgWarn    = Avalonia.Media.Color.Parse("#1A1408");
+    private static readonly Avalonia.Media.Color LogRowBgDefault = Avalonia.Media.Color.FromArgb(0, 0, 0, 0);
+
     private static Avalonia.Controls.Templates.FuncDataTemplate<LogEntryModel> BuildLogItemTemplate()
     {
         return new Avalonia.Controls.Templates.FuncDataTemplate<LogEntryModel>((entry, _) =>
         {
             if (entry == null) return new TextBlock();
-            return new TextBlock
+
+            var levelUpper = entry.Level.ToUpperInvariant();
+
+            // Row background tinted by level.
+            var rowBg = levelUpper switch
             {
-                Text = entry.Formatted,
-                FontFamily = new Avalonia.Media.FontFamily("Monospace"),
-                FontSize = 11,
-                Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.Parse(entry.LevelColor)),
-                Padding = new Avalonia.Thickness(4, 1)
+                "ERROR" => LogRowBgError,
+                "WARN"  => LogRowBgWarn,
+                _       => LogRowBgDefault
             };
+
+            var levelColor = Avalonia.Media.Color.Parse(entry.LevelColor);
+
+            var timeText = new TextBlock
+            {
+                Text         = entry.Timestamp?.ToString("HH:mm:ss.fff") ?? "—",
+                FontFamily   = new Avalonia.Media.FontFamily("Monospace"),
+                FontSize     = 10,
+                Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#667788")),
+                Padding      = new Avalonia.Thickness(4, 1),
+                TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
+                Width        = LogColTime
+            };
+
+            var levelText = new TextBlock
+            {
+                Text       = levelUpper,
+                FontFamily = new Avalonia.Media.FontFamily("Monospace"),
+                FontSize   = 10,
+                Foreground = new Avalonia.Media.SolidColorBrush(levelColor),
+                Padding    = new Avalonia.Thickness(4, 1),
+                Width      = LogColLevel
+            };
+
+            var sourceText = new TextBlock
+            {
+                Text         = entry.Source,
+                FontFamily   = new Avalonia.Media.FontFamily("Monospace"),
+                FontSize     = 10,
+                Foreground   = new Avalonia.Media.SolidColorBrush(
+                    levelUpper == "INFO"
+                        ? Avalonia.Media.Color.Parse("#66CC88")
+                        : levelColor),
+                Padding      = new Avalonia.Thickness(4, 1),
+                TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis,
+                Width        = LogColSource
+            };
+
+            var msgText = new TextBlock
+            {
+                Text         = entry.IsParsed ? entry.Message : entry.RawLine,
+                FontFamily   = new Avalonia.Media.FontFamily("Monospace"),
+                FontSize     = 10,
+                Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#AABBCC")),
+                Padding      = new Avalonia.Thickness(4, 1),
+                TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis
+            };
+
+            var grid = new Grid
+            {
+                ColumnDefinitions = new Avalonia.Controls.ColumnDefinitions($"{LogColTime},{LogColLevel},{LogColSource},*"),
+                Background = new Avalonia.Media.SolidColorBrush(rowBg)
+            };
+            Grid.SetColumn(timeText,   0);
+            Grid.SetColumn(levelText,  1);
+            Grid.SetColumn(sourceText, 2);
+            Grid.SetColumn(msgText,    3);
+            grid.Children.Add(timeText);
+            grid.Children.Add(levelText);
+            grid.Children.Add(sourceText);
+            grid.Children.Add(msgText);
+
+            return grid;
         });
     }
 
@@ -1176,6 +1265,8 @@ public partial class MainWindow : Window
             _vm.StartLiveMonitoring(filePath);
             // Switch the log list to show live entries.
             _logListShowingLive = true;
+            _logStreamPaused    = false;
+            _liveMonitorStartTime = DateTimeOffset.UtcNow;
             BindLogListToLiveMonitor();
             RefreshLiveMonitorPanel();
             return Task.CompletedTask;
@@ -1185,6 +1276,8 @@ public partial class MainWindow : Window
     private void OnStopWatchClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _vm.StopLiveMonitoring();
+        _liveMonitorStartTime = null;
+        _logStreamPaused      = false;
         // Keep the log list on live entries so the user can review what arrived.
         RefreshLiveMonitorPanel();
     }
@@ -1222,13 +1315,27 @@ public partial class MainWindow : Window
 
     private void OnLiveEntriesFlushed()
     {
-        // Scroll the log list to the latest entry.
-        var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
-        if (listBox != null && listBox.ItemCount > 0)
+        // Update event count in the status bar.
+        _vm.TotalEventCount = _vm.LiveMonitor.Entries.Count;
+
+        // Update streaming indicator label with live count.
+        var indicatorText = this.FindControl<TextBlock>("LogStreamIndicatorText");
+        if (indicatorText != null && _vm.LiveMonitor.IsWatching)
         {
-            var last = listBox.Items[listBox.ItemCount - 1];
-            if (last != null)
-                listBox.ScrollIntoView(last);
+            var pausedSuffix = _logStreamPaused ? " (paused)" : string.Empty;
+            indicatorText.Text = $"● Streaming…  {_vm.LiveMonitor.Entries.Count:N0} lines{pausedSuffix}";
+        }
+
+        // Auto-scroll to the latest entry unless stream is paused.
+        if (!_logStreamPaused)
+        {
+            var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
+            if (listBox != null && listBox.ItemCount > 0)
+            {
+                var last = listBox.Items[listBox.ItemCount - 1];
+                if (last != null)
+                    listBox.ScrollIntoView(last);
+            }
         }
 
         // Rebuild the timeline at most once every 2 seconds to avoid hammering it.
@@ -1250,12 +1357,16 @@ public partial class MainWindow : Window
         listBox.ItemsSource = _vm.LiveMonitor.Entries;
     }
 
-    /// <summary>Synchronises the Watch/Stop button states and status text.</summary>
+    /// <summary>Synchronises the Watch/Stop button states and streaming indicator.</summary>
     private void RefreshLiveMonitorPanel()
     {
-        var watchBtn  = this.FindControl<Button>("WatchLogButton");
-        var stopBtn   = this.FindControl<Button>("StopWatchButton");
-        var statusTb  = this.FindControl<TextBlock>("WatchStatusText");
+        var watchBtn      = this.FindControl<Button>("WatchLogButton");
+        var stopBtn       = this.FindControl<Button>("StopWatchButton");
+        var pauseBtn      = this.FindControl<Button>("LogStreamPauseBtn");
+        var indicatorBorder = this.FindControl<Border>("LogStreamIndicatorBorder");
+        var indicatorText   = this.FindControl<TextBlock>("LogStreamIndicatorText");
+        // Legacy hidden control (still updated for safety).
+        var statusTb      = this.FindControl<TextBlock>("WatchStatusText");
 
         bool hasWorkspace  = _vm.HasWorkspace;
         bool isWatching    = _vm.LiveMonitor.IsWatching;
@@ -1263,46 +1374,134 @@ public partial class MainWindow : Window
 
         if (watchBtn != null) watchBtn.IsEnabled = hasWorkspace && !replayPlaying;
         if (stopBtn  != null) stopBtn.IsEnabled  = isWatching;
+        if (pauseBtn != null)
+        {
+            pauseBtn.IsEnabled = isWatching || (_logListShowingLive && _vm.LiveMonitor.Entries.Count > 0);
+            pauseBtn.Content   = _logStreamPaused ? "▶ Resume" : "⏸ Pause";
+        }
 
-        if (statusTb != null)
+        // Update streaming indicator.
+        if (indicatorText != null && indicatorBorder != null)
         {
             if (_vm.LiveMonitor.HasError)
             {
-                statusTb.Text       = $"⚠ {_vm.LiveMonitor.ErrorMessage}";
-                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.Parse("#FF7070"));
+                indicatorText.Text       = $"⚠ Error";
+                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FF7070"));
+                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#2A0F0F"));
             }
             else if (isWatching)
             {
-                statusTb.Text       = $"● {System.IO.Path.GetFileName(_vm.LiveMonitor.WatchedFilePath)} ({_vm.LiveMonitor.Entries.Count} lines)";
-                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.Parse("#66EE88"));
+                var pausedSuffix = _logStreamPaused ? " (paused)" : string.Empty;
+                indicatorText.Text       = $"● Streaming…  {_vm.LiveMonitor.Entries.Count:N0} lines{pausedSuffix}";
+                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#44CC44"));
+                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#152A15"));
             }
             else if (_logListShowingLive && _vm.LiveMonitor.Entries.Count > 0)
             {
-                statusTb.Text       = $"Stopped ({_vm.LiveMonitor.Entries.Count} lines captured)";
-                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.Parse("#778899"));
+                indicatorText.Text       = $"○ Stopped  ({_vm.LiveMonitor.Entries.Count:N0} lines)";
+                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#778899"));
+                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F1E0F"));
             }
             else
             {
-                statusTb.Text       = "Not watching";
-                statusTb.Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.Parse("#556677"));
+                indicatorText.Text       = "○ Idle";
+                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
+                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F1E0F"));
             }
         }
+
+        // Update legacy hidden WatchStatusText for any remaining code paths that read it.
+        if (statusTb != null)
+            statusTb.Text = isWatching ? $"● {_vm.LiveMonitor.WatchedFilePath}" : "Not watching";
 
         // Update top-bar running indicator.
         var runIndicator = this.FindControl<Border>("RunningIndicatorBorder");
         var topStopBtn   = this.FindControl<Button>("TopBarStopBtn");
         if (runIndicator != null) runIndicator.IsVisible = isWatching;
         if (topStopBtn   != null) topStopBtn.IsVisible   = isWatching;
+
+        RefreshStatusBar();
     }
 
     private async void RebuildLiveTimeline()
     {
         if (!_vm.HasWorkspace) return;
         await _vm.Timeline.BuildAsync(_vm.LiveMonitor.Entries, _vm.Workspace);
+    }
+
+    private void OnLogStreamPauseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _logStreamPaused = !_logStreamPaused;
+        RefreshLiveMonitorPanel();
+    }
+
+    /// <summary>Refreshes all status-bar controls from the current view-model state.</summary>
+    private void RefreshStatusBar()
+    {
+        // ── Scan-status dot + label ──────────────────────────────────────────
+        var scanDot   = this.FindControl<TextBlock>("StatusScanDot");
+        var scanLabel = this.FindControl<TextBlock>("StatusScanLabel");
+        if (scanDot != null && scanLabel != null)
+        {
+            switch (_vm.ScanStatus)
+            {
+                case ScanStatusKind.Completed:
+                    scanDot.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#44CC44"));
+                    scanLabel.Text       = "Scan: Completed";
+                    scanLabel.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
+                    break;
+                case ScanStatusKind.InProgress:
+                    scanDot.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFAA44"));
+                    scanLabel.Text       = "Scan: Scanning…";
+                    scanLabel.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFAA44"));
+                    break;
+                default:
+                    scanDot.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3A4A5A"));
+                    scanLabel.Text       = "Idle";
+                    scanLabel.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
+                    break;
+            }
+        }
+
+        // ── Right metric pills ───────────────────────────────────────────────
+        bool hasScanStats = _vm.FileCount > 0 || _vm.ClassCount > 0;
+
+        SetStatusPill("StatusBarFilesText",   hasScanStats, $"Files: {_vm.FileCount:N0}");
+        SetStatusPill("StatusBarSep1",        hasScanStats, " | ");
+        SetStatusPill("StatusBarClassesText", hasScanStats, $"Classes: {_vm.ClassCount:N0}");
+        SetStatusPill("StatusBarSep2",        hasScanStats, " | ");
+        SetStatusPill("StatusBarMethodsText", hasScanStats, $"Methods: {_vm.MethodCount:N0}");
+        SetStatusPill("StatusBarSep3",        hasScanStats, " | ");
+        SetStatusPill("StatusBarLogPtsText",  hasScanStats, $"Log Points: {_vm.LogPointCount:N0}");
+
+        bool isWatching = _vm.LiveMonitor.IsWatching;
+
+        if (isWatching && _liveMonitorStartTime.HasValue)
+        {
+            var elapsed = DateTimeOffset.UtcNow - _liveMonitorStartTime.Value;
+            var runtimeStr = elapsed.TotalHours >= 1
+                ? $"{(int)elapsed.TotalHours:D2}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}"
+                : $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
+            SetStatusPill("StatusBarSep4",       true, " | ");
+            SetStatusPill("StatusBarRuntimeText", true, $"Runtime: {runtimeStr}");
+        }
+        else
+        {
+            SetStatusPill("StatusBarSep4",        false, string.Empty);
+            SetStatusPill("StatusBarRuntimeText", false, string.Empty);
+        }
+
+        bool hasEvents = _vm.TotalEventCount > 0;
+        SetStatusPill("StatusBarSep5",       hasEvents, " | ");
+        SetStatusPill("StatusBarEventsText", hasEvents, $"Events: {_vm.TotalEventCount:N0}");
+    }
+
+    private void SetStatusPill(string controlName, bool visible, string text)
+    {
+        var tb = this.FindControl<TextBlock>(controlName);
+        if (tb == null) return;
+        tb.IsVisible = visible;
+        if (visible) tb.Text = text;
     }
 
     // ── Roslyn Scan ───────────────────────────────────────────────────────────
