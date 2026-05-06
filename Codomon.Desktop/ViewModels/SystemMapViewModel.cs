@@ -342,12 +342,23 @@ public class SystemMapViewModel : INotifyPropertyChanged
     {
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom starting. Systems={model.Systems.Count}, Modules={model.AllModules.Count()}, CodeNodes={model.AllCodeNodes.Count()}, ExternalSystems={model.ExternalSystems.Count}, Relationships={model.Relationships.Count}");
 
+        // Pre-compute the base row for library systems so they are placed after all non-library
+        // rows, preventing overlap when there are more than CardsPerRow non-library systems.
+        // Only systems without a saved layout position contribute to the auto-layout grid.
+        int autoLayoutNonLibCount = model.Systems.Count(s =>
+            s.Kind != SystemKind.LibraryOnly &&
+            !string.Equals(s.StartupMechanism, "Class Library", StringComparison.OrdinalIgnoreCase) &&
+            !TryGetSavedPosition(GetLayoutPositionKey(s.Id, isExternal: false), layoutPositions, out _));
+        int nonLibraryRowCount = autoLayoutNonLibCount == 0 ? 0
+            : (autoLayoutNonLibCount + CardsPerRow - 1) / CardsPerRow;
+        int libraryBaseRow = nonLibraryRowCount == 0 ? 0 : nonLibraryRowCount + 1;
+
         int topLaneIndex = 0;
         int lowerLaneIndex = 0;
 
         _allSystems = model.Systems.Select(s =>
         {
-            var position = GetSystemPosition(s, layoutPositions, ref topLaneIndex, ref lowerLaneIndex);
+            var position = GetSystemPosition(s, layoutPositions, ref topLaneIndex, ref lowerLaneIndex, libraryBaseRow);
             return new SystemItemVm
             {
                 Id               = s.Id,
@@ -863,7 +874,8 @@ public class SystemMapViewModel : INotifyPropertyChanged
         SystemModel system,
         IReadOnlyDictionary<string, LayoutPosition>? layoutPositions,
         ref int topLaneIndex,
-        ref int lowerLaneIndex)
+        ref int lowerLaneIndex,
+        int libraryBaseRow)
     {
         if (TryGetSavedPosition(GetLayoutPositionKey(system.Id, isExternal: false), layoutPositions, out var saved))
             return saved;
@@ -871,7 +883,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
         bool lowerLane = system.Kind == SystemKind.LibraryOnly ||
             string.Equals(system.StartupMechanism, "Class Library", StringComparison.OrdinalIgnoreCase);
 
-        return CreateGridPosition(lowerLane ? lowerLaneIndex++ : topLaneIndex++, lowerLane ? 1 : 0);
+        return CreateGridPosition(lowerLane ? lowerLaneIndex++ : topLaneIndex++, lowerLane ? libraryBaseRow : 0);
     }
 
     private static LayoutPosition GetExternalPosition(
