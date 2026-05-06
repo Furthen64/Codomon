@@ -33,6 +33,15 @@ public class SystemItemVm
     /// <summary>Top module kinds for this system, in descending order of count.</summary>
     public IReadOnlyList<(string Kind, int Count)> ModuleKindCounts { get; init; } = Array.Empty<(string, int)>();
 
+    /// <summary>Primary source file path (first entry-point candidate), or empty.</summary>
+    public string SourceFile { get; init; } = string.Empty;
+    /// <summary>First source line (0 = unknown).</summary>
+    public int SourceLineStart { get; init; }
+    /// <summary>Last source line (0 = unknown).</summary>
+    public int SourceLineEnd { get; init; }
+    /// <summary>Bullet-list responsibilities; populated from manual notes or empty.</summary>
+    public IReadOnlyList<string> Responsibilities { get; init; } = Array.Empty<string>();
+
     /// <summary>True when this system is a class-library rather than a runnable app.</summary>
     public bool IsLibrary =>
         string.Equals(KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal) ||
@@ -299,6 +308,82 @@ public class SystemMapViewModel : INotifyPropertyChanged
         private set { _inspectorDetails = value; OnPropertyChanged(); }
     }
 
+    // ── Extended Component-tab inspector state ─────────────────────────────
+
+    private bool   _inspectorIsSystemSelected;
+    private string _inspectorLayerLabel      = string.Empty;
+    private string _inspectorLayerColor      = "#4A6A8A";
+    private string _inspectorDescription     = string.Empty;
+    private string _inspectorSourceFile      = string.Empty;
+    private string _inspectorSourceLineRange = string.Empty;
+    private List<string>             _inspectorResponsibilities   = new();
+    private List<RelationshipItemVm> _inspectorInboundConnections  = new();
+    private List<RelationshipItemVm> _inspectorOutboundConnections = new();
+
+    /// <summary>True when a System (not a relationship/module/code node) is selected.</summary>
+    public bool InspectorIsSystemSelected
+    {
+        get => _inspectorIsSystemSelected;
+        private set { _inspectorIsSystemSelected = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Human-readable layer label for the selected system (e.g. "Application Layer").</summary>
+    public string InspectorLayerLabel
+    {
+        get => _inspectorLayerLabel;
+        private set { _inspectorLayerLabel = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Accent colour hex for the selected system's architectural layer.</summary>
+    public string InspectorLayerColor
+    {
+        get => _inspectorLayerColor;
+        private set { _inspectorLayerColor = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Short description text for the selected component.</summary>
+    public string InspectorDescription
+    {
+        get => _inspectorDescription;
+        private set { _inspectorDescription = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Primary source file path for the selected system, or empty.</summary>
+    public string InspectorSourceFile
+    {
+        get => _inspectorSourceFile;
+        private set { _inspectorSourceFile = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Formatted source line range (e.g. "Lines: 45–247") or empty.</summary>
+    public string InspectorSourceLineRange
+    {
+        get => _inspectorSourceLineRange;
+        private set { _inspectorSourceLineRange = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Responsibility bullet items for the selected system.</summary>
+    public List<string> InspectorResponsibilities
+    {
+        get => _inspectorResponsibilities;
+        private set { _inspectorResponsibilities = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Inbound relationships targeting the selected system.</summary>
+    public List<RelationshipItemVm> InspectorInboundConnections
+    {
+        get => _inspectorInboundConnections;
+        private set { _inspectorInboundConnections = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Outbound relationships originating from the selected system.</summary>
+    public List<RelationshipItemVm> InspectorOutboundConnections
+    {
+        get => _inspectorOutboundConnections;
+        private set { _inspectorOutboundConnections = value; OnPropertyChanged(); }
+    }
+
+
     // ── Public API ─────────────────────────────────────────────────────────
 
     public void SetActiveView(SystemMapViewKind view) => ActiveView = view;
@@ -372,6 +457,10 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 LayerKind        = ClassifySystemLayer(s.Kind, s.StartupMechanism),
                 ModuleKindCounts = GetModuleKindCounts(model, s),
                 Description      = s.Notes,
+                SourceFile       = s.EntryPointCandidates.Count > 0 ? s.EntryPointCandidates[0] : string.Empty,
+                SourceLineStart  = 0,
+                SourceLineEnd    = 0,
+                Responsibilities = Array.Empty<string>(),
                 X                = position.X,
                 Y                = position.Y
             };
@@ -964,12 +1053,21 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
     private void ClearInspector()
     {
-        InspectorName       = "Nothing selected";
-        InspectorType       = string.Empty;
-        InspectorKind       = string.Empty;
-        InspectorNotes      = string.Empty;
-        InspectorConfidence = string.Empty;
-        InspectorDetails    = new List<string>();
+        InspectorName               = "Nothing selected";
+        InspectorType               = string.Empty;
+        InspectorKind               = string.Empty;
+        InspectorNotes              = string.Empty;
+        InspectorConfidence         = string.Empty;
+        InspectorDetails            = new List<string>();
+        InspectorIsSystemSelected   = false;
+        InspectorLayerLabel         = string.Empty;
+        InspectorLayerColor         = "#4A6A8A";
+        InspectorDescription        = string.Empty;
+        InspectorSourceFile         = string.Empty;
+        InspectorSourceLineRange    = string.Empty;
+        InspectorResponsibilities   = new List<string>();
+        InspectorInboundConnections  = new List<RelationshipItemVm>();
+        InspectorOutboundConnections = new List<RelationshipItemVm>();
     }
 
     private void UpdateInspectorForSystem(SystemItemVm? sys)
@@ -985,6 +1083,25 @@ public class SystemMapViewModel : INotifyPropertyChanged
         InspectorDetails    = sys.ModuleCount > 0
             ? new List<string> { $"{sys.ModuleCount} module(s)" }
             : new List<string>();
+
+        // Component-tab extended fields
+        InspectorIsSystemSelected   = true;
+        InspectorLayerLabel         = $"{sys.LayerKind} Layer";
+        InspectorLayerColor         = LayerAccentColorHex(sys.LayerKind);
+        InspectorDescription        = sys.Description;
+        InspectorSourceFile         = sys.SourceFile;
+        InspectorSourceLineRange    = sys.SourceLineStart > 0 && sys.SourceLineEnd > 0
+                                          ? $"Lines: {sys.SourceLineStart}–{sys.SourceLineEnd}"
+                                          : string.Empty;
+        InspectorResponsibilities   = sys.Responsibilities.ToList();
+
+        // Build connection lists from the currently visible relationships.
+        InspectorInboundConnections  = VisibleRelationships
+            .Where(r => string.Equals(r.ToId,   sys.Id, StringComparison.Ordinal))
+            .ToList();
+        InspectorOutboundConnections = VisibleRelationships
+            .Where(r => string.Equals(r.FromId, sys.Id, StringComparison.Ordinal))
+            .ToList();
     }
 
     private void UpdateInspectorForModule(ModuleItemVm? mod)
@@ -998,6 +1115,16 @@ public class SystemMapViewModel : INotifyPropertyChanged
         InspectorDetails    = mod.CodeNodeCount > 0
             ? new List<string> { $"{mod.CodeNodeCount} code node(s)" }
             : new List<string>();
+
+        InspectorIsSystemSelected   = false;
+        InspectorLayerLabel         = string.Empty;
+        InspectorLayerColor         = "#4A6A8A";
+        InspectorDescription        = string.Empty;
+        InspectorSourceFile         = string.Empty;
+        InspectorSourceLineRange    = string.Empty;
+        InspectorResponsibilities   = new List<string>();
+        InspectorInboundConnections  = new List<RelationshipItemVm>();
+        InspectorOutboundConnections = new List<RelationshipItemVm>();
     }
 
     private void UpdateInspectorForExternalSystem(ExternalSystemItemVm? ext)
@@ -1009,6 +1136,21 @@ public class SystemMapViewModel : INotifyPropertyChanged
         InspectorNotes      = string.Empty;
         InspectorConfidence = ext.Confidence.ToString();
         InspectorDetails    = new List<string>();
+
+        InspectorIsSystemSelected   = false;
+        InspectorLayerLabel         = string.Empty;
+        InspectorLayerColor         = "#4A6A8A";
+        InspectorDescription        = string.Empty;
+        InspectorSourceFile         = string.Empty;
+        InspectorSourceLineRange    = string.Empty;
+        InspectorResponsibilities   = new List<string>();
+        // External systems can also participate in relationships.
+        InspectorInboundConnections  = VisibleRelationships
+            .Where(r => string.Equals(r.ToId,   ext.Id, StringComparison.Ordinal))
+            .ToList();
+        InspectorOutboundConnections = VisibleRelationships
+            .Where(r => string.Equals(r.FromId, ext.Id, StringComparison.Ordinal))
+            .ToList();
     }
 
     private void UpdateInspectorForCodeNode(CodeNodeItemVm? node)
@@ -1022,6 +1164,16 @@ public class SystemMapViewModel : INotifyPropertyChanged
         InspectorDetails    = !string.IsNullOrEmpty(node.FullName)
             ? new List<string> { node.FullName }
             : new List<string>();
+
+        InspectorIsSystemSelected   = false;
+        InspectorLayerLabel         = string.Empty;
+        InspectorLayerColor         = "#4A6A8A";
+        InspectorDescription        = string.Empty;
+        InspectorSourceFile         = node.FilePath;
+        InspectorSourceLineRange    = string.Empty;
+        InspectorResponsibilities   = new List<string>();
+        InspectorInboundConnections  = new List<RelationshipItemVm>();
+        InspectorOutboundConnections = new List<RelationshipItemVm>();
     }
 
     private void UpdateInspectorForRelationship(RelationshipItemVm rel)
@@ -1036,7 +1188,27 @@ public class SystemMapViewModel : INotifyPropertyChanged
             $"From: {rel.FromName}",
             $"To: {rel.ToName}"
         };
+
+        InspectorIsSystemSelected   = false;
+        InspectorLayerLabel         = string.Empty;
+        InspectorLayerColor         = "#4A6A8A";
+        InspectorDescription        = string.Empty;
+        InspectorSourceFile         = string.Empty;
+        InspectorSourceLineRange    = string.Empty;
+        InspectorResponsibilities   = new List<string>();
+        InspectorInboundConnections  = new List<RelationshipItemVm>();
+        InspectorOutboundConnections = new List<RelationshipItemVm>();
     }
+
+    /// <summary>Returns the vision accent colour hex for a given architectural layer.</summary>
+    private static string LayerAccentColorHex(ArchitectureLayerKind layer) => layer switch
+    {
+        ArchitectureLayerKind.Presentation   => "#9B59B6",
+        ArchitectureLayerKind.Application    => "#27AE60",
+        ArchitectureLayerKind.Domain         => "#F39C12",
+        ArchitectureLayerKind.Infrastructure => "#2980B9",
+        _                                    => "#4A6A8A"
+    };
 
     private static int CountModulesForSystem(SystemMapModel map, SystemModel system)
     {

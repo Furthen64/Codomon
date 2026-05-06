@@ -182,111 +182,14 @@
         </Grid>
       </Border>
 
-      <!-- ── Inspector panel ──────────────────────────────────────────────── -->
+      <!-- ── Right panel: Component / Connections / Properties tabs ─────────── -->
       <Border Grid.Column="2" Background="#141C28"
               BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
         <DockPanel>
 
-          <!-- ── Organize panel (above Inspector) ─────────────────────────── -->
-          <Border DockPanel.Dock="Top" Background="#141C28"
-                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-            <StackPanel Margin="8,8,8,8" Spacing="6">
-
-              <TextBlock Text="ORGANIZE" FontSize="9" FontWeight="Bold"
-                         Foreground="#4A6A8A" LetterSpacing="1"/>
-
-              <Button x:Name="CleanupNamesButton"
-                      Content="Cleanup Names"
-                      Click="OnCleanupNamesClick"
-                      HorizontalAlignment="Stretch"
-                      Padding="8,4"
-                      ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
-
-              <Button x:Name="SortAppsFromLibrariesButton"
-                      Content="Sort Apps from Libraries"
-                      Click="OnSortAppsFromLibrariesClick"
-                      HorizontalAlignment="Stretch"
-                      Padding="8,4"
-                      ToolTip.Tip="Move app-type systems (Desktop, Web, Backend, etc.) to the top rows and class libraries to the bottom, with a separator between them."/>
-
-              <Button x:Name="ArrangeButton"
-                      Content="Arrange"
-                      Click="OnArrangeClick"
-                      HorizontalAlignment="Stretch"
-                      Padding="8,4"
-                      ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
-
-              <Button x:Name="SortByLayersButton"
-                      Content="Sort by Layers"
-                      Click="OnSortByLayersClick"
-                      HorizontalAlignment="Stretch"
-                      Padding="8,4"
-                      ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
-
-              <Button x:Name="ClearCanvasButton"
-                      Content="Clear Canvas"
-                      Click="OnClearCanvasClick"
-                      HorizontalAlignment="Stretch"
-                      Padding="8,4"
-                      Background="#3A1A1A"
-                      Foreground="#FFAAAA"
-                      ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
-
-            </StackPanel>
-          </Border>
-
-          <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435"
-                  BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-            <TextBlock Text="Inspector" FontWeight="Bold" Foreground="#AABBCC"/>
-          </Border>
-
-          <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12" Spacing="6">
-
-              <TextBlock x:Name="InspNameText"
-                         Text="Nothing selected"
-                         Foreground="White" FontWeight="SemiBold"
-                         FontSize="14" TextWrapping="Wrap"/>
-
-              <!-- Type row -->
-              <StackPanel x:Name="InspTypePanel" IsVisible="False" Spacing="2">
-                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
-                <TextBlock Text="Type" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
-                <TextBlock x:Name="InspTypeText" Foreground="#AABBCC" TextWrapping="Wrap"/>
-              </StackPanel>
-
-              <!-- Kind row -->
-              <StackPanel x:Name="InspKindPanel" IsVisible="False" Spacing="2">
-                <TextBlock Text="Kind" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
-                <TextBlock x:Name="InspKindText" Foreground="#AABBCC" TextWrapping="Wrap"/>
-              </StackPanel>
-
-              <!-- Confidence row -->
-              <StackPanel x:Name="InspConfPanel" IsVisible="False" Spacing="2">
-                <TextBlock Text="Confidence" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
-                <TextBlock x:Name="InspConfText" Foreground="#AABBCC"/>
-              </StackPanel>
-
-              <!-- Notes row -->
-              <StackPanel x:Name="InspNotesPanel" IsVisible="False" Spacing="2">
-                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
-                <TextBlock Text="Notes" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
-                <TextBlock x:Name="InspNotesText" Foreground="#88AABB"
-                           TextWrapping="Wrap" FontSize="11"/>
-              </StackPanel>
-
-              <!-- Details row -->
-              <StackPanel x:Name="InspDetailsPanel" IsVisible="False" Spacing="4">
-                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
-                <TextBlock Text="Details" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
-                <ItemsControl x:Name="InspDetailsItemsControl"/>
-              </StackPanel>
-
-            </StackPanel>
-          </ScrollViewer>
-
-          <!-- Action buttons for the currently selected item -->
+          <!-- Delete Relationship action (shown when a relationship is selected) -->
           <Border x:Name="InspRelActionPanel" IsVisible="False"
+                  DockPanel.Dock="Bottom"
                   Background="#141C28"
                   BorderThickness="0,1,0,0" BorderBrush="#2A3F5A"
                   Padding="8,6">
@@ -299,6 +202,222 @@
                     Foreground="#FFAAAA"
                     ToolTip.Tip="Permanently remove this relationship from the System Map."/>
           </Border>
+
+          <!-- Tab control -->
+          <TabControl x:Name="RightPanelTabControl"
+                      Background="Transparent"
+                      Padding="0">
+
+            <!-- ── Component tab ──────────────────────────────────────── -->
+            <TabItem Header="Component" Padding="10,4">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12,10" Spacing="6">
+
+                  <!-- Name -->
+                  <TextBlock x:Name="CompNameText"
+                             Text="Nothing selected"
+                             Foreground="White" FontWeight="Bold"
+                             FontSize="16" TextWrapping="Wrap"/>
+
+                  <!-- Active badge + Layer tag -->
+                  <StackPanel x:Name="CompBadgesPanel" IsVisible="False"
+                              Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                    <Border x:Name="CompActiveBadge"
+                            Background="#1A3A1A" CornerRadius="10" Padding="8,3">
+                      <TextBlock Text="● Active" Foreground="#27AE60"
+                                 FontSize="10" FontWeight="Bold"/>
+                    </Border>
+                    <Border x:Name="CompLayerTagBorder"
+                            CornerRadius="4" Padding="8,3">
+                      <TextBlock x:Name="CompLayerTagText"
+                                 FontSize="10" FontWeight="Bold"/>
+                    </Border>
+                  </StackPanel>
+
+                  <!-- Description -->
+                  <TextBlock x:Name="CompDescText"
+                             Foreground="#AABBCC" FontSize="12"
+                             TextWrapping="Wrap" IsVisible="False"
+                             Margin="0,4,0,0"/>
+
+                  <!-- Source section -->
+                  <StackPanel x:Name="CompSourcePanel" IsVisible="False" Spacing="2"
+                              Margin="0,6,0,0">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,0,0,4"/>
+                    <TextBlock Text="SOURCE" Foreground="#778899"
+                               FontSize="9" FontWeight="Bold" LetterSpacing="1"/>
+                    <TextBlock x:Name="CompSourceFileText"
+                               Foreground="#88AABB" FontSize="11"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CompSourceLinesText"
+                               Foreground="#778899" FontSize="10"
+                               IsVisible="False"/>
+                  </StackPanel>
+
+                  <!-- Responsibilities section -->
+                  <StackPanel x:Name="CompResponsibilitiesPanel" IsVisible="False"
+                              Spacing="4" Margin="0,6,0,0">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,0,0,4"/>
+                    <TextBlock Text="RESPONSIBILITIES" Foreground="#778899"
+                               FontSize="9" FontWeight="Bold" LetterSpacing="1"/>
+                    <ItemsControl x:Name="CompResponsibilitiesItemsControl"/>
+                  </StackPanel>
+
+                  <!-- Log Points section (placeholder — data not yet available) -->
+                  <StackPanel x:Name="CompLogPointsPanel" IsVisible="False"
+                              Spacing="4" Margin="0,6,0,0">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="CompLogPointsHeader"
+                               Text="LOG POINTS (0)" Foreground="#778899"
+                               FontSize="9" FontWeight="Bold" LetterSpacing="1"/>
+                  </StackPanel>
+
+                  <!-- Recent Activity section (sparkline placeholder) -->
+                  <StackPanel x:Name="CompActivityPanel" IsVisible="False"
+                              Spacing="4" Margin="0,6,0,0">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,0,0,4"/>
+                    <TextBlock Text="RECENT ACTIVITY" Foreground="#778899"
+                               FontSize="9" FontWeight="Bold" LetterSpacing="1"/>
+                    <Border Height="44" CornerRadius="4"
+                            Background="#1A2435"
+                            BorderBrush="#2A3F5A" BorderThickness="1">
+                      <TextBlock Text="Activity chart coming soon"
+                                 Foreground="#445566" FontSize="10"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"/>
+                    </Border>
+                  </StackPanel>
+
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- ── Connections tab ────────────────────────────────────── -->
+            <TabItem Header="Connections" Padding="10,4">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12,10" Spacing="6">
+
+                  <TextBlock x:Name="CompConnNothingText"
+                             Text="Select a component to see its connections."
+                             Foreground="#445566" FontSize="11"
+                             TextWrapping="Wrap" IsVisible="True"/>
+
+                  <!-- Outbound connections -->
+                  <StackPanel x:Name="CompOutboundPanel" IsVisible="False"
+                              Spacing="4" Margin="0,4,0,0">
+                    <TextBlock Text="OUTBOUND" Foreground="#778899"
+                               FontSize="9" FontWeight="Bold" LetterSpacing="1"/>
+                    <ItemsControl x:Name="CompOutboundItemsControl"/>
+                  </StackPanel>
+
+                  <!-- Inbound connections -->
+                  <StackPanel x:Name="CompInboundPanel" IsVisible="False"
+                              Spacing="4" Margin="0,8,0,0">
+                    <TextBlock Text="INBOUND" Foreground="#778899"
+                               FontSize="9" FontWeight="Bold" LetterSpacing="1"/>
+                    <ItemsControl x:Name="CompInboundItemsControl"/>
+                  </StackPanel>
+
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- ── Properties tab ─────────────────────────────────────── -->
+            <TabItem Header="Properties" Padding="10,4">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12,10" Spacing="6">
+
+                  <TextBlock x:Name="InspNameText"
+                             Text="Nothing selected"
+                             Foreground="White" FontWeight="SemiBold"
+                             FontSize="14" TextWrapping="Wrap"/>
+
+                  <!-- Type row -->
+                  <StackPanel x:Name="InspTypePanel" IsVisible="False" Spacing="2">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                    <TextBlock Text="Type" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                    <TextBlock x:Name="InspTypeText" Foreground="#AABBCC" TextWrapping="Wrap"/>
+                  </StackPanel>
+
+                  <!-- Kind row -->
+                  <StackPanel x:Name="InspKindPanel" IsVisible="False" Spacing="2">
+                    <TextBlock Text="Kind" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                    <TextBlock x:Name="InspKindText" Foreground="#AABBCC" TextWrapping="Wrap"/>
+                  </StackPanel>
+
+                  <!-- Confidence row -->
+                  <StackPanel x:Name="InspConfPanel" IsVisible="False" Spacing="2">
+                    <TextBlock Text="Confidence" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                    <TextBlock x:Name="InspConfText" Foreground="#AABBCC"/>
+                  </StackPanel>
+
+                  <!-- Notes row -->
+                  <StackPanel x:Name="InspNotesPanel" IsVisible="False" Spacing="2">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                    <TextBlock Text="Notes" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                    <TextBlock x:Name="InspNotesText" Foreground="#88AABB"
+                               TextWrapping="Wrap" FontSize="11"/>
+                  </StackPanel>
+
+                  <!-- Details row -->
+                  <StackPanel x:Name="InspDetailsPanel" IsVisible="False" Spacing="4">
+                    <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
+                    <TextBlock Text="Details" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
+                    <ItemsControl x:Name="InspDetailsItemsControl"/>
+                  </StackPanel>
+
+                  <!-- Organise section (collapsible) -->
+                  <Expander x:Name="OrganiseExpander"
+                            Header="ORGANISE" IsExpanded="False"
+                            Margin="0,10,0,0"
+                            Foreground="#4A6A8A">
+                    <StackPanel Spacing="6" Margin="0,4,0,4">
+
+                      <Button x:Name="CleanupNamesButton"
+                              Content="Cleanup Names"
+                              Click="OnCleanupNamesClick"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,4"
+                              ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
+
+                      <Button x:Name="SortAppsFromLibrariesButton"
+                              Content="Sort Apps from Libraries"
+                              Click="OnSortAppsFromLibrariesClick"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,4"
+                              ToolTip.Tip="Move app-type systems (Desktop, Web, Backend, etc.) to the top rows and class libraries to the bottom, with a separator between them."/>
+
+                      <Button x:Name="ArrangeButton"
+                              Content="Arrange"
+                              Click="OnArrangeClick"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,4"
+                              ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
+
+                      <Button x:Name="SortByLayersButton"
+                              Content="Sort by Layers"
+                              Click="OnSortByLayersClick"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,4"
+                              ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
+
+                      <Button x:Name="ClearCanvasButton"
+                              Content="Clear Canvas"
+                              Click="OnClearCanvasClick"
+                              HorizontalAlignment="Stretch"
+                              Padding="8,4"
+                              Background="#3A1A1A"
+                              Foreground="#FFAAAA"
+                              ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
+
+                    </StackPanel>
+                  </Expander>
+
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+          </TabControl>
 
         </DockPanel>
       </Border>
