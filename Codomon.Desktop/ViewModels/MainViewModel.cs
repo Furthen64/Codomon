@@ -554,6 +554,17 @@ public class MainViewModel : INotifyPropertyChanged
         var projectByRelativePath = BuildProjectByRelativePath(scanResult);
         var systemsByProjectName = BuildSystemsByProjectName(Workspace.SystemMap.Systems);
 
+        // Pre-scan: identify systems whose modules are all empty (no code nodes yet).
+        // These systems were populated by the Architecture Hypothesis only and have no
+        // Roslyn-derived content.  When Roslyn classifies new modules for such a system,
+        // we should redirect the code nodes into the existing placeholder modules rather
+        // than creating parallel empty/duplicate Roslyn modules.
+        var systemsWithOnlyEmptyModules = new HashSet<string>(
+            Workspace.SystemMap.Systems
+                .Where(s => s.Modules.Count > 0 && s.Modules.All(m => m.CodeNodes.Count == 0))
+                .Select(s => s.Id),
+            StringComparer.Ordinal);
+
         int addedModules = 0;
         int mergedModules = 0;
         int addedCodeNodes = 0;
@@ -581,6 +592,18 @@ public class MainViewModel : INotifyPropertyChanged
             }
 
             var existingModule = FindModuleByIdentityKey(Workspace.SystemMap, module.IdentityKey);
+
+            // Fallback: if the target system was built entirely from the Architecture
+            // Hypothesis (all modules have 0 code nodes), redirect into an existing
+            // placeholder module instead of adding a new Roslyn-named module alongside.
+            // Prefer a module whose kind matches; otherwise use the first placeholder.
+            if (existingModule == null &&
+                targetSystem != null &&
+                systemsWithOnlyEmptyModules.Contains(targetSystem.Id))
+            {
+                existingModule = FindBestHypothesisModule(targetSystem, module);
+            }
+
             if (existingModule == null)
             {
                 StampCodeNodeIdentityKeys(module.CodeNodes, scanResult.SourcePath);
@@ -726,6 +749,21 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         return allSystems.Count == 1 ? allSystems[0] : null;
+    }
+
+    /// <summary>
+    /// Picks the best hypothesis-placeholder module in <paramref name="system"/> to receive
+    /// incoming Roslyn code nodes.  Prefers a module whose <see cref="ModuleModel.Kind"/>
+    /// matches <paramref name="incomingModule"/>; falls back to the first module in the list.
+    /// Returns <c>null</c> if the system has no modules at all.
+    /// </summary>
+    private static ModuleModel? FindBestHypothesisModule(SystemModel system, ModuleModel incomingModule)
+    {
+        if (system.Modules.Count == 0)
+            return null;
+
+        return system.Modules.FirstOrDefault(m => m.Kind == incomingModule.Kind)
+            ?? system.Modules[0];
     }
 
     private static ModuleModel? FindModuleByIdentityKey(SystemMapModel map, string identityKey)
