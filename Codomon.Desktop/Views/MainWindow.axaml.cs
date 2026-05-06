@@ -1320,8 +1320,10 @@ public partial class MainWindow : Window
         // re-run the scan after every Architecture hypothesis pass.
         if (hypothesisVm.HasCanvasChanges && !string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath))
         {
+            // ListSavedScans returns results in descending chronological order,
+            // so index 0 is always the most recent scan.
             var savedScans = RoslynScanService.ListSavedScans(_vm.WorkspaceFolderPath);
-            if (savedScans.Count > 0)
+            if (savedScans.Any())
             {
                 AppLogger.Info("[Hypothesis] Re-applying latest saved Roslyn scan to coordinate code analysis with hypothesis systems.");
                 await ExecuteSafeAsync(async () =>
