@@ -29,6 +29,10 @@
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <Button x:Name="BackStepButton" Content="← Back" Click="OnBackStepClick" Padding="12,6"/>
             <Button x:Name="NextStepButton" Content="Next →" Click="OnNextStepClick" Padding="12,6" Background="#1A3A5A" Foreground="White"/>
+            <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
+            <Button x:Name="ApplyToCanvasFooterButton" Content="✓ Apply to Canvas"
+                    Click="OnApplyToCanvasClick" Padding="14,6" IsEnabled="False"
+                    Background="#1A3A2A" Foreground="#AAFFAA"/>
           </StackPanel>
         </DockPanel>
         <TextBlock x:Name="StatusText" Text="" Foreground="#88AABB" FontSize="11"/>
@@ -106,6 +110,9 @@
                       Click="OnCancelClick" Padding="10,4" IsEnabled="False"/>
               <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
               <Button Content="↺ Refresh History" Click="OnRefreshHistoryClick" Padding="10,4"/>
+              <Button x:Name="HistoryLoadButton" Content="▶ Load Selected"
+                      Click="OnLoadSelectedHistoryClick" Padding="10,4" IsEnabled="False"
+                      Background="#1A3A5A" Foreground="White"/>
             </StackPanel>
           </Border>
 
@@ -138,7 +145,8 @@
                 </Border>
                 <ListBox x:Name="HistoryListBox"
                          Background="Transparent"
-                         DoubleTapped="OnHistoryDoubleTapped"/>
+                         DoubleTapped="OnHistoryDoubleTapped"
+                         SelectionChanged="OnHistorySelectionChanged"/>
               </DockPanel>
             </Border>
 
@@ -155,11 +163,20 @@
               <TextBlock x:Name="SystemsHeaderText"
                          Text="Suggested Systems — run or load a hypothesis first."
                          Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
-              <Button Content="Save Markdown Overview" Click="OnSaveMarkdownOverviewClick"
-                      Padding="10,4" DockPanel.Dock="Right"/>
+              <StackPanel Orientation="Horizontal" Spacing="6" DockPanel.Dock="Right">
+                <Button Content="Save Markdown Overview" Click="OnSaveMarkdownOverviewClick" Padding="10,4"/>
+                <Border Width="1" Margin="2,0" Background="#2A3F5A"/>
+                <Button x:Name="AcceptSelectedSystemButton" Content="Accept Selected"
+                        Click="OnAcceptSelectedSystemFromTabClick" Padding="10,4" IsEnabled="False"
+                        Background="#1A3A5A" Foreground="White"/>
+                <Button x:Name="AcceptAllLikelySystemsButton" Content="Accept All Likely"
+                        Click="OnAcceptAllLikelySystemsClick" Padding="10,4"
+                        Background="#1A3A2A" Foreground="White"/>
+              </StackPanel>
             </DockPanel>
           </Border>
-          <ListBox x:Name="SystemsListBox" Background="Transparent"/>
+          <ListBox x:Name="SystemsListBox" Background="Transparent"
+                   SelectionChanged="OnSystemsListSelectionChanged"/>
         </DockPanel>
       </TabItem>
 
@@ -168,11 +185,22 @@
         <DockPanel>
           <Border DockPanel.Dock="Top" Background="#1A2435" Padding="12,8"
                   BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-            <TextBlock x:Name="HvnHeaderText"
-                       Text="High-Value Node suggestions — run or load a hypothesis first."
-                       Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
+            <DockPanel>
+              <TextBlock x:Name="HvnHeaderText"
+                         Text="High-Value Node suggestions — run or load a hypothesis first."
+                         Foreground="#556677" FontSize="11" VerticalAlignment="Center"/>
+              <StackPanel Orientation="Horizontal" Spacing="6" DockPanel.Dock="Right">
+                <Button x:Name="AcceptSelectedNodeButton" Content="Accept Selected"
+                        Click="OnAcceptSelectedNodeFromTabClick" Padding="10,4" IsEnabled="False"
+                        Background="#1A3A5A" Foreground="White"/>
+                <Button x:Name="AcceptAllLikelyNodesButton" Content="Accept All Likely"
+                        Click="OnAcceptAllLikelyNodesClick" Padding="10,4"
+                        Background="#1A3A2A" Foreground="White"/>
+              </StackPanel>
+            </DockPanel>
           </Border>
-          <ListBox x:Name="HvnListBox" Background="Transparent"/>
+          <ListBox x:Name="HvnListBox" Background="Transparent"
+                   SelectionChanged="OnHvnListSelectionChanged"/>
         </DockPanel>
       </TabItem>
 
@@ -185,6 +213,21 @@
                        Foreground="#AABBCC" FontWeight="SemiBold" FontSize="13"/>
             <TextBlock Text="Accepted items are added to your workspace System Map. They remain editable and are not overwritten on subsequent synthesis passes."
                        Foreground="#556677" FontSize="11" TextWrapping="Wrap"/>
+
+            <Border Height="1" Background="#2A3F5A"/>
+
+            <!-- Quick actions -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="Quick Actions" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Accept All Likely Systems"
+                        Click="OnAcceptAllLikelySystemsClick" Padding="12,4"
+                        Background="#1A3A2A" Foreground="White"/>
+                <Button Content="Accept All Likely Nodes"
+                        Click="OnAcceptAllLikelyNodesClick" Padding="12,4"
+                        Background="#1A3A2A" Foreground="White"/>
+              </StackPanel>
+            </StackPanel>
 
             <Border Height="1" Background="#2A3F5A"/>
 

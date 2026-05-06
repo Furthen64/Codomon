@@ -39,6 +39,8 @@ public partial class ArchitectureHypothesisDialog : Window
                 SyncRunButtons();
             else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.CurrentHypothesis))
                 Dispatcher.UIThread.Post(RebuildResultTabs);
+            else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.HasCanvasChanges))
+                SyncApplyToCanvasButton();
         };
 
         _vm.ProgressMessages.CollectionChanged += (_, _) =>
@@ -180,6 +182,28 @@ public partial class ArchitectureHypothesisDialog : Window
 
         await _vm.LoadHypothesisAsync(entry);
         SyncStatusText();
+        RebuildResultTabs();
+        UpdateWizardButtons();
+    }
+
+    private void OnHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("HistoryListBox");
+        var loadBtn = this.FindControl<Button>("HistoryLoadButton");
+        if (loadBtn != null)
+            loadBtn.IsEnabled = listBox?.SelectedItem is ListBoxItem { Tag: HypothesisEntry };
+    }
+
+    private async void OnLoadSelectedHistoryClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("HistoryListBox");
+        if (listBox?.SelectedItem is not ListBoxItem item) return;
+        if (item.Tag is not HypothesisEntry entry) return;
+
+        await _vm.LoadHypothesisAsync(entry);
+        SyncStatusText();
+        RebuildResultTabs();
+        UpdateWizardButtons();
     }
 
     private void SyncRunButtons()
@@ -363,6 +387,84 @@ public partial class ArchitectureHypothesisDialog : Window
                 Content = panel
             });
         }
+    }
+
+    // ── Systems / HVN tabs — inline accept handlers ───────────────────────────
+
+    private void OnSystemsListSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("SystemsListBox");
+        var btn = this.FindControl<Button>("AcceptSelectedSystemButton");
+        if (btn != null)
+            btn.IsEnabled = listBox?.SelectedItem is ListBoxItem { Tag: HypothesisSystemModel };
+    }
+
+    private void OnAcceptSelectedSystemFromTabClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("SystemsListBox");
+        if (listBox?.SelectedItem is not ListBoxItem item) return;
+        if (item.Tag is not HypothesisSystemModel sys) return;
+
+        var (_, isNew) = _vm.AcceptSystem(sys);
+        _vm.StatusMessage = isNew ? $"Accepted system: {sys.Name}" : $"Merged system: {sys.Name}";
+        RebuildSystemsList();
+        RebuildAcceptSystemsList();
+        UpdateFinishSummary();
+    }
+
+    private void OnAcceptAllLikelySystemsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var count = 0;
+        foreach (var sys in _vm.Systems.Where(s =>
+                     s.Confidence == Models.SystemMap.ConfidenceLevel.Likely && !s.IsAccepted))
+        {
+            _vm.AcceptSystem(sys);
+            count++;
+        }
+        _vm.StatusMessage = count > 0
+            ? $"Accepted {count} likely system(s)."
+            : "All likely systems already accepted.";
+        RebuildSystemsList();
+        RebuildAcceptSystemsList();
+        UpdateFinishSummary();
+    }
+
+    private void OnHvnListSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("HvnListBox");
+        var btn = this.FindControl<Button>("AcceptSelectedNodeButton");
+        if (btn != null)
+            btn.IsEnabled = listBox?.SelectedItem is ListBoxItem { Tag: HypothesisHighValueNodeModel };
+    }
+
+    private void OnAcceptSelectedNodeFromTabClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var listBox = this.FindControl<ListBox>("HvnListBox");
+        if (listBox?.SelectedItem is not ListBoxItem item) return;
+        if (item.Tag is not HypothesisHighValueNodeModel node) return;
+
+        var (_, isNew) = _vm.AcceptHighValueNode(node);
+        _vm.StatusMessage = isNew ? $"Accepted node: {node.Name}" : $"Merged node: {node.Name}";
+        RebuildHvnList();
+        RebuildAcceptHvnList();
+        UpdateFinishSummary();
+    }
+
+    private void OnAcceptAllLikelyNodesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var count = 0;
+        foreach (var node in _vm.HighValueNodes.Where(n =>
+                     n.Confidence == Models.SystemMap.ConfidenceLevel.Likely && !n.IsAccepted))
+        {
+            _vm.AcceptHighValueNode(node);
+            count++;
+        }
+        _vm.StatusMessage = count > 0
+            ? $"Accepted {count} likely node(s)."
+            : "All likely nodes already accepted.";
+        RebuildHvnList();
+        RebuildAcceptHvnList();
+        UpdateFinishSummary();
     }
 
     // ── Accept tab ────────────────────────────────────────────────────────────
@@ -616,6 +718,13 @@ public partial class ArchitectureHypothesisDialog : Window
         var text = this.FindControl<TextBlock>("StatusText");
         if (text != null)
             text.Text = _vm.StatusMessage;
+    }
+
+    private void SyncApplyToCanvasButton()
+    {
+        var btn = this.FindControl<Button>("ApplyToCanvasFooterButton");
+        if (btn != null)
+            btn.IsEnabled = _vm.HasCanvasChanges;
     }
 
     private static ListBoxItem MakePlaceholderItem(string message) =>
