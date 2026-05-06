@@ -112,7 +112,7 @@ public partial class MainWindow : Window
             SetupTreeView();
             RefreshProfileComboBox();
             RefreshRoslynConnectionsPanel();
-            UpdateWorkspaceNameDisplay();
+            UpdateWorkspaceNameDisplay();  // calls RefreshSidebar() internally
         }
         else if (e.PropertyName == nameof(MainViewModel.Timeline))
         {
@@ -176,6 +176,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void UpdateMainContentVisibility()
     {
+        var sidebarPanel   = this.FindControl<Border>("SidebarPanel");
         var workspaceGrid  = this.FindControl<Grid>("WorkspaceGrid");
         var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
         var designPanel    = this.FindControl<Grid>("DesignPanel");
@@ -184,6 +185,8 @@ public partial class MainWindow : Window
 
         bool has = _vm.HasWorkspace;
 
+        // Sidebar is always visible once a workspace is loaded, regardless of active nav tab.
+        if (sidebarPanel   != null) sidebarPanel.IsVisible   = has;
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
         if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
@@ -235,12 +238,14 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Refreshes the workspace name displayed in the top-bar dropdown button.</summary>
+    /// <summary>Refreshes the workspace name displayed in the top-bar dropdown button and the sidebar.</summary>
     private void UpdateWorkspaceNameDisplay()
     {
         var nameText = this.FindControl<TextBlock>("WorkspaceNameText");
         if (nameText != null)
             nameText.Text = _vm.HasWorkspace ? _vm.Workspace.WorkspaceName : "No Workspace";
+
+        RefreshSidebar();
     }
 
     // ── Toolbar handlers ────────────────────────────────────────────────────
@@ -1057,8 +1062,9 @@ public partial class MainWindow : Window
             listBox.ItemTemplate = BuildLogItemTemplate();
             listBox.ItemsSource = replay.Entries;
 
-            // Entries have changed — rebuild the timeline.
+            // Entries have changed — rebuild the timeline and refresh sidebar log count.
             RebuildTimeline();
+            RefreshSidebar();
         }
     }
 
@@ -1342,6 +1348,8 @@ public partial class MainWindow : Window
                 AppLogger.Debug("[Roslyn] Applying scan results to System Map via SystemDetector.");
                 await _vm.ApplyRoslynScanAsync(result.ScanResult);
                 AppLogger.Debug("[Roslyn] System Map updated. Graph refreshed from System Map.");
+                SetupTreeView();
+                RefreshSidebar();
             }
             else if (result.PromotedConnections.Count > 0)
             {
@@ -1439,6 +1447,8 @@ public partial class MainWindow : Window
         }
 
         AppLogger.Debug($"[Hypothesis] Apply-to-canvas flow finished. IsDirty={_vm.IsDirty}; Final System Map: {DescribeSystemMap(_vm.Workspace.SystemMap)}");
+        SetupTreeView();
+        RefreshSidebar();
     }
 
     private static string DescribeSystemMap(SystemMapModel map)
@@ -2056,6 +2066,143 @@ public partial class MainWindow : Window
         matchText.Text = match.MatchReason;
     }
 
+    // ── Sidebar ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Refreshes all sidebar controls: workspace name, source path, analysis counts,
+    /// and the user profile strip. Call after the workspace is opened, changed, or
+    /// when log entries are loaded.
+    /// </summary>
+    private void RefreshSidebar()
+    {
+        var workspaceNameText  = this.FindControl<TextBlock>("SidebarWorkspaceNameText");
+        var sourcePathText     = this.FindControl<TextBlock>("SidebarSourcePathText");
+        var sourceFilesCount   = this.FindControl<TextBlock>("AnalysisSourceFilesCountText");
+        var mdDocsCount        = this.FindControl<TextBlock>("AnalysisMarkdownDocsCountText");
+        var logPointsCount     = this.FindControl<TextBlock>("AnalysisLogPointsCountText");
+        var profileInitial     = this.FindControl<TextBlock>("ProfileInitialText");
+        var profileDisplayName = this.FindControl<TextBlock>("ProfileDisplayNameText");
+
+        if (!_vm.HasWorkspace)
+        {
+            if (workspaceNameText != null) workspaceNameText.Text = "—";
+            if (sourcePathText    != null) sourcePathText.Text    = string.Empty;
+            if (sourceFilesCount  != null) sourceFilesCount.Text  = string.Empty;
+            if (mdDocsCount       != null) mdDocsCount.Text       = string.Empty;
+            if (logPointsCount    != null) logPointsCount.Text    = string.Empty;
+            return;
+        }
+
+        // WORKSPACE section
+        if (workspaceNameText != null)
+            workspaceNameText.Text = _vm.Workspace.WorkspaceName;
+
+        if (sourcePathText != null)
+        {
+            var slnFile = string.IsNullOrWhiteSpace(_vm.Workspace.SourceProjectPath)
+                ? string.Empty
+                : Path.GetFileName(_vm.Workspace.SourceProjectPath);
+            sourcePathText.Text = string.IsNullOrEmpty(slnFile)
+                ? _vm.WorkspaceFolderPath
+                : $"{slnFile}  ({Path.GetDirectoryName(_vm.Workspace.SourceProjectPath)})";
+        }
+
+        // ANALYSIS counts
+        if (sourceFilesCount != null)
+        {
+            int count = _vm.Workspace.SystemMap.AllCodeNodes
+                .Select(n => n.FilePath)
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            sourceFilesCount.Text = count > 0 ? count.ToString("N0") : string.Empty;
+        }
+
+        if (mdDocsCount != null)
+        {
+            int count = CountMarkdownDocs(_vm.WorkspaceFolderPath);
+            mdDocsCount.Text = count > 0 ? count.ToString("N0") : string.Empty;
+        }
+
+        if (logPointsCount != null)
+        {
+            int count = _vm.LogReplay.Entries.Count;
+            logPointsCount.Text = count > 0 ? count.ToString("N0") : string.Empty;
+        }
+
+        // Profile strip — use OS user name for a simple display
+        var osUser = Environment.UserName;
+        var initial = string.IsNullOrEmpty(osUser) ? "?" : osUser[0].ToString().ToUpperInvariant();
+        if (profileInitial     != null) profileInitial.Text     = initial;
+        if (profileDisplayName != null) profileDisplayName.Text = osUser;
+    }
+
+    private static int CountMarkdownDocs(string workspaceFolderPath)
+    {
+        if (string.IsNullOrEmpty(workspaceFolderPath)) return 0;
+        var summariesRoot = Path.Combine(workspaceFolderPath, "summaries");
+        if (!Directory.Exists(summariesRoot)) return 0;
+        try
+        {
+            return Directory.EnumerateFiles(summariesRoot, "*.md", SearchOption.AllDirectories).Count();
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    // ── Analysis sidebar row click handlers ────────────────────────────────
+
+    private void OnAnalysisScanSummaryClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Scan");
+
+    private void OnAnalysisSourceFilesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        SetActiveNavTab("Monitor");
+        if (_vm.HasWorkspace)
+            _vm.SystemMap.SetActiveView(ViewModels.SystemMapViewKind.CodeDetailView);
+    }
+
+    private void OnAnalysisMarkdownDocsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Docs");
+
+    private void OnAnalysisAstGraphClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Graph");
+
+    private void OnAnalysisLogPointsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Monitor");
+
+    private async void OnAddArchComponentClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace) return;
+
+        var name = await ShowInputDialogAsync(
+            "Add Architecture Component",
+            "Enter a name for the new system/component:",
+            string.Empty);
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var newSystem = new Models.SystemMap.SystemModel
+        {
+            Id          = Guid.NewGuid().ToString(),
+            Name        = name.Trim(),
+            Kind        = Models.SystemMap.SystemKind.Unknown,
+            Confidence  = Models.SystemMap.ConfidenceLevel.Manual,
+            IdentityKey = Services.SystemMapIdentity.CreateSystemKey(
+                name.Trim(), nameof(Models.SystemMap.SystemKind.Unknown))
+        };
+
+        _vm.Workspace.SystemMap.Systems.Add(newSystem);
+        _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
+        _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
+        _vm.IsDirty = true;
+        SetupTreeView();
+        AppLogger.Info($"Architecture component added: {name.Trim()}");
+    }
+
+    // ── Canvas / TreeView ────────────────────────────────────────────────────
+
     private void SetupTreeView()
     {
         var tree = this.FindControl<TreeView>("ArchTreeView");
@@ -2063,24 +2210,98 @@ public partial class MainWindow : Window
 
         tree.SelectionChanged -= OnTreeSelectionChanged;
 
-        var items = _vm.Workspace.Systems.Select(sys =>
+        var layers = new[]
         {
-            var sysNode = new TreeViewItem
+            (ViewModels.ArchitectureLayerKind.Presentation,   "Presentation Layer",   "#9B59B6"),
+            (ViewModels.ArchitectureLayerKind.Application,    "Application Layer",    "#27AE60"),
+            (ViewModels.ArchitectureLayerKind.Domain,         "Domain Layer",         "#F39C12"),
+            (ViewModels.ArchitectureLayerKind.Infrastructure, "Infrastructure Layer", "#2980B9"),
+        };
+
+        var items = new List<TreeViewItem>();
+
+        // Group classified systems (from SystemMap view-model) by layer.
+        var systemsByLayer = _vm.SystemMap.Systems
+            .GroupBy(s => s.LayerKind)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var (layerKind, layerLabel, layerColor) in layers)
+        {
+            var layerSystems = systemsByLayer.TryGetValue(layerKind, out var ls)
+                ? ls
+                : new List<ViewModels.SystemItemVm>();
+
+            var dotColor = Avalonia.Media.Color.Parse(layerColor);
+            var dotBrush = new Avalonia.Media.SolidColorBrush(dotColor);
+
+            var groupHeader = new Avalonia.Controls.StackPanel
             {
-                Header = CreateNodeHeader(sys.Name, "☐"),
-                IsExpanded = true,
-                Tag = sys,
-                ItemsSource = sys.Modules.Select(mod => new TreeViewItem
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                Spacing = 6
+            };
+            groupHeader.Children.Add(new Avalonia.Controls.Shapes.Ellipse
+            {
+                Width  = 8,
+                Height = 8,
+                Fill   = dotBrush,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            });
+            groupHeader.Children.Add(new TextBlock
+            {
+                Text      = layerLabel,
+                Foreground = dotBrush,
+                FontSize  = 11,
+                FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            });
+
+            var layerNode = new TreeViewItem
+            {
+                Header     = groupHeader,
+                IsExpanded = layerSystems.Count > 0,
+                ItemsSource = layerSystems.Select(sys => new TreeViewItem
                 {
-                    Header = CreateNodeHeader(mod.Name, "  ☐"),
-                    Tag = mod
+                    Header = CreateSystemLeafHeader(sys.Name),
+                    Tag    = sys
                 }).ToList()
             };
-            return sysNode;
-        }).ToList();
+
+            items.Add(layerNode);
+        }
+
+        // Add any legacy WorkspaceModel systems not yet classified in the SystemMap
+        // (e.g. workspaces that pre-date the SystemMap) as an "Other" group.
+        var classifiedIds = new HashSet<string>(
+            _vm.SystemMap.Systems.Select(s => s.Id), StringComparer.Ordinal);
+
+        var unclassified = _vm.Workspace.Systems
+            .Where(ws => !classifiedIds.Contains(ws.Id))
+            .Select(ws => new ViewModels.SystemItemVm { Id = ws.Id, Name = ws.Name })
+            .ToList();
+
+        if (unclassified.Count > 0)
+        {
+            var otherNode = new TreeViewItem
+            {
+                Header = new TextBlock
+                {
+                    Text       = "Other",
+                    Foreground = new Avalonia.Media.SolidColorBrush(
+                        Avalonia.Media.Color.Parse("#778899")),
+                    FontSize   = 11,
+                    FontWeight = Avalonia.Media.FontWeight.SemiBold
+                },
+                IsExpanded  = true,
+                ItemsSource = unclassified.Select(sys => new TreeViewItem
+                {
+                    Header = CreateSystemLeafHeader(sys.Name),
+                    Tag    = sys
+                }).ToList()
+            };
+            items.Add(otherNode);
+        }
 
         tree.ItemsSource = items;
-
         tree.SelectionChanged += OnTreeSelectionChanged;
     }
 
@@ -2089,37 +2310,49 @@ public partial class MainWindow : Window
         if (e.AddedItems.Count == 0 || e.AddedItems[0] is not TreeViewItem item)
             return;
 
-        _vm.Workspace.ClearSelection();
+        // Only leaf items (system nodes) carry a SystemItemVm tag; layer group nodes do not.
+        if (item.Tag is not ViewModels.SystemItemVm sys) return;
 
-        if (item.Tag is SystemBoxModel sys)
-        {
-            sys.IsSelected = true;
-            _vm.Selection.SelectedId = sys.Id;
-            _vm.Selection.SelectedType = "System";
-            _vm.Selection.SelectedName = sys.Name;
-        }
-        else if (item.Tag is ModuleBoxModel mod)
-        {
-            mod.IsSelected = true;
-            _vm.Selection.SelectedId = mod.Id;
-            _vm.Selection.SelectedType = "Module";
-            _vm.Selection.SelectedName = mod.Name;
-        }
+        // Highlight the matching card on the System Map canvas.
+        _vm.SystemMap.SelectSystem(sys);
+
+        // Also update the shared selection state used by the Properties panel.
+        _vm.Workspace.ClearSelection();
+        var wsSystem = _vm.Workspace.Systems.FirstOrDefault(s => s.Id == sys.Id);
+        if (wsSystem != null) wsSystem.IsSelected = true;
+
+        _vm.Selection.SelectedId   = sys.Id;
+        _vm.Selection.SelectedType = "System";
+        _vm.Selection.SelectedName = sys.Name;
+
+        // Switch to Monitor/System Map so the user can see the highlighted card.
+        if (_activeNavTab != "Monitor")
+            SetActiveNavTab("Monitor");
     }
 
-    private static Avalonia.Controls.StackPanel CreateNodeHeader(string name, string icon)
+    private static Avalonia.Controls.StackPanel CreateSystemLeafHeader(string name)
     {
         var panel = new Avalonia.Controls.StackPanel
         {
             Orientation = Avalonia.Layout.Orientation.Horizontal,
             Spacing = 6
         };
-        panel.Children.Add(new TextBlock { Text = icon, Foreground = Avalonia.Media.Brushes.Gray });
-        panel.Children.Add(new TextBlock { Text = name, Foreground = Avalonia.Media.Brushes.LightGray });
+        panel.Children.Add(new TextBlock
+        {
+            Text      = "·",
+            Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677")),
+            FontSize  = 13,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text      = name,
+            Foreground = Avalonia.Media.Brushes.LightGray,
+            FontSize  = 11,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        });
         return panel;
     }
-
-    // ── Error handling ───────────────────────────────────────────────────────
 
     private async Task ExecuteSafeAsync(Func<Task> action)
     {

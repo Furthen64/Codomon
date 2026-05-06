@@ -159,6 +159,170 @@
 
       <!-- Main Content rows (row 0) -->
       <Grid Grid.Row="0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="220"/>  <!-- sidebar -->
+          <ColumnDefinition Width="*"/>    <!-- content area -->
+        </Grid.ColumnDefinitions>
+
+        <!-- ── Left Sidebar — always visible when a workspace is loaded ── -->
+        <Border x:Name="SidebarPanel" Grid.Column="0" IsVisible="False"
+                Background="#141C28" BorderThickness="0,0,1,0" BorderBrush="#2A3F5A">
+          <DockPanel>
+
+            <!-- User profile strip — docked to the bottom -->
+            <Border DockPanel.Dock="Bottom" Background="#111820" Padding="10,7"
+                    BorderThickness="0,1,0,0" BorderBrush="#2A3F5A">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Width="26" Height="26" CornerRadius="13"
+                        Background="#2A4A6A" VerticalAlignment="Center" Margin="0,0,8,0">
+                  <TextBlock x:Name="ProfileInitialText" Text="D"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             FontSize="11" FontWeight="Bold" Foreground="White"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                  <TextBlock x:Name="ProfileDisplayNameText" Text="developer"
+                             FontSize="12" FontWeight="SemiBold" Foreground="#AABBCC"/>
+                  <TextBlock Text="Local Workspace" FontSize="10" Foreground="#556677"/>
+                </StackPanel>
+                <Button Grid.Column="2" Content="⚙" Click="OnSettingsClick"
+                        Padding="5,3" FontSize="13" ToolTip.Tip="User Settings"
+                        VerticalAlignment="Center" Background="Transparent"/>
+              </Grid>
+            </Border>
+
+            <!-- Scrollable sidebar sections -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel>
+
+                <!-- WORKSPACE section -->
+                <StackPanel Margin="8,8,8,4" Spacing="2">
+                  <TextBlock Text="WORKSPACE" FontSize="10" FontWeight="Bold"
+                             Foreground="#556677" Margin="2,0,0,4"/>
+                  <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0,0,0">
+                    <TextBlock Text="📁" FontSize="12" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                    <StackPanel Spacing="1" MinWidth="0">
+                      <TextBlock x:Name="SidebarWorkspaceNameText" Text="—"
+                                 FontSize="12" FontWeight="SemiBold" Foreground="#AABBCC"
+                                 TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock x:Name="SidebarSourcePathText" Text=""
+                                 FontSize="10" Foreground="#556677"
+                                 TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+
+                <Border Height="1" Background="#1E2A3A" Margin="8,4"/>
+
+                <!-- ANALYSIS section -->
+                <StackPanel Margin="8,4,8,2" Spacing="0">
+                  <TextBlock Text="ANALYSIS" FontSize="10" FontWeight="Bold"
+                             Foreground="#556677" Margin="2,0,0,6"/>
+
+                  <!-- Scan Summary -->
+                  <Button x:Name="AnalysisScanSummaryBtn" Click="OnAnalysisScanSummaryClick"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Background="Transparent" Padding="4,4" CornerRadius="3">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="📋" FontSize="11" VerticalAlignment="Center"/>
+                      <TextBlock Text="Scan Summary" FontSize="11" Foreground="#AABBCC" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+
+                  <!-- Source Files -->
+                  <Button x:Name="AnalysisSourceFilesBtn" Click="OnAnalysisSourceFilesClick"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Background="Transparent" Padding="4,4" CornerRadius="3">
+                    <Grid HorizontalAlignment="Stretch">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="📄" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Text="Source Files" FontSize="11" Foreground="#AABBCC" VerticalAlignment="Center"/>
+                      </StackPanel>
+                      <TextBlock x:Name="AnalysisSourceFilesCountText" Grid.Column="1"
+                                 Text="" FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
+                    </Grid>
+                  </Button>
+
+                  <!-- Markdown Docs -->
+                  <Button x:Name="AnalysisMarkdownDocsBtn" Click="OnAnalysisMarkdownDocsClick"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Background="Transparent" Padding="4,4" CornerRadius="3">
+                    <Grid HorizontalAlignment="Stretch">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="📝" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Text="Markdown Docs" FontSize="11" Foreground="#AABBCC" VerticalAlignment="Center"/>
+                      </StackPanel>
+                      <TextBlock x:Name="AnalysisMarkdownDocsCountText" Grid.Column="1"
+                                 Text="" FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
+                    </Grid>
+                  </Button>
+
+                  <!-- AST Graph -->
+                  <Button x:Name="AnalysisAstGraphBtn" Click="OnAnalysisAstGraphClick"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Background="Transparent" Padding="4,4" CornerRadius="3">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="🔷" FontSize="11" VerticalAlignment="Center"/>
+                      <TextBlock Text="AST Graph" FontSize="11" Foreground="#AABBCC" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+
+                  <!-- Log Points -->
+                  <Button x:Name="AnalysisLogPointsBtn" Click="OnAnalysisLogPointsClick"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Background="Transparent" Padding="4,4" CornerRadius="3">
+                    <Grid HorizontalAlignment="Stretch">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="📍" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Text="Log Points" FontSize="11" Foreground="#AABBCC" VerticalAlignment="Center"/>
+                      </StackPanel>
+                      <TextBlock x:Name="AnalysisLogPointsCountText" Grid.Column="1"
+                                 Text="" FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
+                    </Grid>
+                  </Button>
+                </StackPanel>
+
+                <Border Height="1" Background="#1E2A3A" Margin="8,4"/>
+
+                <!-- ARCHITECTURE MAP header + tree -->
+                <Grid Margin="8,6,8,2">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Text="ARCHITECTURE MAP" FontSize="10" FontWeight="Bold"
+                             Foreground="#556677" VerticalAlignment="Center"/>
+                  <Button Grid.Column="1" Content="+" Click="OnAddArchComponentClick"
+                          Padding="5,2" FontSize="14" FontWeight="Bold"
+                          ToolTip.Tip="Add new architecture component"
+                          VerticalAlignment="Center" Background="Transparent" Foreground="#4A90D9"/>
+                </Grid>
+                <TreeView x:Name="ArchTreeView" Background="Transparent" Margin="2,2,2,4"/>
+
+              </StackPanel>
+            </ScrollViewer>
+
+          </DockPanel>
+        </Border>
+
+        <!-- ── Content area (all tab panels sit here) ── -->
+        <Grid Grid.Column="1">
 
       <!-- ── Design tab placeholder ─── -->
       <Grid x:Name="DesignPanel" IsVisible="False" Background="#0F141E">
@@ -187,26 +351,15 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
       </Grid>
 
-      <!-- ── 3-column workspace layout ─── -->
+      <!-- ── 2-column workspace layout (sidebar extracted above) ─── -->
       <Grid x:Name="WorkspaceGrid" IsVisible="False">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="250"/>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="300"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Left Panel: TreeView -->
-        <Border Grid.Column="0" Background="#141C28" BorderThickness="0,0,1,0" BorderBrush="#2A3F5A">
-          <DockPanel>
-            <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-              <TextBlock Text="Architecture" FontWeight="Bold" Foreground="#AABBCC"/>
-            </Border>
-            <TreeView x:Name="ArchTreeView" Background="Transparent" Margin="4"/>
-          </DockPanel>
-        </Border>
-
         <!-- Center Panel: Graph / System Map tabs -->
-        <Border Grid.Column="1" Background="#0F141E" ClipToBounds="True">
+        <Border Grid.Column="0" Background="#0F141E" ClipToBounds="True">
           <TabControl x:Name="CenterTabControl"
                       SelectionChanged="OnCenterTabSelectionChanged"
                       Background="Transparent"
@@ -226,7 +379,7 @@
         </Border>
 
         <!-- Right Panel: Properties -->
-        <Border Grid.Column="2" Background="#141C28" BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
+        <Border Grid.Column="1" Background="#141C28" BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
           <DockPanel>
             <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
               <TextBlock Text="Properties" FontWeight="Bold" Foreground="#AABBCC"/>
@@ -335,7 +488,9 @@
         </DockPanel>
       </Grid>
 
-    </Grid><!-- end main content row 0 -->
+        </Grid><!-- end content area Grid.Column="1" -->
+
+      </Grid><!-- end main content row 0 -->
 
   </Grid><!-- end resizable outer Grid -->
 
