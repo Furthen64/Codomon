@@ -18,6 +18,7 @@ public static class LlmSummaryService
     private const string RuntimeStatsFileName = "runtime_stats.json";
     private const double DefaultEstimatedTokensPerSecond = 1200.0;
     private const int MaxContinuationRequests = 6;
+    private const string ContinuationPrompt = "Continue exactly where you left off. Do not repeat previous text. Return only the remaining summary content.";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -408,7 +409,8 @@ public static class LlmSummaryService
 
         try
         {
-            for (int attempt = 0; attempt < MaxContinuationRequests; attempt++)
+            var continuationRequests = 0;
+            while (true)
             {
                 var payload = new ChatRequest
                 {
@@ -418,7 +420,7 @@ public static class LlmSummaryService
                 };
 
                 using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
-                AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}  attempt={attempt + 1}");
+                AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}  attempt={continuationRequests + 1}");
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -436,7 +438,7 @@ public static class LlmSummaryService
                 var finishReason = firstChoice?.FinishReason ?? "(null)";
                 var content = firstChoice?.Message?.Content;
 
-                AppLogger.Debug($"[LLM] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}  attempt={attempt + 1}");
+                AppLogger.Debug($"[LLM] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}  attempt={continuationRequests + 1}");
 
                 if (string.IsNullOrWhiteSpace(content))
                 {
@@ -449,7 +451,7 @@ public static class LlmSummaryService
                 if (!string.Equals(finishReason, "length", StringComparison.OrdinalIgnoreCase))
                     return summaryBuilder.ToString();
 
-                if (attempt >= MaxContinuationRequests - 1)
+                if (continuationRequests >= MaxContinuationRequests)
                 {
                     AppLogger.Warn("[LLM] Summary generation hit the continuation limit while finish_reason=length.");
                     throw new InvalidOperationException(
@@ -457,16 +459,15 @@ public static class LlmSummaryService
                         "Try increasing Summary output token cap or using a model with larger output capacity.");
                 }
 
-                AppLogger.Warn($"[LLM] Summary response hit output limit (finish_reason=length). Requesting continuation (call {attempt + 2}/{MaxContinuationRequests}).");
+                continuationRequests++;
+                AppLogger.Warn($"[LLM] Summary response hit output limit (finish_reason=length). Requesting continuation ({continuationRequests}/{MaxContinuationRequests}).");
                 messages.Add(new ChatMessage { Role = "assistant", Content = content });
                 messages.Add(new ChatMessage
                 {
                     Role = "user",
-                    Content = "Continue exactly where you left off. Do not repeat previous text. Return only the remaining summary content."
+                    Content = ContinuationPrompt
                 });
             }
-
-            throw new InvalidOperationException("Summary generation failed to complete.");
         }
         catch (OperationCanceledException oce)
         {
