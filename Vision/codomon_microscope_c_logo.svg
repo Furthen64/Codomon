@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Codomon microscope C logo</title>
+  <desc id="desc">A simplified black microscope logo where the curved body forms a capital C shape.</desc>
+
+  <defs>
+    <style>
+      .mark { fill: #000000; }
+    </style>
+  </defs>
+
+  <!-- stage -->
+  <rect class="mark" x="82" y="308" width="92" height="18" rx="2" />
+
+  <!-- base line -->
+  <rect class="mark" x="80" y="402" width="305" height="17" rx="2" />
+
+  <!-- small foot / lower support -->
+  <path class="mark" d="M142 392 H238 C218 378 204 360 198 339 C184 364 164 381 142 392 Z" />
+
+  <!-- C-shaped microscope arm -->
+  <path class="mark" fill-rule="evenodd" d="
+    M327 170
+    C381 211 408 281 385 343
+    C365 397 315 425 260 419
+    C229 416 200 405 178 385
+    L212 345
+    C227 359 247 367 267 367
+    C301 368 332 349 345 317
+    C359 281 345 238 315 216
+    C295 202 271 196 247 201
+    L236 149
+    C268 142 300 150 327 170
+    Z
+
+    M282 232
+    C304 239 322 256 329 279
+    C337 307 323 336 298 350
+    C279 361 255 360 237 348
+    C218 335 207 314 210 291
+    C213 270 226 251 245 241
+    C256 235 269 232 282 232
+    Z" />
+
+  <!-- angled microscope tube -->
+  <g transform="rotate(-58 231 156)">
+    <rect class="mark" x="184" y="65" width="66" height="178" rx="3" />
+    <rect class="mark" x="184" y="38" width="66" height="27" rx="2" />
+    <rect class="mark" x="184" y="248" width="66" height="28" rx="2" />
+  </g>
+</svg>
