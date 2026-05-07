@@ -87,8 +87,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private readonly HashSet<string> _callerOverlayNodeKeys = new(StringComparer.Ordinal);
     private readonly List<ConnectionViewModel> _callerOverlayConnections = new();
     private SystemMapModel? _callerLookupMap;
-    private readonly Dictionary<string, ModuleModel> _moduleByCodeNodeId = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, CodeNodeModel> _codeNodeById = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (ModuleModel Module, CodeNodeModel Node)> _codeNodeEndpointLookup = new(StringComparer.Ordinal);
     private string _workspaceFolderPath = string.Empty;
 
     // ── Filters ───────────────────────────────────────────────────────────────
@@ -1105,22 +1104,32 @@ public class GraphViewModel : INotifyPropertyChanged
 
         var map = _currentSystemMap;
         EnsureCallerLookups(map);
+        var targetEndpointIds = BuildCodeNodeEndpointIds(codeNodeId);
 
         return map.Relationships
-            .Where(rel => string.Equals(rel.ToId, codeNodeId, StringComparison.Ordinal))
+            .Where(rel => targetEndpointIds.Contains(rel.ToId))
             .Where(rel => !string.Equals(rel.FromId, rel.ToId, StringComparison.Ordinal))
             .Where(rel => ShowLowConfidenceItems || rel.Confidence != ConfidenceLevel.Unknown)
             .Where(rel => IsKindVisible(rel.Kind))
-            .GroupBy(rel => rel.FromId, StringComparer.Ordinal)
+            .Select(rel =>
+            {
+                if (!TryResolveCodeNodeEndpoint(rel.FromId, out var caller))
+                    return ((RelationshipModel Relationship, ModuleModel Module, CodeNodeModel Node)?)null;
+
+                return (rel, caller.Module, caller.Node);
+            })
+            .Where(item => item != null)
+            .Select(item => item!.Value)
+            .GroupBy(item => item.Node.Id, StringComparer.Ordinal)
             .Select(group =>
             {
-                if (!_moduleByCodeNodeId.TryGetValue(group.Key, out var callerModule)
-                    || !_codeNodeById.TryGetValue(group.Key, out var callerNode))
-                    return null;
+                var first = group.First();
+                var callerModule = first.Module;
+                var callerNode = first.Node;
 
                 var ownerSystemName = ResolveOwnerSystemName(map, callerModule);
                 var relationKinds = group
-                    .Select(rel => rel.Kind.ToString())
+                    .Select(item => item.Relationship.Kind.ToString())
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(kind => kind, StringComparer.Ordinal)
                     .ToArray();
@@ -1135,8 +1144,6 @@ public class GraphViewModel : INotifyPropertyChanged
                     RelationshipLabel = relationLabel
                 };
             })
-            .Where(caller => caller != null)
-            .Cast<GraphCallerVm>()
             .OrderBy(caller => caller.CallerName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(caller => caller.ModuleId, StringComparer.Ordinal)
             .ToList();
@@ -1246,17 +1253,42 @@ public class GraphViewModel : INotifyPropertyChanged
             return;
 
         _callerLookupMap = map;
-        _moduleByCodeNodeId.Clear();
-        _codeNodeById.Clear();
+        _codeNodeEndpointLookup.Clear();
 
         foreach (var module in map.AllModules)
         {
             foreach (var codeNode in module.CodeNodes)
             {
-                _moduleByCodeNodeId[codeNode.Id] = module;
-                _codeNodeById[codeNode.Id] = codeNode;
+                if (!string.IsNullOrWhiteSpace(codeNode.Id))
+                    _codeNodeEndpointLookup.TryAdd(codeNode.Id, (module, codeNode));
+                if (!string.IsNullOrWhiteSpace(codeNode.IdentityKey))
+                    _codeNodeEndpointLookup.TryAdd(codeNode.IdentityKey, (module, codeNode));
             }
         }
+    }
+
+    private HashSet<string> BuildCodeNodeEndpointIds(string codeNodeId)
+    {
+        var endpointIds = new HashSet<string>(StringComparer.Ordinal) { codeNodeId };
+
+        if (TryResolveCodeNodeEndpoint(codeNodeId, out var selected)
+            && !string.IsNullOrWhiteSpace(selected.Node.IdentityKey))
+        {
+            endpointIds.Add(selected.Node.IdentityKey);
+        }
+
+        return endpointIds;
+    }
+
+    private bool TryResolveCodeNodeEndpoint(string endpointId, out (ModuleModel Module, CodeNodeModel Node) endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpointId))
+        {
+            endpoint = default;
+            return false;
+        }
+
+        return _codeNodeEndpointLookup.TryGetValue(endpointId, out endpoint);
     }
 
     private static string ResolveOwnerSystemName(SystemMapModel map, ModuleModel module)
