@@ -1084,6 +1084,9 @@ public class GraphViewModel : INotifyPropertyChanged
         var moduleByCodeNodeId = map.AllModules
             .SelectMany(module => module.CodeNodes.Select(codeNode => (codeNode.Id, Module: module)))
             .ToDictionary(x => x.Id, x => x.Module, StringComparer.Ordinal);
+        var codeNodeById = map.AllModules
+            .SelectMany(module => module.CodeNodes)
+            .ToDictionary(codeNode => codeNode.Id, codeNode => codeNode, StringComparer.Ordinal);
 
         var callerGroups = map.Relationships
             .Where(rel => string.Equals(rel.ToId, node.Key, StringComparison.Ordinal))
@@ -1091,15 +1094,11 @@ public class GraphViewModel : INotifyPropertyChanged
             .Where(rel => ShowLowConfidenceItems || rel.Confidence != ConfidenceLevel.Unknown)
             .Where(rel => IsKindVisible(rel.Kind))
             .GroupBy(rel => rel.FromId, StringComparer.Ordinal)
+            .Where(group => moduleByCodeNodeId.ContainsKey(group.Key) && codeNodeById.ContainsKey(group.Key))
             .Select(group =>
             {
-                if (!moduleByCodeNodeId.TryGetValue(group.Key, out var callerModule))
-                    return null;
-
-                var callerNode = callerModule.CodeNodes
-                    .FirstOrDefault(codeNode => string.Equals(codeNode.Id, group.Key, StringComparison.Ordinal));
-                if (callerNode == null)
-                    return null;
+                var callerModule = moduleByCodeNodeId[group.Key];
+                var callerNode = codeNodeById[group.Key];
 
                 var ownerSystemName = ResolveOwnerSystemName(map, callerModule);
                 var relationKinds = group
@@ -1118,8 +1117,6 @@ public class GraphViewModel : INotifyPropertyChanged
                     ModuleId = callerModule.Id
                 };
             })
-            .Where(caller => caller != null)
-            .Cast<GraphCallerVm>()
             .OrderBy(caller => caller.CallerName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(caller => caller.ModuleId, StringComparer.Ordinal)
             .ToList();
