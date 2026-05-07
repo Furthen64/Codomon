@@ -38,6 +38,12 @@ public class GraphViewModel : INotifyPropertyChanged
 {
     /// <summary>Entity type string assigned to code-node <see cref="NodeViewModel"/> instances.</summary>
     private const string CodeNodeEntityType = "Code Node";
+    private const string CallerOverlayNodeKeyPrefix = "__caller_overlay__:";
+    private const double CallerOverlayHorizontalOffset = 360;
+    private const double CallerOverlayVerticalSpacing = 130;
+    private const double CallerOverlayCenteringDivisor = 2d;
+    private const string CallerOverlayConnectionStroke = "#E0A84E";
+    private const double CallerOverlayConnectionStrokeThickness = 2.25;
 
     public sealed class AutoAlignOptions
     {
@@ -1152,14 +1158,12 @@ public class GraphViewModel : INotifyPropertyChanged
 
         if (callersToRender.Count == 0) return;
 
-        const double overlayXOffset = 360;
-        const double overlayYStep = 130;
-        var startY = selectedNode.Location.Y - ((callersToRender.Count - 1) * overlayYStep / 2d);
+        var startY = selectedNode.Location.Y - ((callersToRender.Count - 1) * CallerOverlayVerticalSpacing / CallerOverlayCenteringDivisor);
 
         for (var i = 0; i < callersToRender.Count; i++)
         {
             var caller = callersToRender[i];
-            var overlayNodeKey = $"__caller_overlay__:{selectedNode.Key}:{caller.CallerCodeNodeId}";
+            var overlayNodeKey = $"{CallerOverlayNodeKeyPrefix}{selectedNode.Key}:{caller.CallerCodeNodeId}";
             var overlayNode = new NodeViewModel
             {
                 Key = overlayNodeKey,
@@ -1174,7 +1178,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 ModuleName = string.Empty,
                 SystemName = string.Empty,
                 RelatedFiles = Array.Empty<string>(),
-                Location = new Point(selectedNode.Location.X - overlayXOffset, startY + (i * overlayYStep))
+                Location = new Point(selectedNode.Location.X - CallerOverlayHorizontalOffset, startY + (i * CallerOverlayVerticalSpacing))
             };
 
             overlayNode.OutputConnector.IsConnected = true;
@@ -1185,8 +1189,8 @@ public class GraphViewModel : INotifyPropertyChanged
                 selectedNode.InputConnector,
                 caller.RelationshipLabel)
             {
-                Stroke = "#E0A84E",
-                StrokeThickness = 2.25
+                Stroke = CallerOverlayConnectionStroke,
+                StrokeThickness = CallerOverlayConnectionStrokeThickness
             };
 
             Nodes.Add(overlayNode);
@@ -1204,8 +1208,9 @@ public class GraphViewModel : INotifyPropertyChanged
         if (_callerOverlayNodeKeys.Count == 0 && _callerOverlayConnections.Count == 0)
             return;
 
+        var overlayNodeKeys = _callerOverlayNodeKeys;
         _nodeEdges.RemoveAll(edge =>
-            _callerOverlayNodeKeys.Contains(edge.From.Key) || _callerOverlayNodeKeys.Contains(edge.To.Key));
+            overlayNodeKeys.Contains(edge.From.Key) || overlayNodeKeys.Contains(edge.To.Key));
 
         if (_callerOverlayConnections.Count > 0)
         {
