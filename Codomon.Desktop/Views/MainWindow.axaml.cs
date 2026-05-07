@@ -1918,6 +1918,7 @@ public partial class MainWindow : Window
 
         var view = new SystemMapView(_vm.SystemMap);
         view.ShowDetailedRelationshipsRequested += OnShowDetailedRelationshipsRequested;
+        view.ShowDetailedCodeNodeRelationshipsRequested += OnShowDetailedCodeNodeRelationshipsRequested;
         view.ClearCanvasRequested += OnSystemMapClearCanvasRequested;
         view.LayoutPositionChanged += OnSystemMapLayoutPositionChanged;
         view.RemoveRelationshipRequested += OnSystemMapRemoveRelationshipRequested;
@@ -1937,6 +1938,17 @@ public partial class MainWindow : Window
 
         AppLogger.Debug($"[SystemMap] Opening module relationship graph for system '{system.Name}' ({system.Id}).");
         _vm.Graph.RefreshModuleRelationshipsForSystem(_vm.Workspace.SystemMap, system.Id);
+
+        // Switch to the Graph nav tab (which sets CenterTabControl to the Graph sub-tab).
+        SetActiveNavTab("Graph");
+    }
+
+    private void OnShowDetailedCodeNodeRelationshipsRequested(ModuleItemVm module)
+    {
+        if (!_vm.HasWorkspace) return;
+
+        AppLogger.Debug($"[SystemMap] Opening code-node relationship graph for module '{module.Name}' ({module.Id}).");
+        _vm.Graph.RefreshCodeNodeRelationshipsForModule(_vm.Workspace.SystemMap, module.Id);
 
         // Switch to the Graph nav tab (which sets CenterTabControl to the Graph sub-tab).
         SetActiveNavTab("Graph");
