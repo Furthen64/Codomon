@@ -310,6 +310,10 @@ public class GraphViewModel : INotifyPropertyChanged
 
     private void BuildCodeNodeRelationshipsForModule(SystemMapModel map, string? moduleId)
     {
+        const double defaultCodeNodeStartX = 80;
+        const double defaultCodeNodeStartY = 180;
+        const double codeNodeHorizontalGap = 220;
+
         Nodes.Clear();
         Connections.Clear();
         _nodeEdges.Clear();
@@ -338,9 +342,7 @@ public class GraphViewModel : INotifyPropertyChanged
             return;
         }
 
-        double autoX = 80;
-        const double autoY = 180;
-        const double autoGap = 220;
+        double autoX = defaultCodeNodeStartX;
 
         var nodeMap = new Dictionary<string, NodeViewModel>(codeNodes.Count, StringComparer.Ordinal);
         foreach (var codeNode in codeNodes)
@@ -350,15 +352,15 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Key = codeNode.Id,
-                Title = $"{codeNode.Name}\n{codeNode.Kind}",
+                Title = $"{codeNode.Name}\nKind: {codeNode.Kind}",
                 Location = _savedPositions.TryGetValue(codeNode.Id, out var savedPosition)
                     ? savedPosition
-                    : new Point(autoX, autoY)
+                    : new Point(autoX, defaultCodeNodeStartY)
             };
 
             nodeMap[codeNode.Id] = node;
             Nodes.Add(node);
-            autoX += autoGap;
+            autoX += codeNodeHorizontalGap;
         }
 
         foreach (var rel in map.Relationships)
