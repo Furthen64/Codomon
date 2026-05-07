@@ -8,6 +8,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Codomon.Desktop.Services;
 using Codomon.Desktop.Views;
+using Codomon.Desktop.Persistence;
 
 namespace Codomon.Desktop;
 
@@ -41,11 +42,11 @@ public partial class App : Application
     private static async Task StartWithSplashAsync(IClassicDesktopStyleApplicationLifetime desktop)
     {
         var timings = new SplashTimings(
-            MinimumSplashMilliseconds: 20000,
+            MinimumSplashMilliseconds: 7000,
             FallbackSplashMilliseconds: 500,
             ProgressStepMilliseconds: 250,
-            FancyCodeRefreshMilliseconds: 1300,
-            FancyFadeInMilliseconds: 4000);
+            FancyCodeRefreshMilliseconds: 700,
+            FancyFadeInMilliseconds: 3000);
         Window? splash = null;
         FancySplashWindow? fancy = null;
         var splashTimer = Stopwatch.StartNew();
@@ -83,6 +84,16 @@ public partial class App : Application
         }
 
         var main = new MainWindow();
+        // Apply saved window state preference from user config.
+        try
+        {
+            var userCfg = UserConfigService.Load();
+            main.WindowState = userCfg.StartMaximized ? Avalonia.Controls.WindowState.Maximized : Avalonia.Controls.WindowState.Normal;
+        }
+        catch
+        {
+            // ignore and proceed with default state
+        }
         desktop.MainWindow = main;
         main.Show();
 

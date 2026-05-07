@@ -38,6 +38,9 @@ public class UserConfigModel
     /// </summary>
     public GraphAutoAlignSettingsModel GraphAutoAlignSettings { get; set; } = new();
 
+    /// <summary>Whether the main window should start maximized.</summary>
+    public bool StartMaximized { get; set; } = false;
+
     // ── Log import defaults ───────────────────────────────────────────────────
 
     /// <summary>Key of the delimiter option pre-selected in the import wizard (e.g. "tab").</summary>

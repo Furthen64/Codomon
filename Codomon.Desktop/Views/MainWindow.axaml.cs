@@ -84,7 +84,23 @@ public partial class MainWindow : Window
         Closing += OnWindowClosing;
         Opened += OnWindowOpened;
 
+        Closed += OnWindowClosed;
+
         AppLogger.Info("App started");
+    }
+
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        try
+        {
+            var cfg = UserConfigService.Load();
+            cfg.StartMaximized = this.WindowState == Avalonia.Controls.WindowState.Maximized;
+            UserConfigService.Save(cfg);
+        }
+        catch
+        {
+            // Non-critical - ignore persistence errors during shutdown.
+        }
     }
 
     private async void OnWindowOpened(object? sender, EventArgs e)
