@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
