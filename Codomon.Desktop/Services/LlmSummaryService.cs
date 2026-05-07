@@ -1,6 +1,7 @@
 using Codomon.Desktop.Models;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -16,6 +17,7 @@ public static class LlmSummaryService
     private const string PromptFileName = "summary_prompt.md";
     private const string RuntimeStatsFileName = "runtime_stats.json";
     private const double DefaultEstimatedTokensPerSecond = 1200.0;
+    private const int MaxContinuationRequests = 6;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -397,46 +399,74 @@ public static class LlmSummaryService
         var url = BuildChatCompletionsUrl(apiEndpoint);
         AppLogger.Debug($"[LLM] CallLlm → POST {url}  model={modelName}  promptLength={prompt.Length}");
 
-        var payload = new ChatRequest
+        var messages = new List<ChatMessage>
         {
-            Model = modelName,
-            Messages = new[] { new ChatMessage { Role = "user", Content = prompt } },
-            MaxTokens = maxOutputTokens > 0 ? maxOutputTokens : null
+            new() { Role = "user", Content = prompt }
         };
+        var summaryBuilder = new StringBuilder();
+        var maxTokens = maxOutputTokens > 0 ? maxOutputTokens : null;
 
         try
         {
-            using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
-            AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}");
-
-            if (!response.IsSuccessStatusCode)
+            for (int attempt = 0; attempt <= MaxContinuationRequests; attempt++)
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                var snippet = body.Length > 500 ? body[..500] + "…" : body;
-                AppLogger.Error($"[LLM] CallLlm error body: {snippet}");
-                throw new InvalidOperationException(
-                    $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+                var payload = new ChatRequest
+                {
+                    Model = modelName,
+                    Messages = messages.ToArray(),
+                    MaxTokens = maxTokens
+                };
+
+                using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
+                AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}  attempt={attempt + 1}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var snippet = body.Length > 500 ? body[..500] + "…" : body;
+                    AppLogger.Error($"[LLM] CallLlm error body: {snippet}");
+                    throw new InvalidOperationException(
+                        $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
+                    ?? throw new InvalidOperationException("LLM API returned an empty response.");
+
+                var firstChoice = result.Choices?.FirstOrDefault();
+                var finishReason = firstChoice?.FinishReason ?? "(null)";
+                var content = firstChoice?.Message?.Content;
+
+                AppLogger.Debug($"[LLM] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}  attempt={attempt + 1}");
+
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    AppLogger.Warn($"[LLM] CallLlm: response content is empty. finish_reason={finishReason}");
+                    throw new InvalidOperationException("LLM API returned a response with empty content.");
+                }
+
+                summaryBuilder.Append(content);
+
+                if (!string.Equals(finishReason, "length", StringComparison.OrdinalIgnoreCase))
+                    return summaryBuilder.ToString();
+
+                if (attempt >= MaxContinuationRequests)
+                {
+                    AppLogger.Warn("[LLM] Summary generation hit the continuation limit while finish_reason=length.");
+                    throw new InvalidOperationException(
+                        "The summary response repeatedly reached the output limit and could not be completed. " +
+                        "Try increasing Summary output token cap or using a model with larger output capacity.");
+                }
+
+                AppLogger.Warn($"[LLM] Summary response hit output limit (finish_reason=length). Requesting continuation ({attempt + 1}/{MaxContinuationRequests}).");
+                messages.Add(new ChatMessage { Role = "assistant", Content = content });
+                messages.Add(new ChatMessage
+                {
+                    Role = "user",
+                    Content = "Continue exactly where you left off. Do not repeat previous text. Return only the remaining summary content."
+                });
             }
 
-            var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
-                ?? throw new InvalidOperationException("LLM API returned an empty response.");
-
-            var firstChoice = result.Choices?.FirstOrDefault();
-            var finishReason = firstChoice?.FinishReason ?? "(null)";
-            var content = firstChoice?.Message?.Content;
-
-            AppLogger.Debug($"[LLM] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}");
-
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                AppLogger.Warn($"[LLM] CallLlm: response content is empty. finish_reason={finishReason}");
-                throw new InvalidOperationException("LLM API returned a response with empty content.");
-            }
-
-            if (finishReason == "length")
-                AppLogger.Warn("[LLM] Summary output may be truncated (finish_reason=length). Consider increasing MaxOutputTokens or reducing source size.");
-
-            return content;
+            throw new InvalidOperationException("Summary generation failed to complete.");
         }
         catch (OperationCanceledException oce)
         {
