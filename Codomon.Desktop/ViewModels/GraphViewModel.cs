@@ -1075,7 +1075,11 @@ public class GraphViewModel : INotifyPropertyChanged
         {
             var filePath = node.RelatedFiles.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
             if (!string.IsNullOrWhiteSpace(filePath))
-                summaryText = LlmSummaryService.GetSummaryFirstParagraph(_workspaceFolderPath, filePath) ?? string.Empty;
+            {
+                var found = LlmSummaryService.GetSummaryFirstParagraph(_workspaceFolderPath, filePath);
+                // Show a clear placeholder when no summary exists.
+                summaryText = found ?? "<no summary found>";
+            }
         }
         SelectedNodeSummaryFirstParagraph = summaryText;
     }
