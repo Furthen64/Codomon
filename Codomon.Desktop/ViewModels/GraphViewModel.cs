@@ -5,6 +5,7 @@ using Codomon.Desktop.Services.Graph;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
@@ -15,6 +16,12 @@ public enum GraphRenderMode
     SystemMap,
     ModuleRelationships,
     CodeNodeRelationships
+}
+
+public sealed class GraphNodeFileVm
+{
+    public string DisplayName { get; init; } = string.Empty;
+    public string FullPath { get; init; } = string.Empty;
 }
 
 public class GraphViewModel : INotifyPropertyChanged
@@ -43,6 +50,19 @@ public class GraphViewModel : INotifyPropertyChanged
     private string? _moduleSystemId;
     private string? _codeNodeModuleId;
     private readonly Dictionary<string, Point> _savedPositions = new(StringComparer.Ordinal);
+    private string _breadcrumbSystemLabel = "System Map";
+    private string _breadcrumbModuleLabel = "Module";
+    private string _breadcrumbCodeNodesLabel = "Code nodes";
+    private string? _breadcrumbSystemId;
+    private string? _breadcrumbModuleId;
+    private NodeViewModel? _selectedNode;
+    private string _selectedNodeType = string.Empty;
+    private string _selectedNodeKind = string.Empty;
+    private string _selectedNodeFullName = string.Empty;
+    private string _selectedNodeConfidence = string.Empty;
+    private string _selectedNodeModule = string.Empty;
+    private string _selectedNodeSystem = string.Empty;
+    private readonly ObservableCollection<GraphNodeFileVm> _selectedNodeFiles = new();
 
     // ── Filters ───────────────────────────────────────────────────────────────
 
@@ -93,6 +113,79 @@ public class GraphViewModel : INotifyPropertyChanged
         set { if (_showOtherRelationships == value) return; _showOtherRelationships = value; OnPropertyChanged(); ApplyFilters(); }
     }
 
+    public string BreadcrumbSystemLabel
+    {
+        get => _breadcrumbSystemLabel;
+        private set { _breadcrumbSystemLabel = value; OnPropertyChanged(); }
+    }
+
+    public string BreadcrumbModuleLabel
+    {
+        get => _breadcrumbModuleLabel;
+        private set { _breadcrumbModuleLabel = value; OnPropertyChanged(); }
+    }
+
+    public string BreadcrumbCodeNodesLabel
+    {
+        get => _breadcrumbCodeNodesLabel;
+        private set { _breadcrumbCodeNodesLabel = value; OnPropertyChanged(); }
+    }
+
+    public bool ShowModuleBreadcrumb => _renderMode is GraphRenderMode.ModuleRelationships or GraphRenderMode.CodeNodeRelationships;
+    public bool ShowCodeNodesBreadcrumb => _renderMode == GraphRenderMode.CodeNodeRelationships;
+    public bool CanNavigateToModule => !string.IsNullOrWhiteSpace(_breadcrumbSystemId);
+    public bool CanNavigateToCodeNodes => !string.IsNullOrWhiteSpace(_breadcrumbModuleId);
+    public string? BreadcrumbSystemId => _breadcrumbSystemId;
+    public string? BreadcrumbModuleId => _breadcrumbModuleId;
+
+    public NodeViewModel? SelectedNode
+    {
+        get => _selectedNode;
+        private set
+        {
+            if (ReferenceEquals(_selectedNode, value)) return;
+            _selectedNode = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasSelectedNode));
+            OnPropertyChanged(nameof(SelectedNodeName));
+            UpdateSelectedNodeDetails();
+        }
+    }
+
+    public bool HasSelectedNode => SelectedNode != null;
+    public string SelectedNodeName => SelectedNode?.Title ?? "Select a node";
+    public string SelectedNodeType
+    {
+        get => _selectedNodeType;
+        private set { _selectedNodeType = value; OnPropertyChanged(); }
+    }
+    public string SelectedNodeKind
+    {
+        get => _selectedNodeKind;
+        private set { _selectedNodeKind = value; OnPropertyChanged(); }
+    }
+    public string SelectedNodeFullName
+    {
+        get => _selectedNodeFullName;
+        private set { _selectedNodeFullName = value; OnPropertyChanged(); }
+    }
+    public string SelectedNodeConfidence
+    {
+        get => _selectedNodeConfidence;
+        private set { _selectedNodeConfidence = value; OnPropertyChanged(); }
+    }
+    public string SelectedNodeModule
+    {
+        get => _selectedNodeModule;
+        private set { _selectedNodeModule = value; OnPropertyChanged(); }
+    }
+    public string SelectedNodeSystem
+    {
+        get => _selectedNodeSystem;
+        private set { _selectedNodeSystem = value; OnPropertyChanged(); }
+    }
+    public ObservableCollection<GraphNodeFileVm> SelectedNodeFiles => _selectedNodeFiles;
+
     // ── Construction ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -134,6 +227,8 @@ public class GraphViewModel : INotifyPropertyChanged
             ApplyFilters();
         else
             BuildFromWorkspaceConnections(workspace);
+
+        UpdateBreadcrumbs(null, null);
     }
 
     /// <summary>
@@ -149,6 +244,7 @@ public class GraphViewModel : INotifyPropertyChanged
         _moduleSystemId = null;
         _codeNodeModuleId = null;
         ApplyFilters();
+        UpdateBreadcrumbs(null, null);
     }
 
     /// <summary>
@@ -175,6 +271,32 @@ public class GraphViewModel : INotifyPropertyChanged
         _moduleSystemId = null;
         _codeNodeModuleId = moduleId;
         ApplyFilters();
+    }
+
+    public void SelectNode(NodeViewModel? node)
+        => SelectedNode = node;
+
+    public string ResolveFilePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return path;
+        if (Path.IsPathRooted(path)) return Path.GetFullPath(path);
+
+        var sourceProjectDir = Path.GetDirectoryName(_currentWorkspace?.SourceProjectPath ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(sourceProjectDir)) return path;
+
+        var rootFullPath = Path.GetFullPath(sourceProjectDir);
+        var candidate = Path.Combine(rootFullPath, path);
+        var candidateFullPath = Path.GetFullPath(candidate);
+
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(rootFullPath);
+        var rootPrefix = Path.EndsInDirectorySeparator(normalizedRoot)
+            ? normalizedRoot
+            : normalizedRoot + Path.DirectorySeparatorChar;
+
+        if (!candidateFullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        return candidateFullPath;
     }
 
     // ── Private render helpers ────────────────────────────────────────────────
@@ -225,6 +347,7 @@ public class GraphViewModel : INotifyPropertyChanged
             BuildFromSystemMap(map);
             return;
         }
+        UpdateBreadcrumbs(system, null);
 
         var modules = GetModulesForSystem(map, system);
         if (modules.Count == 0)
@@ -250,7 +373,20 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Key = module.Id,
-                Title = $"{module.Name}\n{module.CodeNodes.Count} code node(s)",
+                Title = module.Name,
+                Subtitle = $"{module.CodeNodes.Count} code node(s)",
+                KindLabel = module.Kind.ToString(),
+                KindBadgeBackground = "#1E3A5F",
+                KindBadgeForeground = "#8BD4FF",
+                EntityType = "Module",
+                Confidence = module.Confidence.ToString(),
+                ModuleName = module.Name,
+                SystemName = system.Name,
+                RelatedFiles = module.CodeNodes
+                    .Select(n => n.FilePath)
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
                 Location = _savedPositions.TryGetValue(module.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, autoY)
@@ -304,6 +440,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count}");
     }
@@ -335,6 +472,11 @@ public class GraphViewModel : INotifyPropertyChanged
             return;
         }
 
+        var ownerSystem = map.Systems.FirstOrDefault(s =>
+            s.Modules.Any(m => string.Equals(m.Id, module.Id, StringComparison.Ordinal)) ||
+            module.SystemIds.Any(id => string.Equals(id, s.Id, StringComparison.Ordinal)));
+        UpdateBreadcrumbs(ownerSystem, module);
+
         var codeNodes = module.CodeNodes;
         if (codeNodes.Count == 0)
         {
@@ -352,7 +494,19 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Key = codeNode.Id,
-                Title = $"{codeNode.Name}\n{codeNode.Kind}",
+                Title = codeNode.Name,
+                Subtitle = codeNode.FullName,
+                KindLabel = codeNode.Kind.ToString(),
+                KindBadgeBackground = KindBadgeBackgroundForCodeNode(codeNode.Kind),
+                KindBadgeForeground = KindBadgeForegroundForCodeNode(codeNode.Kind),
+                EntityType = "Code Node",
+                Confidence = codeNode.Confidence.ToString(),
+                FullName = codeNode.FullName,
+                ModuleName = module.Name,
+                SystemName = ownerSystem?.Name ?? string.Empty,
+                RelatedFiles = string.IsNullOrWhiteSpace(codeNode.FilePath)
+                    ? Array.Empty<string>()
+                    : new[] { codeNode.FilePath },
                 Location = _savedPositions.TryGetValue(codeNode.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, defaultCodeNodeStartY)
@@ -385,6 +539,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildCodeNodeRelationshipsForModule complete. Module='{module.Name}' CodeNodes={Nodes.Count} Connections={Connections.Count}");
     }
@@ -394,6 +549,7 @@ public class GraphViewModel : INotifyPropertyChanged
         Nodes.Clear();
         Connections.Clear();
         _nodeEdges.Clear();
+        UpdateBreadcrumbs(null, null);
 
         bool lowConf = ShowLowConfidenceItems;
 
@@ -414,7 +570,17 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Key = sys.Id,
-                Title = $"{sys.Name}\n{moduleCount} module(s)",
+                Title = sys.Name,
+                Subtitle = $"{moduleCount} module(s)",
+                KindLabel = sys.Kind.ToString(),
+                KindBadgeBackground = "#1F4335",
+                KindBadgeForeground = "#7FE0B1",
+                EntityType = "System",
+                Confidence = sys.Confidence.ToString(),
+                RelatedFiles = sys.EntryPointCandidates
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
                 Location = _savedPositions.TryGetValue(sys.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, autoY)
@@ -432,6 +598,12 @@ public class GraphViewModel : INotifyPropertyChanged
             {
                 Key = ext.Id,
                 Title = $"[ext] {ext.Name}",
+                Subtitle = string.IsNullOrWhiteSpace(ext.Kind) ? "External System" : ext.Kind,
+                KindLabel = "External",
+                KindBadgeBackground = "#3A2C5F",
+                KindBadgeForeground = "#C5A9FF",
+                EntityType = "External System",
+                Confidence = ext.Confidence.ToString(),
                 Location = _savedPositions.TryGetValue(ext.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, autoY + 160)
@@ -463,6 +635,7 @@ public class GraphViewModel : INotifyPropertyChanged
         // Set ChildCount (outgoing edge count) on each node.
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildFromSystemMap complete. " +
                         $"Nodes={Nodes.Count}  Connections={Connections.Count}");
@@ -525,6 +698,7 @@ public class GraphViewModel : INotifyPropertyChanged
         Nodes.Clear();
         Connections.Clear();
         _nodeEdges.Clear();
+        UpdateBreadcrumbs(null, null);
 
         var nodeMap = new Dictionary<string, NodeViewModel>(workspace.Systems.Count, StringComparer.Ordinal);
         double autoX = 80;
@@ -538,6 +712,11 @@ public class GraphViewModel : INotifyPropertyChanged
             double y = hasSavedPosition ? sys.Y : autoY;
 
             var node = new NodeViewModel { Key = sys.Id, Title = sys.Name, Location = new Point(x, y) };
+            node.Subtitle = "System";
+            node.KindLabel = "System";
+            node.KindBadgeBackground = "#1F4335";
+            node.KindBadgeForeground = "#7FE0B1";
+            node.EntityType = "System";
             nodeMap[sys.Id] = node;
             Nodes.Add(node);
             autoX += autoGap;
@@ -565,6 +744,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildFromWorkspaceConnections complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
                         $"(workspace had {workspace.Connections.Count} connection(s) total).");
@@ -776,6 +956,76 @@ public class GraphViewModel : INotifyPropertyChanged
                 _savedPositions[node.Key] = node.Location;
         }
     }
+
+    private void UpdateBreadcrumbs(SystemModel? system, ModuleModel? module)
+    {
+        _breadcrumbSystemId = system?.Id;
+        _breadcrumbModuleId = module?.Id;
+        BreadcrumbSystemLabel = "System Map";
+        BreadcrumbModuleLabel = system?.Name ?? "Module";
+        BreadcrumbCodeNodesLabel = module?.Name ?? "Code nodes";
+        OnPropertyChanged(nameof(ShowModuleBreadcrumb));
+        OnPropertyChanged(nameof(ShowCodeNodesBreadcrumb));
+        OnPropertyChanged(nameof(CanNavigateToModule));
+        OnPropertyChanged(nameof(CanNavigateToCodeNodes));
+    }
+
+    private void EnsureSelectedNodeIsValid()
+    {
+        if (SelectedNode == null) return;
+        if (Nodes.Contains(SelectedNode)) return;
+        SelectedNode = null;
+    }
+
+    private void UpdateSelectedNodeDetails()
+    {
+        var node = SelectedNode;
+        if (node == null)
+        {
+            SelectedNodeType = string.Empty;
+            SelectedNodeKind = string.Empty;
+            SelectedNodeFullName = string.Empty;
+            SelectedNodeConfidence = string.Empty;
+            SelectedNodeModule = string.Empty;
+            SelectedNodeSystem = string.Empty;
+            _selectedNodeFiles.Clear();
+            return;
+        }
+
+        SelectedNodeType = node.EntityType;
+        SelectedNodeKind = node.KindLabel;
+        SelectedNodeFullName = node.FullName;
+        SelectedNodeConfidence = node.Confidence;
+        SelectedNodeModule = node.ModuleName;
+        SelectedNodeSystem = node.SystemName;
+        _selectedNodeFiles.Clear();
+        foreach (var file in node.RelatedFiles
+                     .Where(p => !string.IsNullOrWhiteSpace(p))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            _selectedNodeFiles.Add(new GraphNodeFileVm
+            {
+                DisplayName = Path.GetFileName(file),
+                FullPath = file
+            });
+        }
+    }
+
+    private static string KindBadgeBackgroundForCodeNode(CodeNodeKind kind) => kind switch
+    {
+        CodeNodeKind.Service => "#2D1C52",
+        CodeNodeKind.Class => "#183A66",
+        CodeNodeKind.Interface => "#164C4C",
+        _ => "#1E3A5F"
+    };
+
+    private static string KindBadgeForegroundForCodeNode(CodeNodeKind kind) => kind switch
+    {
+        CodeNodeKind.Service => "#D6B8FF",
+        CodeNodeKind.Class => "#9FCEFF",
+        CodeNodeKind.Interface => "#9FE7E7",
+        _ => "#8BD4FF"
+    };
 
     // ── helpers ──────────────────────────────────────────────────────────────
 

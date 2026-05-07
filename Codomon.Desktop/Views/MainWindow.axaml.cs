@@ -1901,6 +1901,9 @@ public partial class MainWindow : Window
         {
             DataContext = _vm.Graph
         };
+        graphView.NavigateToSystemMapRequested += OnGraphNavigateToSystemMapRequested;
+        graphView.NavigateToModuleRequested += OnGraphNavigateToModuleRequested;
+        graphView.NavigateToCodeNodesRequested += OnGraphNavigateToCodeNodesRequested;
 
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
@@ -1953,6 +1956,52 @@ public partial class MainWindow : Window
 
         // Switch to the Graph nav tab (which sets CenterTabControl to the Graph sub-tab).
         SetActiveNavTab("Graph");
+    }
+
+    private void OnGraphNavigateToSystemMapRequested()
+    {
+        SetActiveNavTab("Monitor");
+        _vm.SystemMap.SetActiveView(SystemMapViewKind.SystemOverview);
+    }
+
+    private void OnGraphNavigateToModuleRequested(string systemId)
+    {
+        if (string.IsNullOrWhiteSpace(systemId)) return;
+        var system = _vm.SystemMap.Systems.FirstOrDefault(s => string.Equals(s.Id, systemId, StringComparison.Ordinal));
+        if (system == null) return;
+
+        _vm.SystemMap.SelectSystem(system);
+        _vm.SystemMap.SetActiveView(SystemMapViewKind.ModuleView);
+        SetActiveNavTab("Monitor");
+    }
+
+    private void OnGraphNavigateToCodeNodesRequested(string moduleId)
+    {
+        if (string.IsNullOrWhiteSpace(moduleId)) return;
+
+        var wsModule = _vm.Workspace.SystemMap.AllModules
+            .FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.Ordinal));
+        if (wsModule == null) return;
+
+        var ownerSystemId = wsModule.SystemIds.FirstOrDefault()
+            ?? _vm.Workspace.SystemMap.Systems
+                .FirstOrDefault(s => s.Modules.Any(m => string.Equals(m.Id, wsModule.Id, StringComparison.Ordinal)))?.Id
+            ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(ownerSystemId))
+        {
+            var sys = _vm.SystemMap.Systems.FirstOrDefault(s => string.Equals(s.Id, ownerSystemId, StringComparison.Ordinal));
+            if (sys != null)
+                _vm.SystemMap.SelectSystem(sys);
+        }
+
+        var module = _vm.SystemMap.ModulesForSelectedSystem
+            .FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.Ordinal));
+        if (module == null) return;
+
+        _vm.SystemMap.SelectModule(module);
+        _vm.SystemMap.SetActiveView(SystemMapViewKind.CodeDetailView);
+        SetActiveNavTab("Monitor");
     }
 
     private void OnSystemMapClearCanvasRequested()
