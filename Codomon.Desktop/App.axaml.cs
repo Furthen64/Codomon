@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -29,8 +30,10 @@ public partial class App : Application
 
     private static async Task StartWithSplashAsync(IClassicDesktopStyleApplicationLifetime desktop)
     {
+        const int MinimumSplashMilliseconds = 5000;
         Window? splash = null;
         FancySplashWindow? fancy = null;
+        var splashTimer = Stopwatch.StartNew();
 
         try
         {
@@ -54,6 +57,12 @@ public partial class App : Application
             splash = new StaticSplashWindow();
             splash.Show();
             await Task.Delay(500);
+        }
+
+        var remaining = MinimumSplashMilliseconds - (int)splashTimer.ElapsedMilliseconds;
+        if (remaining > 0)
+        {
+            await Task.Delay(remaining);
         }
 
         var main = new MainWindow();
