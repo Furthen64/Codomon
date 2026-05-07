@@ -352,7 +352,7 @@ public class GraphViewModel : INotifyPropertyChanged
             var node = new NodeViewModel
             {
                 Key = codeNode.Id,
-                Title = $"{codeNode.Kind}: {codeNode.Name}",
+                Title = $"{codeNode.Name}\n{codeNode.Kind}",
                 Location = _savedPositions.TryGetValue(codeNode.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, defaultCodeNodeStartY)

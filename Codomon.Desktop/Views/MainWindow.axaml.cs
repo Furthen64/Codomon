@@ -1949,6 +1949,7 @@ public partial class MainWindow : Window
 
         AppLogger.Debug($"[SystemMap] Opening code-node relationship graph for module '{module.Name}' ({module.Id}).");
         _vm.Graph.RefreshCodeNodeRelationshipsForModule(_vm.Workspace.SystemMap, module.Id);
+        _vm.Graph.AutoAlign();
 
         // Switch to the Graph nav tab (which sets CenterTabControl to the Graph sub-tab).
         SetActiveNavTab("Graph");
