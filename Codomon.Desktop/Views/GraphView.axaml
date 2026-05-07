@@ -220,8 +220,8 @@
           <DataTemplate x:DataType="vm:ConnectionViewModel">
             <nodify:Connection Source="{Binding Source}"
                                Target="{Binding Target}"
-                               Stroke="#80B4D4"
-                               StrokeThickness="2"
+                               Stroke="{Binding Stroke}"
+                               StrokeThickness="{Binding StrokeThickness}"
                                ToolTip.Tip="{Binding Label}" />
           </DataTemplate>
         </nodify:NodifyEditor.ConnectionTemplate>
