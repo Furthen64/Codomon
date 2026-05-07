@@ -37,6 +37,11 @@ public partial class SystemMapView : UserControl
     /// currently selected system in Module View.
     /// </summary>
     public event Action<SystemItemVm>? ShowDetailedRelationshipsRequested;
+    /// <summary>
+    /// Raised when the user requests a code-node relationship graph for the
+    /// currently selected module in Code Detail View.
+    /// </summary>
+    public event Action<ModuleItemVm>? ShowDetailedCodeNodeRelationshipsRequested;
 
     /// <summary>
     /// Raised when the user requests clearing the current System Map canvas.
@@ -761,6 +766,7 @@ public partial class SystemMapView : UserControl
         var header     = this.FindControl<TextBlock>("CodeDetailHeader")!;
         var codeList   = this.FindControl<ListBox>("CodeNodesListBox")!;
         var noCodeText = this.FindControl<TextBlock>("NoCodeNodesText")!;
+        var detailBtn  = this.FindControl<Button>("ShowCodeNodeRelationshipsButton");
 
         if (_vm.SelectedModule != null)
             header.Text = $"Code Nodes — {_vm.SelectedModuleName}";
@@ -771,6 +777,9 @@ public partial class SystemMapView : UserControl
 
         codeList.ItemsSource = _vm.CodeNodesForSelectedScope;
         noCodeText.IsVisible = _vm.CodeNodesForSelectedScope.Count == 0;
+
+        if (detailBtn != null)
+            detailBtn.IsEnabled = _vm.SelectedModule != null && _vm.CodeNodesForSelectedScope.Count > 0;
     }
 
     private void RefreshStartupView()
@@ -1037,6 +1046,12 @@ public partial class SystemMapView : UserControl
     {
         if (_vm.SelectedSystem == null) return;
         ShowDetailedRelationshipsRequested?.Invoke(_vm.SelectedSystem);
+    }
+
+    public void OnShowCodeNodeRelationshipsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm.SelectedModule == null) return;
+        ShowDetailedCodeNodeRelationshipsRequested?.Invoke(_vm.SelectedModule);
     }
 
     public void OnClearCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

@@ -125,7 +125,16 @@
           <DockPanel x:Name="PanelCodeDetail" IsVisible="False">
             <Border DockPanel.Dock="Top" Background="#141C28"
                     Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
-              <TextBlock x:Name="CodeDetailHeader" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <DockPanel>
+                <TextBlock x:Name="CodeDetailHeader" Foreground="#AABBCC" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button x:Name="ShowCodeNodeRelationshipsButton"
+                        DockPanel.Dock="Right"
+                        Content="Show detailed relationship"
+                        Click="OnShowCodeNodeRelationshipsClick"
+                        Padding="10,4"
+                        Margin="10,0,0,0"
+                        ToolTip.Tip="Open the Graph tab with code-node relationships for the selected module."/>
+              </DockPanel>
             </Border>
             <TextBlock x:Name="NoCodeNodesText"
                        Text="No code nodes found for the selected scope."

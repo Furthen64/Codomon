@@ -13,7 +13,8 @@ namespace Codomon.Desktop.ViewModels;
 public enum GraphRenderMode
 {
     SystemMap,
-    ModuleRelationships
+    ModuleRelationships,
+    CodeNodeRelationships
 }
 
 public class GraphViewModel : INotifyPropertyChanged
@@ -40,6 +41,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private WorkspaceModel? _currentWorkspace;
     private GraphRenderMode _renderMode = GraphRenderMode.SystemMap;
     private string? _moduleSystemId;
+    private string? _codeNodeModuleId;
     private readonly Dictionary<string, Point> _savedPositions = new(StringComparer.Ordinal);
 
     // ── Filters ───────────────────────────────────────────────────────────────
@@ -126,6 +128,7 @@ public class GraphViewModel : INotifyPropertyChanged
         _currentSystemMap  = workspace.SystemMap.Systems.Count > 0 ? workspace.SystemMap : null;
         _renderMode = GraphRenderMode.SystemMap;
         _moduleSystemId = null;
+        _codeNodeModuleId = null;
 
         if (_currentSystemMap != null)
             ApplyFilters();
@@ -144,6 +147,7 @@ public class GraphViewModel : INotifyPropertyChanged
         _currentSystemMap = map;
         _renderMode = GraphRenderMode.SystemMap;
         _moduleSystemId = null;
+        _codeNodeModuleId = null;
         ApplyFilters();
     }
 
@@ -156,6 +160,20 @@ public class GraphViewModel : INotifyPropertyChanged
         _currentSystemMap = map;
         _renderMode = GraphRenderMode.ModuleRelationships;
         _moduleSystemId = systemId;
+        _codeNodeModuleId = null;
+        ApplyFilters();
+    }
+
+    /// <summary>
+    /// Rebuilds the graph as code-node relationships for a single selected module.
+    /// Only relationships where both endpoints are code nodes in the selected module are shown.
+    /// </summary>
+    public void RefreshCodeNodeRelationshipsForModule(SystemMapModel map, string moduleId)
+    {
+        _currentSystemMap = map;
+        _renderMode = GraphRenderMode.CodeNodeRelationships;
+        _moduleSystemId = null;
+        _codeNodeModuleId = moduleId;
         ApplyFilters();
     }
 
@@ -175,6 +193,8 @@ public class GraphViewModel : INotifyPropertyChanged
         {
             if (_renderMode == GraphRenderMode.ModuleRelationships)
                 BuildModuleRelationshipsForSystem(_currentSystemMap, _moduleSystemId);
+            else if (_renderMode == GraphRenderMode.CodeNodeRelationships)
+                BuildCodeNodeRelationshipsForModule(_currentSystemMap, _codeNodeModuleId);
             else
                 BuildFromSystemMap(_currentSystemMap);
         }
@@ -286,6 +306,87 @@ public class GraphViewModel : INotifyPropertyChanged
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
 
         AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count}");
+    }
+
+    private void BuildCodeNodeRelationshipsForModule(SystemMapModel map, string? moduleId)
+    {
+        const double defaultCodeNodeStartX = 80;
+        const double defaultCodeNodeStartY = 180;
+        const double codeNodeHorizontalGap = 220;
+
+        Nodes.Clear();
+        Connections.Clear();
+        _nodeEdges.Clear();
+
+        if (string.IsNullOrWhiteSpace(moduleId))
+        {
+            AppLogger.Warn("[Graph] Code-node relationship view requested without a module id. Falling back to System Map graph.");
+            BuildFromSystemMap(map);
+            return;
+        }
+
+        bool lowConf = ShowLowConfidenceItems;
+
+        var module = map.AllModules.FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.Ordinal));
+        if (module == null)
+        {
+            AppLogger.Warn($"[Graph] Code-node relationship view requested for unknown module id={moduleId}. Falling back to System Map graph.");
+            BuildFromSystemMap(map);
+            return;
+        }
+
+        var codeNodes = module.CodeNodes;
+        if (codeNodes.Count == 0)
+        {
+            AppLogger.Debug($"[Graph] Code-node relationship view: module '{module.Name}' has no code nodes.");
+            return;
+        }
+
+        double autoX = defaultCodeNodeStartX;
+
+        var nodeMap = new Dictionary<string, NodeViewModel>(codeNodes.Count, StringComparer.Ordinal);
+        foreach (var codeNode in codeNodes)
+        {
+            if (!lowConf && codeNode.Confidence == ConfidenceLevel.Unknown) continue;
+
+            var node = new NodeViewModel
+            {
+                Key = codeNode.Id,
+                Title = $"{codeNode.Kind}: {codeNode.Name}",
+                Location = _savedPositions.TryGetValue(codeNode.Id, out var savedPosition)
+                    ? savedPosition
+                    : new Point(autoX, defaultCodeNodeStartY)
+            };
+
+            nodeMap[codeNode.Id] = node;
+            Nodes.Add(node);
+            autoX += codeNodeHorizontalGap;
+        }
+
+        foreach (var rel in map.Relationships)
+        {
+            if (!lowConf && rel.Confidence == ConfidenceLevel.Unknown) continue;
+            if (!IsKindVisible(rel.Kind)) continue;
+
+            if (!nodeMap.TryGetValue(rel.FromId, out var fromNode) ||
+                !nodeMap.TryGetValue(rel.ToId, out var toNode))
+                continue;
+
+            if (string.Equals(rel.FromId, rel.ToId, StringComparison.Ordinal))
+                continue;
+
+            fromNode.OutputConnector.IsConnected = true;
+            toNode.InputConnector.IsConnected    = true;
+
+            Connections.Add(new ConnectionViewModel(
+                fromNode.OutputConnector, toNode.InputConnector, rel.Kind.ToString()));
+            _nodeEdges.Add((fromNode, toNode));
+        }
+
+        foreach (var node in Nodes) node.ChildCount = 0;
+        foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+
+        AppLogger.Debug($"[Graph] BuildCodeNodeRelationshipsForModule complete. Module='{module.Name}' CodeNodes={Nodes.Count} Connections={Connections.Count}");
     }
 
     private void BuildFromSystemMap(SystemMapModel map)
@@ -478,7 +579,7 @@ public class GraphViewModel : INotifyPropertyChanged
     /// </summary>
     public AutoAlignOptions CreateAutoAlignDefaults()
     {
-        if (_renderMode == GraphRenderMode.ModuleRelationships)
+        if (_renderMode is GraphRenderMode.ModuleRelationships or GraphRenderMode.CodeNodeRelationships)
         {
             return new AutoAlignOptions
             {
@@ -508,7 +609,7 @@ public class GraphViewModel : INotifyPropertyChanged
     {
         options ??= CreateAutoAlignDefaults();
 
-        if (_renderMode == GraphRenderMode.ModuleRelationships)
+        if (_renderMode is GraphRenderMode.ModuleRelationships or GraphRenderMode.CodeNodeRelationships)
         {
             AutoAlignModuleRelationships(options);
             return;
