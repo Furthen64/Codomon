@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.FancySplashWindow"
+        Width="840" Height="480"
+        CanResize="False"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        Background="Transparent"
+        TransparencyLevelHint="AcrylicBlur,Blur,Transparent"
+        WindowStartupLocation="CenterScreen">
+  <Border CornerRadius="24" ClipToBounds="True" BorderThickness="1" BorderBrush="#7A7DFF">
+    <Grid>
+      <Border Background="#0D111A"/>
+      <Border Opacity="0.7">
+        <Border.Background>
+          <RadialGradientBrush Center="0.1,0.2" Radius="1.0">
+            <GradientStop Color="#32176B" Offset="0"/>
+            <GradientStop Color="#0D111A" Offset="1"/>
+          </RadialGradientBrush>
+        </Border.Background>
+      </Border>
+
+      <TextBlock Name="CodeBackdrop"
+                 Text=""
+                 FontFamily="Consolas"
+                 FontSize="12"
+                 Foreground="#59D7FF"
+                 Opacity="0.22"
+                 Margin="24"/>
+
+      <StackPanel Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <TextBlock Text="codomon" FontSize="54" FontWeight="Bold" Foreground="#F0F3FF" HorizontalAlignment="Center"/>
+        <TextBlock Text="Architecture intelligence in motion" FontSize="18" Foreground="#AAB4D6" HorizontalAlignment="Center"/>
+        <ProgressBar Name="LoadProgress" Width="360" Height="8" Minimum="0" Maximum="100" Value="8"/>
+        <TextBlock Name="StatusText" Text="Initializing workspace analysis..." HorizontalAlignment="Center" Foreground="#9CC6FF"/>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>
