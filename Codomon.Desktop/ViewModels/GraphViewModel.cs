@@ -279,13 +279,24 @@ public class GraphViewModel : INotifyPropertyChanged
     public string ResolveFilePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return path;
-        if (Path.IsPathRooted(path)) return path;
+        if (Path.IsPathRooted(path)) return Path.GetFullPath(path);
 
         var sourceProjectDir = Path.GetDirectoryName(_currentWorkspace?.SourceProjectPath ?? string.Empty);
         if (string.IsNullOrWhiteSpace(sourceProjectDir)) return path;
 
-        var candidate = Path.Combine(sourceProjectDir, path);
-        return File.Exists(candidate) ? candidate : path;
+        var rootFullPath = Path.GetFullPath(sourceProjectDir);
+        var candidate = Path.Combine(rootFullPath, path);
+        var candidateFullPath = Path.GetFullPath(candidate);
+
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(rootFullPath);
+        var rootPrefix = Path.EndsInDirectorySeparator(normalizedRoot)
+            ? normalizedRoot
+            : normalizedRoot + Path.DirectorySeparatorChar;
+
+        if (!candidateFullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        return candidateFullPath;
     }
 
     // ── Private render helpers ────────────────────────────────────────────────
@@ -951,8 +962,8 @@ public class GraphViewModel : INotifyPropertyChanged
         _breadcrumbSystemId = system?.Id;
         _breadcrumbModuleId = module?.Id;
         BreadcrumbSystemLabel = "System Map";
-        BreadcrumbModuleLabel = "Module";
-        BreadcrumbCodeNodesLabel = "Code nodes";
+        BreadcrumbModuleLabel = system?.Name ?? "Module";
+        BreadcrumbCodeNodesLabel = module?.Name ?? "Code nodes";
         OnPropertyChanged(nameof(ShowModuleBreadcrumb));
         OnPropertyChanged(nameof(ShowCodeNodesBreadcrumb));
         OnPropertyChanged(nameof(CanNavigateToModule));
@@ -983,7 +994,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         SelectedNodeType = node.EntityType;
         SelectedNodeKind = node.KindLabel;
-        SelectedNodeFullName = string.IsNullOrWhiteSpace(node.FullName) ? node.Subtitle : node.FullName;
+        SelectedNodeFullName = node.FullName;
         SelectedNodeConfidence = node.Confidence;
         SelectedNodeModule = node.ModuleName;
         SelectedNodeSystem = node.SystemName;

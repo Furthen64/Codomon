@@ -3,7 +3,9 @@ using Avalonia.Interactivity;
 using Avalonia.Input;
 using Codomon.Desktop.ViewModels;
 using Nodify;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 
 namespace Codomon.Desktop.Views;
@@ -109,6 +111,7 @@ public partial class GraphView : UserControl
         var candidate = DataContext is GraphViewModel vm
             ? vm.ResolveFilePath(filePath)
             : filePath;
+        if (string.IsNullOrWhiteSpace(candidate) || !File.Exists(candidate)) return;
 
         try
         {
@@ -118,9 +121,9 @@ public partial class GraphView : UserControl
                 UseShellExecute = true
             });
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is Win32Exception or UnauthorizedAccessException or FileNotFoundException)
         {
-            AppLogger.Error($"[Graph] Failed to open source file '{candidate}': {ex.Message}");
+            Models.AppLogger.Error($"[Graph] Failed to open source file '{candidate}': {ex.Message}");
         }
     }
 }
