@@ -165,7 +165,14 @@
 
               <nodify:Node.Header>
                 <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Text="●"
+                               IsVisible="{Binding IsCodeLeaf}"
+                               FontSize="18"
+                               Foreground="#8BD4FF"
+                               VerticalAlignment="Center"/>
+                  </StackPanel>
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Border Background="{Binding KindBadgeBackground}" CornerRadius="3" Padding="5,2">
                       <TextBlock Text="{Binding KindLabel}" FontSize="10"
@@ -252,6 +259,31 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
+
+              <StackPanel IsVisible="{Binding HasSelectedNodeCallers}" Spacing="4" Margin="0,8,0,0">
+                <Border Height="1" Background="#2A3F5A"/>
+                <TextBlock Text="Called by" Foreground="#AABBCC" FontWeight="SemiBold"/>
+                <ItemsControl ItemsSource="{Binding SelectedNodeCallers}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GraphCallerVm">
+                      <Button Tag="{Binding ModuleId}"
+                              Click="OnCallerCardClick"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Left"
+                              Padding="8,6"
+                              Margin="0,2,0,0">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding CallerName}" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding CallerContext}"
+                                     FontSize="10"
+                                     Foreground="#8FA5BC"
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
 
               <StackPanel IsVisible="{Binding HasSelectedNodeSummary}" Spacing="4" Margin="0,8,0,0">
                 <Border Height="1" Background="#2A3F5A"/>

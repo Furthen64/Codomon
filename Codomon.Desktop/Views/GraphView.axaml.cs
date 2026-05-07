@@ -15,6 +15,7 @@ public partial class GraphView : UserControl
     public event Action? NavigateToSystemMapRequested;
     public event Action<string>? NavigateToModuleRequested;
     public event Action<string>? NavigateToCodeNodesRequested;
+    public event Action<string>? NavigateToCallerModuleRequested;
 
     public GraphView()
     {
@@ -125,5 +126,12 @@ public partial class GraphView : UserControl
         {
             Models.AppLogger.Error($"[Graph] Failed to open source file '{candidate}': {ex.Message}");
         }
+    }
+
+    private void OnCallerCardClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button) return;
+        if (button.Tag is not string moduleId || string.IsNullOrWhiteSpace(moduleId)) return;
+        NavigateToCallerModuleRequested?.Invoke(moduleId);
     }
 }
