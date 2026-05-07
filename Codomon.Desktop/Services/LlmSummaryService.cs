@@ -202,6 +202,42 @@ public static class LlmSummaryService
     }
 
     /// <summary>
+    /// Looks up the most recent summary for <paramref name="relativeSourcePath"/> and returns
+    /// the text of its first content paragraph (skipping the metadata comment and any Markdown
+    /// headings that precede it).  Returns <c>null</c> when no summary exists for the file.
+    /// </summary>
+    public static string? GetSummaryFirstParagraph(string workspaceFolderPath, string relativeSourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(workspaceFolderPath) || string.IsNullOrWhiteSpace(relativeSourcePath))
+            return null;
+
+        var summariesRoot = Path.Combine(workspaceFolderPath, SummariesFolder);
+        if (!Directory.Exists(summariesRoot))
+            return null;
+
+        var safeName = RelativePathToSafeName(relativeSourcePath) + ".md";
+
+        foreach (var batchDir in Directory.EnumerateDirectories(summariesRoot).OrderByDescending(d => d))
+        {
+            var candidate = Path.Combine(batchDir, safeName);
+            if (!File.Exists(candidate))
+                continue;
+
+            try
+            {
+                return ExtractFirstParagraph(candidate);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"[LLM] GetSummaryFirstParagraph failed reading '{candidate}': {ex.Message}");
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Returns all saved summaries for the workspace, newest first.
     /// Each entry carries the relative source path and the full path to the markdown file.
     /// </summary>
@@ -503,6 +539,65 @@ public static class LlmSummaryService
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None,
             out result);
+    }
+
+    /// <summary>
+    /// Opens <paramref name="mdFilePath"/>, skips the <c>&lt;!-- codomon-source: … --&gt;</c>
+    /// metadata comment on the first line (if present), then skips blank lines and Markdown
+    /// headings, and returns the first non-heading paragraph as a single space-joined string.
+    /// Returns <c>null</c> when the file is empty or contains no paragraph text.
+    /// </summary>
+    private static string? ExtractFirstParagraph(string mdFilePath)
+    {
+        using var reader = new StreamReader(mdFilePath);
+
+        // Read the first line.  If it is the metadata comment, discard it; otherwise treat it
+        // as part of the document content.
+        string? firstLine = reader.ReadLine();
+
+        var lines = new List<string>();
+        bool inParagraph = false;
+
+        // Helper to process one line against our paragraph-extraction state machine.
+        void ProcessLine(string line)
+        {
+            if (!inParagraph)
+            {
+                // Skip blank lines and Markdown headings (# …) before the first paragraph.
+                if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#'))
+                    return;
+                inParagraph = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                // Blank line terminates the paragraph — stop reading.
+                inParagraph = false;
+                return;
+            }
+
+            lines.Add(line);
+        }
+
+        if (firstLine != null)
+        {
+            // If the first line is the codomon metadata comment, skip it; otherwise process it.
+            if (!firstLine.StartsWith("<!-- codomon-source:", StringComparison.Ordinal))
+                ProcessLine(firstLine);
+        }
+
+        if (lines.Count == 0 || inParagraph)
+        {
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                ProcessLine(line);
+                if (!inParagraph && lines.Count > 0)
+                    break; // Paragraph ended — no more lines needed.
+            }
+        }
+
+        return lines.Count > 0 ? string.Join(" ", lines) : null;
     }
 
     /// <summary>
