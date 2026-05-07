@@ -1,4 +1,6 @@
 using Avalonia;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -9,8 +11,18 @@ public class NodeViewModel : INotifyPropertyChanged
 {
     private string _key = string.Empty;
     private string _title = string.Empty;
+    private string _subtitle = string.Empty;
+    private string _kindLabel = string.Empty;
+    private string _kindBadgeBackground = "#1A2435";
+    private string _kindBadgeForeground = "#AABBCC";
+    private string _entityType = string.Empty;
+    private string _confidence = string.Empty;
+    private string _fullName = string.Empty;
+    private string _moduleName = string.Empty;
+    private string _systemName = string.Empty;
     private Point _location;
     private int _childCount;
+    private IReadOnlyList<string> _relatedFiles = Array.Empty<string>();
 
     public string Key
     {
@@ -22,6 +34,66 @@ public class NodeViewModel : INotifyPropertyChanged
     {
         get => _title;
         set { _title = value; OnPropertyChanged(); }
+    }
+
+    public string Subtitle
+    {
+        get => _subtitle;
+        set { _subtitle = value; OnPropertyChanged(); }
+    }
+
+    public string KindLabel
+    {
+        get => _kindLabel;
+        set { _kindLabel = value; OnPropertyChanged(); }
+    }
+
+    public string KindBadgeBackground
+    {
+        get => _kindBadgeBackground;
+        set { _kindBadgeBackground = value; OnPropertyChanged(); }
+    }
+
+    public string KindBadgeForeground
+    {
+        get => _kindBadgeForeground;
+        set { _kindBadgeForeground = value; OnPropertyChanged(); }
+    }
+
+    public string EntityType
+    {
+        get => _entityType;
+        set { _entityType = value; OnPropertyChanged(); }
+    }
+
+    public string Confidence
+    {
+        get => _confidence;
+        set { _confidence = value; OnPropertyChanged(); }
+    }
+
+    public string FullName
+    {
+        get => _fullName;
+        set { _fullName = value; OnPropertyChanged(); }
+    }
+
+    public string ModuleName
+    {
+        get => _moduleName;
+        set { _moduleName = value; OnPropertyChanged(); }
+    }
+
+    public string SystemName
+    {
+        get => _systemName;
+        set { _systemName = value; OnPropertyChanged(); }
+    }
+
+    public IReadOnlyList<string> RelatedFiles
+    {
+        get => _relatedFiles;
+        set { _relatedFiles = value; OnPropertyChanged(); }
     }
 
     public Point Location

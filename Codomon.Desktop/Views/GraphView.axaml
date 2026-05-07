@@ -7,6 +7,35 @@
 
   <DockPanel>
 
+    <!-- ── Breadcrumb ───────────────────────────────────────────────────────── -->
+    <Border DockPanel.Dock="Top"
+            Background="#0F141E"
+            BorderThickness="0,0,0,1"
+            BorderBrush="#2A3F5A"
+            Padding="10,6">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button x:Name="BreadcrumbSystemMapButton"
+                Content="{Binding BreadcrumbSystemLabel}"
+                Padding="8,2"/>
+        <TextBlock Text=">" Foreground="#4A6A8A" VerticalAlignment="Center"/>
+        <Button x:Name="BreadcrumbModuleButton"
+                Content="{Binding BreadcrumbModuleLabel}"
+                IsVisible="{Binding ShowModuleBreadcrumb}"
+                IsEnabled="{Binding CanNavigateToModule}"
+                Padding="8,2"/>
+        <TextBlock Text=">" Foreground="#4A6A8A" VerticalAlignment="Center"
+                   IsVisible="{Binding ShowModuleBreadcrumb}"/>
+        <Button x:Name="BreadcrumbCodeNodesButton"
+                Content="{Binding BreadcrumbCodeNodesLabel}"
+                IsVisible="{Binding ShowCodeNodesBreadcrumb}"
+                IsEnabled="{Binding CanNavigateToCodeNodes}"
+                Padding="8,2"/>
+        <TextBlock Text=">" Foreground="#4A6A8A" VerticalAlignment="Center"
+                   IsVisible="{Binding ShowCodeNodesBreadcrumb}"/>
+        <TextBlock Text="Graph" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center"/>
+      </StackPanel>
+    </Border>
+
     <!-- ── Canvas Alignment Toolbar ──────────────────────────────────────── -->
     <Border DockPanel.Dock="Top"
             Background="#1A2435"
@@ -114,18 +143,41 @@
       </StackPanel>
     </Border>
 
-    <!-- ── Graph Canvas ───────────────────────────────────────────────────── -->
-    <nodify:NodifyEditor x:Name="Editor"
-                         ItemsSource="{Binding Nodes}"
-                         Connections="{Binding Connections}">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="320"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- ── Graph Canvas ───────────────────────────────────────────────────── -->
+      <nodify:NodifyEditor x:Name="Editor"
+                           Grid.Column="0"
+                           ItemsSource="{Binding Nodes}"
+                           Connections="{Binding Connections}">
 
       <!-- Node template: explicit left-side inputs and right-side outputs -->
-      <nodify:NodifyEditor.ItemTemplate>
-        <DataTemplate x:DataType="vm:NodeViewModel">
-          <nodify:Node Header="{Binding Title}"
-                       Input="{Binding Inputs}"
-                       Output="{Binding Outputs}"
-                       BorderThickness="{Binding BorderThickness}">
+        <nodify:NodifyEditor.ItemTemplate>
+          <DataTemplate x:DataType="vm:NodeViewModel">
+            <nodify:Node Input="{Binding Inputs}"
+                         Output="{Binding Outputs}"
+                         BorderThickness="{Binding BorderThickness}"
+                         PointerPressed="OnNodePointerPressed">
+
+              <nodify:Node.Header>
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border Background="{Binding KindBadgeBackground}" CornerRadius="3" Padding="5,2">
+                      <TextBlock Text="{Binding KindLabel}" FontSize="10"
+                                 Foreground="{Binding KindBadgeForeground}" FontWeight="SemiBold"/>
+                    </Border>
+                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#8FA5BC"
+                               VerticalAlignment="Center"
+                               MaxWidth="170"
+                               TextTrimming="CharacterEllipsis"/>
+                  </StackPanel>
+                </StackPanel>
+              </nodify:Node.Header>
 
             <!-- Each input connector rendered as a NodeInput on the left -->
             <nodify:Node.InputConnectorTemplate>
@@ -143,31 +195,68 @@
               </DataTemplate>
             </nodify:Node.OutputConnectorTemplate>
 
-          </nodify:Node>
-        </DataTemplate>
-      </nodify:NodifyEditor.ItemTemplate>
+            </nodify:Node>
+          </DataTemplate>
+        </nodify:NodifyEditor.ItemTemplate>
 
       <!-- Position each ItemContainer at the node's Location.
            ReflectionBinding is used because ControlTheme bindings cannot resolve
            the DataContext type statically when compiled bindings are enabled globally. -->
-      <nodify:NodifyEditor.ItemContainerTheme>
-        <ControlTheme TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
-          <Setter Property="Location" Value="{ReflectionBinding Location}" />
-        </ControlTheme>
-      </nodify:NodifyEditor.ItemContainerTheme>
+        <nodify:NodifyEditor.ItemContainerTheme>
+          <ControlTheme TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
+            <Setter Property="Location" Value="{ReflectionBinding Location}" />
+          </ControlTheme>
+        </nodify:NodifyEditor.ItemContainerTheme>
 
       <!-- Connection template: cubic bezier curve; Label is shown as a tooltip. -->
-      <nodify:NodifyEditor.ConnectionTemplate>
-        <DataTemplate x:DataType="vm:ConnectionViewModel">
-          <nodify:Connection Source="{Binding Source}"
-                             Target="{Binding Target}"
-                             Stroke="#80B4D4"
-                             StrokeThickness="2"
-                             ToolTip.Tip="{Binding Label}" />
-        </DataTemplate>
-      </nodify:NodifyEditor.ConnectionTemplate>
+        <nodify:NodifyEditor.ConnectionTemplate>
+          <DataTemplate x:DataType="vm:ConnectionViewModel">
+            <nodify:Connection Source="{Binding Source}"
+                               Target="{Binding Target}"
+                               Stroke="#80B4D4"
+                               StrokeThickness="2"
+                               ToolTip.Tip="{Binding Label}" />
+          </DataTemplate>
+        </nodify:NodifyEditor.ConnectionTemplate>
 
-    </nodify:NodifyEditor>
+      </nodify:NodifyEditor>
+
+      <!-- ── Node details panel ───────────────────────────────────────────── -->
+      <Border Grid.Column="1" Background="#141C28" BorderBrush="#2A3F5A" BorderThickness="1,0,0,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="10" Spacing="8">
+            <TextBlock Text="Node details" FontWeight="SemiBold" Foreground="#AABBCC"/>
+            <TextBlock Text="{Binding SelectedNodeName}" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
+
+            <StackPanel IsVisible="{Binding HasSelectedNode}" Spacing="6">
+              <Border Height="1" Background="#2A3F5A"/>
+              <TextBlock Text="{Binding SelectedNodeType}" Foreground="#88AABB"/>
+              <TextBlock Text="{Binding SelectedNodeKind}" Foreground="#AABBCC"/>
+              <TextBlock Text="{Binding SelectedNodeFullName}" Foreground="#778899" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding SelectedNodeConfidence}" Foreground="#778899"/>
+              <TextBlock Text="{Binding SelectedNodeSystem}" Foreground="#778899"/>
+              <TextBlock Text="{Binding SelectedNodeModule}" Foreground="#778899"/>
+
+              <Border Height="1" Background="#2A3F5A" Margin="0,4,0,0"/>
+              <TextBlock Text="Files" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <ItemsControl ItemsSource="{Binding SelectedNodeFiles}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:GraphNodeFileVm">
+                    <Button Content="{Binding DisplayName}"
+                            Tag="{Binding FullPath}"
+                            Click="OnFileClick"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="6,3"
+                            Margin="0,2,0,0"/>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
 
   </DockPanel>
 
