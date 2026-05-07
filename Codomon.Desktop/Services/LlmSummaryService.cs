@@ -404,7 +404,7 @@ public static class LlmSummaryService
             new() { Role = "user", Content = prompt }
         };
         var summaryBuilder = new StringBuilder();
-        var maxTokens = maxOutputTokens > 0 ? maxOutputTokens : null;
+        int? maxTokens = maxOutputTokens > 0 ? maxOutputTokens : null;
 
         try
         {
