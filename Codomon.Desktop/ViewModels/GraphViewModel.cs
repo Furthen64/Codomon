@@ -1071,13 +1071,7 @@ public class GraphViewModel : INotifyPropertyChanged
     {
         _selectedNodeCallers.Clear();
 
-        if (!string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal))
-        {
-            OnPropertyChanged(nameof(HasSelectedNodeCallers));
-            return;
-        }
-
-        if (_currentSystemMap == null)
+        if (!string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal) || _currentSystemMap == null)
         {
             OnPropertyChanged(nameof(HasSelectedNodeCallers));
             return;
@@ -1092,11 +1086,11 @@ public class GraphViewModel : INotifyPropertyChanged
             .Where(rel => ShowLowConfidenceItems || rel.Confidence != ConfidenceLevel.Unknown)
             .Where(rel => IsKindVisible(rel.Kind))
             .GroupBy(rel => rel.FromId, StringComparer.Ordinal)
-            .Where(group => _moduleByCodeNodeId.ContainsKey(group.Key) && _codeNodeById.ContainsKey(group.Key))
             .Select(group =>
             {
-                var callerModule = _moduleByCodeNodeId[group.Key];
-                var callerNode = _codeNodeById[group.Key];
+                if (!_moduleByCodeNodeId.TryGetValue(group.Key, out var callerModule)
+                    || !_codeNodeById.TryGetValue(group.Key, out var callerNode))
+                    return null;
 
                 var ownerSystemName = ResolveOwnerSystemName(map, callerModule);
                 var relationKinds = group
@@ -1113,6 +1107,8 @@ public class GraphViewModel : INotifyPropertyChanged
                     ModuleId = callerModule.Id
                 };
             })
+            .Where(caller => caller != null)
+            .Cast<GraphCallerVm>()
             .OrderBy(caller => caller.CallerName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(caller => caller.ModuleId, StringComparer.Ordinal)
             .ToList();
