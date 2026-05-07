@@ -14,6 +14,60 @@ using System.Threading.Tasks;
 
 namespace Codomon.Desktop.Views;
 
+/*
+High-level overview of MainWindow and its responsibilities:
+
+- Constructor `MainWindow()`
+    - Called when the app does `new MainWindow()` (invoked from App.StartWithSplashAsync).
+    - Initializes UI (`InitializeComponent()`), creates `MainViewModel`, sets `DataContext`,
+        sets window title, and calls setup routines (`SetupCanvas`, `SetupTreeView`,
+        `SetupTimeline`, etc.). Subscribes to VM events and window lifecycle events.
+
+- Lifecycle handlers
+    - `OnWindowOpened`, `OnWindowClosed`, `OnWindowClosing`: invoked by Avalonia window
+        events to handle first-run prompts, persist window state, and prompt/save
+        unsaved changes.
+    - `OnViewModelPropertyChanged`: called when `_vm.PropertyChanged` to update UI
+        in response to VM state changes.
+
+- UI command handlers & dialogs
+    - Methods like `OnNewWorkspaceClick`, `OnOpenWorkspaceClick`, `OnSaveWorkspaceClick`,
+        `OnSettingsClick`, and various dialog helpers (`ShowInputDialogAsync`,
+        `ShowErrorAsync`, etc.) are called from XAML-bound buttons or internal flows.
+
+- Profile management
+    - `RefreshProfileComboBox`, `OnProfileComboBoxSelectionChanged`, and profile CRUD
+        handlers are triggered by UI interactions and VM updates.
+
+- Log import / replay / live monitoring
+    - `OnImportLogClick`, `SubscribeToLogReplay`, `RefreshLogReplayPanel`, `OnWatchLogClick`,
+        `OnLiveEntryArrived`, and related methods are wired to UI and to `LogReplayViewModel`/
+        `LiveMonitorViewModel` events.
+
+- Roslyn scan & architecture features
+    - `OnScanClick`, `OnHypothesisClick` and helpers run analysis dialogs and call
+        services/VM methods to update SystemMap, Graph, and workspace state.
+
+- Canvas / SystemMap / Graph navigation
+    - `SetupCanvas`, `SetupSystemMapView`, and navigation callbacks (`OnGraphNavigateTo*`)
+        are used by internal initialization and by Graph/SystemMap events.
+
+- Timeline & status bar
+    - `SetupTimeline`, `RebuildTimeline`, `UpdateTimelineCursor`, and `RefreshStatusBar`
+        update timeline and status information in response to replay/live activity and VM
+        changes.
+
+- Sidebar / TreeView helpers
+    - `RefreshSidebar`, `SetupTreeView`, and tree selection handlers keep the sidebar in
+        sync with workspace state.
+
+- Utilities
+    - `ExecuteSafeAsync` wraps asynchronous operations with centralized error handling
+        and `AppLogger` calls.
+
+Refer to the individual method implementations below for details and call-sites.
+*/
+
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _vm;

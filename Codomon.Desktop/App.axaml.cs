@@ -21,6 +21,9 @@ public partial class App : Application
     // step 2: After that:
     // OnFrameworkInitializationCompleted() performs lifetime setup and creates the MainWindow.
 
+    // step 3: Views/MainWindow
+
+    
     public override void Initialize()
     {
         // (step 1)
