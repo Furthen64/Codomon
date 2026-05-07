@@ -8,9 +8,19 @@
         Background="Transparent"
         TransparencyLevelHint="AcrylicBlur,Blur,Transparent"
         WindowStartupLocation="CenterScreen">
-  <Border CornerRadius="24" ClipToBounds="True" BorderThickness="1" BorderBrush="#7A7DFF">
+  <Border CornerRadius="24" ClipToBounds="True" BorderThickness="2" BorderBrush="#7A7DFF">
     <Grid>
       <Border Background="#0D111A"/>
+      <Border CornerRadius="24" BorderThickness="2" Margin="8" IsHitTestVisible="False">
+        <Border.BorderBrush>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#AA7A7DFF" Offset="0"/>
+            <GradientStop Color="#66B47CFF" Offset="0.4"/>
+            <GradientStop Color="#66F65CD0" Offset="0.75"/>
+            <GradientStop Color="#AA7A7DFF" Offset="1"/>
+          </LinearGradientBrush>
+        </Border.BorderBrush>
+      </Border>
       <Border Opacity="0.7">
         <Border.Background>
           <RadialGradientBrush Center="0.1,0.2" Radius="1.0">
@@ -28,12 +38,39 @@
                  Opacity="0.22"
                  Margin="24"/>
 
-      <StackPanel Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="codomon" FontSize="54" FontWeight="Bold" Foreground="#F0F3FF" HorizontalAlignment="Center"/>
+      <Canvas HorizontalAlignment="Center" VerticalAlignment="Center" Width="500" Height="290">
+        <Border Width="106" Height="106"
+                CornerRadius="53"
+                Canvas.Left="-22"
+                Canvas.Top="92"
+                ZIndex="10"
+                BorderThickness="3"
+                BorderBrush="#C97A7DFF"
+                Background="#1F2A4D">
+          <Border.Effect>
+            <DropShadowEffect Color="#7A7DFF" BlurRadius="18" OffsetX="0" OffsetY="0" Opacity="0.6"/>
+          </Border.Effect>
+          <Grid>
+            <TextBlock Text="C" FontSize="52" FontWeight="Black" Foreground="#F0F3FF"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+
+        <Border Width="420" Height="250"
+                Canvas.Left="52"
+                Canvas.Top="20"
+                CornerRadius="20"
+                BorderThickness="1"
+                BorderBrush="#395180"
+                Background="#140F1726">
+          <StackPanel Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24,30,24,24">
+            <TextBlock Text="codomon" FontSize="54" FontWeight="Bold" Foreground="#F0F3FF" HorizontalAlignment="Center"/>
         <TextBlock Text="Architecture intelligence in motion" FontSize="18" Foreground="#AAB4D6" HorizontalAlignment="Center"/>
         <ProgressBar Name="LoadProgress" Width="360" Height="8" Minimum="0" Maximum="100" Value="8"/>
         <TextBlock Name="StatusText" Text="Initializing workspace analysis..." HorizontalAlignment="Center" Foreground="#9CC6FF"/>
-      </StackPanel>
+          </StackPanel>
+        </Border>
+      </Canvas>
     </Grid>
   </Border>
 </Window>
