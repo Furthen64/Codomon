@@ -1204,10 +1204,8 @@ public class GraphViewModel : INotifyPropertyChanged
         if (_callerOverlayNodeKeys.Count == 0 && _callerOverlayConnections.Count == 0)
             return;
 
-        var overlayNodeKeys = _callerOverlayNodeKeys.ToHashSet(StringComparer.Ordinal);
-
         _nodeEdges.RemoveAll(edge =>
-            overlayNodeKeys.Contains(edge.From.Key) || overlayNodeKeys.Contains(edge.To.Key));
+            _callerOverlayNodeKeys.Contains(edge.From.Key) || _callerOverlayNodeKeys.Contains(edge.To.Key));
 
         if (_callerOverlayConnections.Count > 0)
         {
@@ -1218,11 +1216,11 @@ public class GraphViewModel : INotifyPropertyChanged
 
         if (_callerOverlayNodeKeys.Count > 0)
         {
-            var overlayNodes = Nodes
-                .Where(node => _callerOverlayNodeKeys.Contains(node.Key))
-                .ToList();
-            foreach (var node in overlayNodes)
-                Nodes.Remove(node);
+            for (var index = Nodes.Count - 1; index >= 0; index--)
+            {
+                if (_callerOverlayNodeKeys.Contains(Nodes[index].Key))
+                    Nodes.RemoveAt(index);
+            }
             _callerOverlayNodeKeys.Clear();
         }
 
