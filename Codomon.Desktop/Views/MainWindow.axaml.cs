@@ -1904,6 +1904,7 @@ public partial class MainWindow : Window
         graphView.NavigateToSystemMapRequested += OnGraphNavigateToSystemMapRequested;
         graphView.NavigateToModuleRequested += OnGraphNavigateToModuleRequested;
         graphView.NavigateToCodeNodesRequested += OnGraphNavigateToCodeNodesRequested;
+        graphView.NavigateToCallerModuleRequested += OnGraphNavigateToCallerModuleRequested;
 
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
@@ -2001,6 +2002,35 @@ public partial class MainWindow : Window
 
         _vm.SystemMap.SelectModule(module);
         _vm.SystemMap.SetActiveView(SystemMapViewKind.CodeDetailView);
+        SetActiveNavTab("Monitor");
+    }
+
+    private void OnGraphNavigateToCallerModuleRequested(string moduleId)
+    {
+        if (string.IsNullOrWhiteSpace(moduleId)) return;
+
+        var wsModule = _vm.Workspace.SystemMap.AllModules
+            .FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.Ordinal));
+        if (wsModule == null) return;
+
+        var ownerSystemId = wsModule.SystemIds.FirstOrDefault()
+            ?? _vm.Workspace.SystemMap.Systems
+                .FirstOrDefault(s => s.Modules.Any(m => string.Equals(m.Id, wsModule.Id, StringComparison.Ordinal)))?.Id
+            ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(ownerSystemId))
+        {
+            var sys = _vm.SystemMap.Systems.FirstOrDefault(s => string.Equals(s.Id, ownerSystemId, StringComparison.Ordinal));
+            if (sys != null)
+                _vm.SystemMap.SelectSystem(sys);
+        }
+
+        var module = _vm.SystemMap.ModulesForSelectedSystem
+            .FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.Ordinal));
+        if (module == null) return;
+
+        _vm.SystemMap.SelectModule(module);
+        _vm.SystemMap.SetActiveView(SystemMapViewKind.ModuleView);
         SetActiveNavTab("Monitor");
     }
 

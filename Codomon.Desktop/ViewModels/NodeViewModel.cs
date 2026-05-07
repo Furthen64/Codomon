@@ -22,6 +22,7 @@ public class NodeViewModel : INotifyPropertyChanged
     private string _systemName = string.Empty;
     private Point _location;
     private int _childCount;
+    private bool _isCodeLeaf;
     private IReadOnlyList<string> _relatedFiles = Array.Empty<string>();
 
     public string Key
@@ -131,6 +132,12 @@ public class NodeViewModel : INotifyPropertyChanged
 
     /// <summary>Convenience accessor for the single output connector.</summary>
     public ConnectorViewModel OutputConnector => Outputs[0];
+
+    public bool IsCodeLeaf
+    {
+        get => _isCodeLeaf;
+        set { _isCodeLeaf = value; OnPropertyChanged(); }
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

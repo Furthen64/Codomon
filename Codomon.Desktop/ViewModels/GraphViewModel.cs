@@ -25,6 +25,13 @@ public sealed class GraphNodeFileVm
     public string FullPath { get; init; } = string.Empty;
 }
 
+public sealed class GraphCallerVm
+{
+    public string CallerName { get; init; } = string.Empty;
+    public string CallerContext { get; init; } = string.Empty;
+    public string ModuleId { get; init; } = string.Empty;
+}
+
 public class GraphViewModel : INotifyPropertyChanged
 {
     /// <summary>Entity type string assigned to code-node <see cref="NodeViewModel"/> instances.</summary>
@@ -68,6 +75,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private string _selectedNodeSystem = string.Empty;
     private string _selectedNodeSummaryFirstParagraph = string.Empty;
     private readonly ObservableCollection<GraphNodeFileVm> _selectedNodeFiles = new();
+    private readonly ObservableCollection<GraphCallerVm> _selectedNodeCallers = new();
     private string _workspaceFolderPath = string.Empty;
 
     // ── Filters ───────────────────────────────────────────────────────────────
@@ -197,6 +205,8 @@ public class GraphViewModel : INotifyPropertyChanged
     }
     public bool HasSelectedNodeSummary => !string.IsNullOrEmpty(_selectedNodeSummaryFirstParagraph);
     public ObservableCollection<GraphNodeFileVm> SelectedNodeFiles => _selectedNodeFiles;
+    public ObservableCollection<GraphCallerVm> SelectedNodeCallers => _selectedNodeCallers;
+    public bool HasSelectedNodeCallers => _selectedNodeCallers.Count > 0;
 
     // ── Workspace context ─────────────────────────────────────────────────────
 
@@ -464,6 +474,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        foreach (var node in Nodes) node.IsCodeLeaf = false;
         EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count}");
@@ -563,6 +574,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        foreach (var node in Nodes) node.IsCodeLeaf = node.ChildCount == 0;
         EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildCodeNodeRelationshipsForModule complete. Module='{module.Name}' CodeNodes={Nodes.Count} Connections={Connections.Count}");
@@ -659,6 +671,7 @@ public class GraphViewModel : INotifyPropertyChanged
         // Set ChildCount (outgoing edge count) on each node.
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        foreach (var node in Nodes) node.IsCodeLeaf = false;
         EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildFromSystemMap complete. " +
@@ -768,6 +781,7 @@ public class GraphViewModel : INotifyPropertyChanged
 
         foreach (var node in Nodes) node.ChildCount = 0;
         foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        foreach (var node in Nodes) node.IsCodeLeaf = false;
         EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildFromWorkspaceConnections complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
@@ -1014,6 +1028,8 @@ public class GraphViewModel : INotifyPropertyChanged
             SelectedNodeSystem = string.Empty;
             SelectedNodeSummaryFirstParagraph = string.Empty;
             _selectedNodeFiles.Clear();
+            _selectedNodeCallers.Clear();
+            OnPropertyChanged(nameof(HasSelectedNodeCallers));
             return;
         }
 
@@ -1034,6 +1050,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 FullPath = file
             });
         }
+        PopulateSelectedNodeCallers(node);
 
         // Populate summary first paragraph for code nodes when a workspace is loaded.
         string summaryText = string.Empty;
@@ -1045,6 +1062,86 @@ public class GraphViewModel : INotifyPropertyChanged
                 summaryText = LlmSummaryService.GetSummaryFirstParagraph(_workspaceFolderPath, filePath) ?? string.Empty;
         }
         SelectedNodeSummaryFirstParagraph = summaryText;
+    }
+
+    private void PopulateSelectedNodeCallers(NodeViewModel node)
+    {
+        _selectedNodeCallers.Clear();
+
+        if (!string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal))
+        {
+            OnPropertyChanged(nameof(HasSelectedNodeCallers));
+            return;
+        }
+
+        if (_currentSystemMap == null)
+        {
+            OnPropertyChanged(nameof(HasSelectedNodeCallers));
+            return;
+        }
+
+        var map = _currentSystemMap;
+        var moduleByCodeNodeId = map.AllModules
+            .SelectMany(module => module.CodeNodes.Select(codeNode => (codeNode.Id, Module: module)))
+            .ToDictionary(x => x.Id, x => x.Module, StringComparer.Ordinal);
+
+        var callerGroups = map.Relationships
+            .Where(rel => string.Equals(rel.ToId, node.Key, StringComparison.Ordinal))
+            .Where(rel => !string.Equals(rel.FromId, rel.ToId, StringComparison.Ordinal))
+            .Where(rel => ShowLowConfidenceItems || rel.Confidence != ConfidenceLevel.Unknown)
+            .Where(rel => IsKindVisible(rel.Kind))
+            .GroupBy(rel => rel.FromId, StringComparer.Ordinal)
+            .Select(group =>
+            {
+                if (!moduleByCodeNodeId.TryGetValue(group.Key, out var callerModule))
+                    return null;
+
+                var callerNode = callerModule.CodeNodes
+                    .FirstOrDefault(codeNode => string.Equals(codeNode.Id, group.Key, StringComparison.Ordinal));
+                if (callerNode == null)
+                    return null;
+
+                var ownerSystemName = ResolveOwnerSystemName(map, callerModule);
+                var relationKinds = group
+                    .Select(rel => rel.Kind.ToString())
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(kind => kind, StringComparer.Ordinal)
+                    .ToArray();
+                var relationLabel = relationKinds.Length == 0
+                    ? "Unknown"
+                    : string.Join(", ", relationKinds);
+
+                return new GraphCallerVm
+                {
+                    CallerName = callerNode.Name,
+                    CallerContext = $"{callerModule.Name} · {ownerSystemName} · {relationLabel}",
+                    ModuleId = callerModule.Id
+                };
+            })
+            .Where(caller => caller != null)
+            .Cast<GraphCallerVm>()
+            .OrderBy(caller => caller.CallerName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(caller => caller.ModuleId, StringComparer.Ordinal)
+            .ToList();
+
+        foreach (var caller in callerGroups)
+            _selectedNodeCallers.Add(caller);
+
+        OnPropertyChanged(nameof(HasSelectedNodeCallers));
+    }
+
+    private static string ResolveOwnerSystemName(SystemMapModel map, ModuleModel module)
+    {
+        var ownerSystemId = module.SystemIds.FirstOrDefault()
+            ?? map.Systems.FirstOrDefault(system =>
+                system.Modules.Any(systemModule => string.Equals(systemModule.Id, module.Id, StringComparison.Ordinal)))?.Id;
+        if (string.IsNullOrWhiteSpace(ownerSystemId))
+            return "(unknown system)";
+
+        return map.Systems
+            .FirstOrDefault(system => string.Equals(system.Id, ownerSystemId, StringComparison.Ordinal))
+            ?.Name
+            ?? "(unknown system)";
     }
 
     private static string KindBadgeBackgroundForCodeNode(CodeNodeKind kind) => kind switch
