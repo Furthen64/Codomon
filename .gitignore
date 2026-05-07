@@ -1,3 +1,7 @@
+# IDE-specific files
+.vscode/
+.idea/
+
 # Fayts docs
 Docs/
 
