@@ -404,17 +404,17 @@ public static class LlmSummaryService
             new() { Role = "user", Content = prompt }
         };
         var summaryBuilder = new StringBuilder();
-        int? maxTokens = maxOutputTokens > 0 ? maxOutputTokens : null;
+        int? maxTokensPerRequest = maxOutputTokens > 0 ? maxOutputTokens : null;
 
         try
         {
-            for (int attempt = 0; attempt <= MaxContinuationRequests; attempt++)
+            for (int attempt = 0; attempt < MaxContinuationRequests; attempt++)
             {
                 var payload = new ChatRequest
                 {
                     Model = modelName,
                     Messages = messages.ToArray(),
-                    MaxTokens = maxTokens
+                    MaxTokens = maxTokensPerRequest
                 };
 
                 using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
@@ -449,7 +449,7 @@ public static class LlmSummaryService
                 if (!string.Equals(finishReason, "length", StringComparison.OrdinalIgnoreCase))
                     return summaryBuilder.ToString();
 
-                if (attempt >= MaxContinuationRequests)
+                if (attempt >= MaxContinuationRequests - 1)
                 {
                     AppLogger.Warn("[LLM] Summary generation hit the continuation limit while finish_reason=length.");
                     throw new InvalidOperationException(
@@ -457,7 +457,7 @@ public static class LlmSummaryService
                         "Try increasing Summary output token cap or using a model with larger output capacity.");
                 }
 
-                AppLogger.Warn($"[LLM] Summary response hit output limit (finish_reason=length). Requesting continuation ({attempt + 1}/{MaxContinuationRequests}).");
+                AppLogger.Warn($"[LLM] Summary response hit output limit (finish_reason=length). Requesting continuation (call {attempt + 2}/{MaxContinuationRequests}).");
                 messages.Add(new ChatMessage { Role = "assistant", Content = content });
                 messages.Add(new ChatMessage
                 {
