@@ -13,19 +13,25 @@ namespace Codomon.Desktop.Views;
 public partial class FancySplashWindow : Window
 {
     private readonly DispatcherTimer _codeTimer;
+    private readonly TimeSpan _fadeInDuration;
     private int _lineOffset;
 
-    public FancySplashWindow()
+    public FancySplashWindow() : this(1300, 4000)
+    {
+    }
+
+    public FancySplashWindow(int codeRefreshMilliseconds, int fadeInMilliseconds)
     {
         InitializeComponent();
 
-        _codeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(130) };
+        _codeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(codeRefreshMilliseconds) };
+        _fadeInDuration = TimeSpan.FromMilliseconds(fadeInMilliseconds);
         _codeTimer.Tick += (_, _) => UpdateCodeBackdrop();
 
         Opened += async (_, _) =>
         {
             _codeTimer.Start();
-            await RunIntroAnimationAsync();
+            await RunFadeInAsync();
         };
 
         Closed += (_, _) => _codeTimer.Stop();
@@ -49,12 +55,12 @@ public partial class FancySplashWindow : Window
         _lineOffset++;
     }
 
-    private async System.Threading.Tasks.Task RunIntroAnimationAsync()
+    private async System.Threading.Tasks.Task RunFadeInAsync()
     {
         Opacity = 0;
         var animation = new Animation
         {
-            Duration = TimeSpan.FromMilliseconds(400),
+            Duration = _fadeInDuration,
             Easing = new CubicEaseOut(),
             FillMode = FillMode.Forward,
             Children =

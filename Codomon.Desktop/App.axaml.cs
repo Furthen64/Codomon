@@ -13,13 +13,23 @@ namespace Codomon.Desktop;
 
 public partial class App : Application
 {
+    // step 1: The XAML root is loaded by the App instance itself, 
+    // Initialize(),
+    // AvaloniaXamlLoader.Load() 
+
+    // step 2: After that:
+    // OnFrameworkInitializationCompleted() performs lifetime setup and creates the MainWindow.
+
     public override void Initialize()
     {
+        // (step 1)
         AvaloniaXamlLoader.Load(this);
     }
 
+    
     public override void OnFrameworkInitializationCompleted()
     {
+        // (step 2)
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _ = StartWithSplashAsync(desktop);
@@ -30,7 +40,12 @@ public partial class App : Application
 
     private static async Task StartWithSplashAsync(IClassicDesktopStyleApplicationLifetime desktop)
     {
-        const int MinimumSplashMilliseconds = 5000;
+        var timings = new SplashTimings(
+            MinimumSplashMilliseconds: 20000,
+            FallbackSplashMilliseconds: 500,
+            ProgressStepMilliseconds: 250,
+            FancyCodeRefreshMilliseconds: 1300,
+            FancyFadeInMilliseconds: 4000);
         Window? splash = null;
         FancySplashWindow? fancy = null;
         var splashTimer = Stopwatch.StartNew();
@@ -39,7 +54,9 @@ public partial class App : Application
         {
             if (SplashModeSelector.ShouldUseFancySplash())
             {
-                fancy = new FancySplashWindow();
+                fancy = new FancySplashWindow(
+                    timings.FancyCodeRefreshMilliseconds,
+                    timings.FancyFadeInMilliseconds);
                 splash = fancy;
             }
             else
@@ -49,17 +66,17 @@ public partial class App : Application
 
             splash.Show();
 
-            await SimulateStartupAsync(fancy);
+            await SimulateStartupAsync(fancy, timings.ProgressStepMilliseconds);
         }
         catch
         {
             splash?.Close();
             splash = new StaticSplashWindow();
             splash.Show();
-            await Task.Delay(500);
+            await Task.Delay(timings.FallbackSplashMilliseconds);
         }
 
-        var remaining = MinimumSplashMilliseconds - (int)splashTimer.ElapsedMilliseconds;
+        var remaining = timings.MinimumSplashMilliseconds - (int)splashTimer.ElapsedMilliseconds;
         if (remaining > 0)
         {
             await Task.Delay(remaining);
@@ -75,7 +92,14 @@ public partial class App : Application
         }
     }
 
-    private static async Task SimulateStartupAsync(FancySplashWindow? fancy)
+    private readonly record struct SplashTimings(
+        int MinimumSplashMilliseconds,
+        int FallbackSplashMilliseconds,
+        int ProgressStepMilliseconds,
+        int FancyCodeRefreshMilliseconds,
+        int FancyFadeInMilliseconds);
+
+    private static async Task SimulateStartupAsync(FancySplashWindow? fancy, int progressStepMilliseconds)
     {
         (int progress, string status)[] steps =
         [
@@ -88,7 +112,7 @@ public partial class App : Application
         foreach (var (progress, status) in steps)
         {
             fancy?.SetProgress(progress, status);
-            await Task.Delay(250);
+            await Task.Delay(progressStepMilliseconds);
         }
     }
 }

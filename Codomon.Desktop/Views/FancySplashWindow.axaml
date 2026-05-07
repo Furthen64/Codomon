@@ -23,7 +23,7 @@
       </Border>
       <Border Opacity="0.7">
         <Border.Background>
-          <RadialGradientBrush Center="0.1,0.2" Radius="1.0">
+          <RadialGradientBrush Center="0.1,0.2" RadiusX="100%" RadiusY="100%">
             <GradientStop Color="#32176B" Offset="0"/>
             <GradientStop Color="#0D111A" Offset="1"/>
           </RadialGradientBrush>
