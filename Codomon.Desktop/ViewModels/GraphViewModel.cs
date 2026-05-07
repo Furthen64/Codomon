@@ -76,6 +76,9 @@ public class GraphViewModel : INotifyPropertyChanged
     private string _selectedNodeSummaryFirstParagraph = string.Empty;
     private readonly ObservableCollection<GraphNodeFileVm> _selectedNodeFiles = new();
     private readonly ObservableCollection<GraphCallerVm> _selectedNodeCallers = new();
+    private SystemMapModel? _callerLookupMap;
+    private readonly Dictionary<string, ModuleModel> _moduleByCodeNodeId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CodeNodeModel> _codeNodeById = new(StringComparer.Ordinal);
     private string _workspaceFolderPath = string.Empty;
 
     // ── Filters ───────────────────────────────────────────────────────────────
@@ -1081,12 +1084,7 @@ public class GraphViewModel : INotifyPropertyChanged
         }
 
         var map = _currentSystemMap;
-        var moduleByCodeNodeId = map.AllModules
-            .SelectMany(module => module.CodeNodes.Select(codeNode => (codeNode.Id, Module: module)))
-            .ToDictionary(x => x.Id, x => x.Module, StringComparer.Ordinal);
-        var codeNodeById = map.AllModules
-            .SelectMany(module => module.CodeNodes)
-            .ToDictionary(codeNode => codeNode.Id, codeNode => codeNode, StringComparer.Ordinal);
+        EnsureCallerLookups(map);
 
         var callerGroups = map.Relationships
             .Where(rel => string.Equals(rel.ToId, node.Key, StringComparison.Ordinal))
@@ -1094,11 +1092,11 @@ public class GraphViewModel : INotifyPropertyChanged
             .Where(rel => ShowLowConfidenceItems || rel.Confidence != ConfidenceLevel.Unknown)
             .Where(rel => IsKindVisible(rel.Kind))
             .GroupBy(rel => rel.FromId, StringComparer.Ordinal)
-            .Where(group => moduleByCodeNodeId.ContainsKey(group.Key) && codeNodeById.ContainsKey(group.Key))
+            .Where(group => _moduleByCodeNodeId.ContainsKey(group.Key) && _codeNodeById.ContainsKey(group.Key))
             .Select(group =>
             {
-                var callerModule = moduleByCodeNodeId[group.Key];
-                var callerNode = codeNodeById[group.Key];
+                var callerModule = _moduleByCodeNodeId[group.Key];
+                var callerNode = _codeNodeById[group.Key];
 
                 var ownerSystemName = ResolveOwnerSystemName(map, callerModule);
                 var relationKinds = group
@@ -1106,9 +1104,7 @@ public class GraphViewModel : INotifyPropertyChanged
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(kind => kind, StringComparer.Ordinal)
                     .ToArray();
-                var relationLabel = relationKinds.Length == 0
-                    ? "Unknown"
-                    : string.Join(", ", relationKinds);
+                var relationLabel = string.Join(", ", relationKinds);
 
                 return new GraphCallerVm
                 {
@@ -1125,6 +1121,25 @@ public class GraphViewModel : INotifyPropertyChanged
             _selectedNodeCallers.Add(caller);
 
         OnPropertyChanged(nameof(HasSelectedNodeCallers));
+    }
+
+    private void EnsureCallerLookups(SystemMapModel map)
+    {
+        if (ReferenceEquals(_callerLookupMap, map))
+            return;
+
+        _callerLookupMap = map;
+        _moduleByCodeNodeId.Clear();
+        _codeNodeById.Clear();
+
+        foreach (var module in map.AllModules)
+        {
+            foreach (var codeNode in module.CodeNodes)
+            {
+                _moduleByCodeNodeId[codeNode.Id] = module;
+                _codeNodeById[codeNode.Id] = codeNode;
+            }
+        }
     }
 
     private static string ResolveOwnerSystemName(SystemMapModel map, ModuleModel module)
