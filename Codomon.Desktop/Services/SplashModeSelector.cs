@@ -37,29 +37,8 @@ public static class SplashModeSelector
             return false;
         }
 
-        try
-        {
-            var probeWindow = new Window
-            {
-                Width = 1,
-                Height = 1,
-                ShowInTaskbar = false,
-                Opacity = 0,
-                IsVisible = false,
-                TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent }
-            };
-
-            probeWindow.Show();
-
-            var rendererName = probeWindow.Renderer?.GetType().Name ?? string.Empty;
-            var supportsCompositing = rendererName.Contains("Composit", StringComparison.OrdinalIgnoreCase);
-
-            probeWindow.Close();
-            return supportsCompositing;
-        }
-        catch
-        {
-            return false;
-        }
+        // Avalonia no longer exposes renderer details on Window in current versions.
+        // If not explicitly forced to software/static modes above, prefer the fancy splash.
+        return true;
     }
 }
