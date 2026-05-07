@@ -1,6 +1,7 @@
 using Avalonia;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.SystemMap;
+using Codomon.Desktop.Services;
 using Codomon.Desktop.Services.Graph;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -26,6 +27,9 @@ public sealed class GraphNodeFileVm
 
 public class GraphViewModel : INotifyPropertyChanged
 {
+    /// <summary>Entity type string assigned to code-node <see cref="NodeViewModel"/> instances.</summary>
+    private const string CodeNodeEntityType = "Code Node";
+
     public sealed class AutoAlignOptions
     {
         public double StartX { get; set; } = 80;
@@ -62,7 +66,9 @@ public class GraphViewModel : INotifyPropertyChanged
     private string _selectedNodeConfidence = string.Empty;
     private string _selectedNodeModule = string.Empty;
     private string _selectedNodeSystem = string.Empty;
+    private string _selectedNodeSummaryFirstParagraph = string.Empty;
     private readonly ObservableCollection<GraphNodeFileVm> _selectedNodeFiles = new();
+    private string _workspaceFolderPath = string.Empty;
 
     // ── Filters ───────────────────────────────────────────────────────────────
 
@@ -184,7 +190,25 @@ public class GraphViewModel : INotifyPropertyChanged
         get => _selectedNodeSystem;
         private set { _selectedNodeSystem = value; OnPropertyChanged(); }
     }
+    public string SelectedNodeSummaryFirstParagraph
+    {
+        get => _selectedNodeSummaryFirstParagraph;
+        private set { _selectedNodeSummaryFirstParagraph = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasSelectedNodeSummary)); }
+    }
+    public bool HasSelectedNodeSummary => !string.IsNullOrEmpty(_selectedNodeSummaryFirstParagraph);
     public ObservableCollection<GraphNodeFileVm> SelectedNodeFiles => _selectedNodeFiles;
+
+    // ── Workspace context ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Path to the workspace folder on disk. Used to locate LLM-generated summaries for
+    /// code nodes in the Node Details panel. Set by the caller whenever a workspace is opened.
+    /// </summary>
+    public string WorkspaceFolderPath
+    {
+        get => _workspaceFolderPath;
+        set { _workspaceFolderPath = value ?? string.Empty; OnPropertyChanged(); }
+    }
 
     // ── Construction ──────────────────────────────────────────────────────────
 
@@ -499,7 +523,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 KindLabel = codeNode.Kind.ToString(),
                 KindBadgeBackground = KindBadgeBackgroundForCodeNode(codeNode.Kind),
                 KindBadgeForeground = KindBadgeForegroundForCodeNode(codeNode.Kind),
-                EntityType = "Code Node",
+                EntityType = CodeNodeEntityType,
                 Confidence = codeNode.Confidence.ToString(),
                 FullName = codeNode.FullName,
                 ModuleName = module.Name,
@@ -988,6 +1012,7 @@ public class GraphViewModel : INotifyPropertyChanged
             SelectedNodeConfidence = string.Empty;
             SelectedNodeModule = string.Empty;
             SelectedNodeSystem = string.Empty;
+            SelectedNodeSummaryFirstParagraph = string.Empty;
             _selectedNodeFiles.Clear();
             return;
         }
@@ -1009,6 +1034,17 @@ public class GraphViewModel : INotifyPropertyChanged
                 FullPath = file
             });
         }
+
+        // Populate summary first paragraph for code nodes when a workspace is loaded.
+        string summaryText = string.Empty;
+        if (string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(_workspaceFolderPath))
+        {
+            var filePath = node.RelatedFiles.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
+            if (!string.IsNullOrWhiteSpace(filePath))
+                summaryText = LlmSummaryService.GetSummaryFirstParagraph(_workspaceFolderPath, filePath) ?? string.Empty;
+        }
+        SelectedNodeSummaryFirstParagraph = summaryText;
     }
 
     private static string KindBadgeBackgroundForCodeNode(CodeNodeKind kind) => kind switch

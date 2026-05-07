@@ -74,7 +74,12 @@ public class MainViewModel : INotifyPropertyChanged
     public string WorkspaceFolderPath
     {
         get => _workspaceFolderPath;
-        private set { _workspaceFolderPath = value; OnPropertyChanged(); }
+        private set
+        {
+            _workspaceFolderPath = value;
+            OnPropertyChanged();
+            Graph.WorkspaceFolderPath = value;
+        }
     }
 
     public string StatusMessage

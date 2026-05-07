@@ -252,6 +252,15 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
+
+              <StackPanel IsVisible="{Binding HasSelectedNodeSummary}" Spacing="4" Margin="0,8,0,0">
+                <Border Height="1" Background="#2A3F5A"/>
+                <TextBlock Text="Summary" Foreground="#AABBCC" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding SelectedNodeSummaryFirstParagraph}"
+                           Foreground="#9BB4CC"
+                           FontSize="11"
+                           TextWrapping="Wrap"/>
+              </StackPanel>
             </StackPanel>
           </StackPanel>
         </ScrollViewer>
