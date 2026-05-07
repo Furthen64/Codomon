@@ -30,6 +30,8 @@ public sealed class GraphCallerVm
     public string CallerName { get; init; } = string.Empty;
     public string CallerContext { get; init; } = string.Empty;
     public string ModuleId { get; init; } = string.Empty;
+    public string CallerCodeNodeId { get; init; } = string.Empty;
+    public string RelationshipLabel { get; init; } = string.Empty;
 }
 
 public class GraphViewModel : INotifyPropertyChanged
@@ -76,6 +78,8 @@ public class GraphViewModel : INotifyPropertyChanged
     private string _selectedNodeSummaryFirstParagraph = string.Empty;
     private readonly ObservableCollection<GraphNodeFileVm> _selectedNodeFiles = new();
     private readonly ObservableCollection<GraphCallerVm> _selectedNodeCallers = new();
+    private readonly HashSet<string> _callerOverlayNodeKeys = new(StringComparer.Ordinal);
+    private readonly List<ConnectionViewModel> _callerOverlayConnections = new();
     private SystemMapModel? _callerLookupMap;
     private readonly Dictionary<string, ModuleModel> _moduleByCodeNodeId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CodeNodeModel> _codeNodeById = new(StringComparer.Ordinal);
@@ -1020,6 +1024,8 @@ public class GraphViewModel : INotifyPropertyChanged
 
     private void UpdateSelectedNodeDetails()
     {
+        ClearCallerOverlay();
+
         var node = SelectedNode;
         if (node == null)
         {
@@ -1054,6 +1060,7 @@ public class GraphViewModel : INotifyPropertyChanged
             });
         }
         PopulateSelectedNodeCallers(node);
+        PopulateCallerOverlay(node);
 
         // Populate summary first paragraph for code nodes when a workspace is loaded.
         string summaryText = string.Empty;
@@ -1071,17 +1078,30 @@ public class GraphViewModel : INotifyPropertyChanged
     {
         _selectedNodeCallers.Clear();
 
-        if (!string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal) || _currentSystemMap == null)
+        if (!string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal))
         {
             OnPropertyChanged(nameof(HasSelectedNodeCallers));
             return;
         }
 
+        var callerGroups = BuildCallersForCodeNode(node.Key);
+
+        foreach (var caller in callerGroups)
+            _selectedNodeCallers.Add(caller);
+
+        OnPropertyChanged(nameof(HasSelectedNodeCallers));
+    }
+
+    private List<GraphCallerVm> BuildCallersForCodeNode(string codeNodeId)
+    {
+        if (_currentSystemMap == null || string.IsNullOrWhiteSpace(codeNodeId))
+            return new List<GraphCallerVm>();
+
         var map = _currentSystemMap;
         EnsureCallerLookups(map);
 
-        var callerGroups = map.Relationships
-            .Where(rel => string.Equals(rel.ToId, node.Key, StringComparison.Ordinal))
+        return map.Relationships
+            .Where(rel => string.Equals(rel.ToId, codeNodeId, StringComparison.Ordinal))
             .Where(rel => !string.Equals(rel.FromId, rel.ToId, StringComparison.Ordinal))
             .Where(rel => ShowLowConfidenceItems || rel.Confidence != ConfidenceLevel.Unknown)
             .Where(rel => IsKindVisible(rel.Kind))
@@ -1104,7 +1124,9 @@ public class GraphViewModel : INotifyPropertyChanged
                 {
                     CallerName = callerNode.Name,
                     CallerContext = $"{callerModule.Name} · {ownerSystemName} · {relationLabel}",
-                    ModuleId = callerModule.Id
+                    ModuleId = callerModule.Id,
+                    CallerCodeNodeId = callerNode.Id,
+                    RelationshipLabel = relationLabel
                 };
             })
             .Where(caller => caller != null)
@@ -1112,11 +1134,107 @@ public class GraphViewModel : INotifyPropertyChanged
             .OrderBy(caller => caller.CallerName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(caller => caller.ModuleId, StringComparer.Ordinal)
             .ToList();
+    }
 
-        foreach (var caller in callerGroups)
-            _selectedNodeCallers.Add(caller);
+    private void PopulateCallerOverlay(NodeViewModel selectedNode)
+    {
+        if (_renderMode != GraphRenderMode.CodeNodeRelationships) return;
+        if (!string.Equals(selectedNode.EntityType, CodeNodeEntityType, StringComparison.Ordinal)) return;
 
-        OnPropertyChanged(nameof(HasSelectedNodeCallers));
+        var callers = BuildCallersForCodeNode(selectedNode.Key);
+        if (callers.Count == 0) return;
+
+        var existingNodeKeys = new HashSet<string>(Nodes.Select(n => n.Key), StringComparer.Ordinal);
+        var callersToRender = callers
+            .Where(caller => !string.IsNullOrWhiteSpace(caller.CallerCodeNodeId))
+            .Where(caller => !existingNodeKeys.Contains(caller.CallerCodeNodeId))
+            .ToList();
+
+        if (callersToRender.Count == 0) return;
+
+        const double overlayXOffset = 360;
+        const double overlayYStep = 130;
+        var startY = selectedNode.Location.Y - ((callersToRender.Count - 1) * overlayYStep / 2d);
+
+        for (var i = 0; i < callersToRender.Count; i++)
+        {
+            var caller = callersToRender[i];
+            var overlayNodeKey = $"__caller_overlay__:{selectedNode.Key}:{caller.CallerCodeNodeId}";
+            var overlayNode = new NodeViewModel
+            {
+                Key = overlayNodeKey,
+                Title = caller.CallerName,
+                Subtitle = caller.CallerContext,
+                KindLabel = "Caller",
+                KindBadgeBackground = "#2A354A",
+                KindBadgeForeground = "#C9D8EA",
+                EntityType = "Caller",
+                Confidence = string.Empty,
+                FullName = string.Empty,
+                ModuleName = string.Empty,
+                SystemName = string.Empty,
+                RelatedFiles = Array.Empty<string>(),
+                Location = new Point(selectedNode.Location.X - overlayXOffset, startY + (i * overlayYStep))
+            };
+
+            overlayNode.OutputConnector.IsConnected = true;
+            selectedNode.InputConnector.IsConnected = true;
+
+            var overlayConnection = new ConnectionViewModel(
+                overlayNode.OutputConnector,
+                selectedNode.InputConnector,
+                caller.RelationshipLabel)
+            {
+                Stroke = "#E0A84E",
+                StrokeThickness = 2.25
+            };
+
+            Nodes.Add(overlayNode);
+            Connections.Add(overlayConnection);
+            _nodeEdges.Add((overlayNode, selectedNode));
+            _callerOverlayNodeKeys.Add(overlayNodeKey);
+            _callerOverlayConnections.Add(overlayConnection);
+        }
+
+        RecalculateNodeEdgeStats();
+    }
+
+    private void ClearCallerOverlay()
+    {
+        if (_callerOverlayNodeKeys.Count == 0 && _callerOverlayConnections.Count == 0)
+            return;
+
+        var overlayNodeKeys = _callerOverlayNodeKeys.ToHashSet(StringComparer.Ordinal);
+
+        _nodeEdges.RemoveAll(edge =>
+            overlayNodeKeys.Contains(edge.From.Key) || overlayNodeKeys.Contains(edge.To.Key));
+
+        if (_callerOverlayConnections.Count > 0)
+        {
+            foreach (var connection in _callerOverlayConnections)
+                Connections.Remove(connection);
+            _callerOverlayConnections.Clear();
+        }
+
+        if (_callerOverlayNodeKeys.Count > 0)
+        {
+            var overlayNodes = Nodes
+                .Where(node => _callerOverlayNodeKeys.Contains(node.Key))
+                .ToList();
+            foreach (var node in overlayNodes)
+                Nodes.Remove(node);
+            _callerOverlayNodeKeys.Clear();
+        }
+
+        RecalculateNodeEdgeStats();
+    }
+
+    private void RecalculateNodeEdgeStats()
+    {
+        foreach (var node in Nodes) node.ChildCount = 0;
+        foreach (var (from, _) in _nodeEdges) from.ChildCount++;
+        foreach (var node in Nodes)
+            node.IsCodeLeaf = string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal) && node.ChildCount == 0;
     }
 
     private void EnsureCallerLookups(SystemMapModel map)

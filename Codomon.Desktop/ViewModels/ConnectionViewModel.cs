@@ -28,6 +28,12 @@ public class ConnectionViewModel : INotifyPropertyChanged
     /// <summary>Short label shown as a tooltip on the edge (e.g. the relationship kind).</summary>
     public string Label { get; }
 
+    /// <summary>Stroke brush for the edge.</summary>
+    public string Stroke { get; init; } = "#80B4D4";
+
+    /// <summary>Stroke thickness for the edge.</summary>
+    public double StrokeThickness { get; init; } = 2;
+
     private void OnConnectorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ConnectorViewModel.Anchor))
