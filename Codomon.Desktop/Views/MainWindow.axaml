@@ -50,7 +50,7 @@
         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
                     Spacing="2" VerticalAlignment="Center">
           <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"/>
-          <Button x:Name="NavScanBtn"    Content="Scan"    Tag="Scan"    Click="OnNavTabClick" Padding="14,5"/>
+          <Button x:Name="NavScanBtn"    Content="Analyze" Tag="Scan"    Click="OnNavTabClick" Padding="14,5"/>
           <Button x:Name="NavMonitorBtn" Content="Monitor" Tag="Monitor" Click="OnNavTabClick" Padding="14,5"/>
           <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"/>
           <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"/>
@@ -423,17 +423,60 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
       </Grid>
 
-      <!-- ── Scan tab panel (devtools) ─── -->
+      <!-- ── Analyze tab panel (devtools) ─── -->
       <Grid x:Name="ScanPanel" IsVisible="False" Background="#0F141E">
         <DockPanel Margin="40,32">
-          <TextBlock DockPanel.Dock="Top" Text="Scan" FontSize="18" FontWeight="Bold"
-                     Foreground="#AABBCC" Margin="0,0,0,20"/>
-          <StackPanel Spacing="8" DockPanel.Dock="Top">
-            <Button Content="Run Scan"           Click="OnScanClick"       Padding="14,6" HorizontalAlignment="Left"/>
-            <Button Content="LLM Summaries"      Click="OnSummariesClick"  Padding="14,6" HorizontalAlignment="Left"/>
-            <Button Content="Architecture"       Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left"/>
-            <Button Content="Replay Logs"        Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left"/>
-            <Button Content="Dev Console"        Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left"/>
+          <TextBlock DockPanel.Dock="Top" Text="Analyze" FontSize="18" FontWeight="Bold"
+                     Foreground="#AABBCC" Margin="0,0,0,6"/>
+          <TextBlock DockPanel.Dock="Top" Text="Run analysis in order: Scan → LLM Summaries → Architecture. Replay Logs and Dev Console are always available."
+                     FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+          <StackPanel Spacing="10" DockPanel.Dock="Top">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <Button x:Name="AnalyzeRunScanBtn" Grid.Column="0" Grid.RowSpan="2"
+                      Content="Run Scan" Click="OnScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+              <TextBlock x:Name="AnalyzeRunScanStatusText" Grid.Column="1" Grid.Row="1"
+                         Text="" FontSize="10" Foreground="#556677"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <Button x:Name="AnalyzeLlmSummariesBtn" Grid.Column="0" Grid.RowSpan="2"
+                      Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock x:Name="AnalyzeLlmSummariesAvailabilityText" Grid.Column="1" Grid.Row="0"
+                         Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+              <TextBlock x:Name="AnalyzeLlmSummariesStatusText" Grid.Column="1" Grid.Row="1"
+                         Text="" FontSize="10" Foreground="#556677"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <Button x:Name="AnalyzeArchitectureBtn" Grid.Column="0" Grid.RowSpan="2"
+                      Content="Architecture" Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock x:Name="AnalyzeArchitectureAvailabilityText" Grid.Column="1" Grid.Row="0"
+                         Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+              <TextBlock x:Name="AnalyzeArchitectureStatusText" Grid.Column="1" Grid.Row="1"
+                         Text="" FontSize="10" Foreground="#556677"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <Button x:Name="AnalyzeReplayLogsBtn" Grid.Column="0" Grid.RowSpan="2"
+                      Content="Replay Logs" Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+              <TextBlock Grid.Column="1" Grid.Row="1" Text="Import and replay log files." FontSize="10" Foreground="#556677"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <Button x:Name="AnalyzeDevConsoleBtn" Grid.Column="0" Grid.RowSpan="2"
+                      Content="Dev Console" Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+              <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock Text="Open diagnostics window." FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
+                <CheckBox x:Name="AnalyzeDevConsoleAutoStartCheckBox" Content="Autostart"
+                          FontSize="10" Foreground="#AABBCC"
+                          Checked="OnDevConsoleAutoStartChanged"
+                          Unchecked="OnDevConsoleAutoStartChanged"/>
+              </StackPanel>
+            </Grid>
           </StackPanel>
         </DockPanel>
       </Grid>
@@ -506,4 +549,3 @@
 
   </DockPanel>
 </Window>
-
