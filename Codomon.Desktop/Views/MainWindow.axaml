@@ -444,15 +444,11 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
       </Grid>
 
-      <!-- ── 2-column workspace layout (sidebar extracted above) ─── -->
+      <!-- ── 1-column workspace layout ─── -->
       <Grid x:Name="WorkspaceGrid" IsVisible="False">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="300"/>
-        </Grid.ColumnDefinitions>
 
         <!-- Center Panel: Graph / System Map tabs -->
-        <Border Grid.Column="0" Background="#0F141E" ClipToBounds="True">
+        <Border Background="#0F141E" ClipToBounds="True">
           <TabControl x:Name="CenterTabControl"
                       SelectionChanged="OnCenterTabSelectionChanged"
                       Background="Transparent"
@@ -471,85 +467,6 @@
           </TabControl>
         </Border>
 
-        <!-- Right Panel: Properties -->
-        <Border Grid.Column="1" Background="#141C28" BorderThickness="1,0,0,0" BorderBrush="#2A3F5A">
-          <DockPanel>
-            <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
-              <TextBlock Text="Properties" FontWeight="Bold" Foreground="#AABBCC"/>
-            </Border>
-            <StackPanel Margin="10" Spacing="8">
-              <TextBlock Text="Selected Item" Foreground="#778899" FontSize="11"/>
-              <StackPanel Spacing="4">
-                <TextBlock Text="Name:" Foreground="#AABBCC" FontWeight="SemiBold"/>
-                <TextBlock x:Name="PropNameText" Text="None" Foreground="White" Margin="0,0,0,8"/>
-                <TextBlock Text="Type:" Foreground="#AABBCC" FontWeight="SemiBold"/>
-                <TextBlock x:Name="PropTypeText" Text="-" Foreground="White" Margin="0,0,0,8"/>
-              </StackPanel>
-
-              <!-- Mapping rules section — visible only when an item is selected -->
-              <StackPanel x:Name="PropRulesPanel" IsVisible="False" Spacing="4">
-                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
-                <TextBlock Text="Mapping Rules" Foreground="#AABBCC" FontWeight="SemiBold"/>
-                <TextBlock x:Name="PropRulesCountText" Foreground="#778899" FontSize="11"/>
-                <Button x:Name="EditRulesButton" Content="📏 Edit Rules…"
-                        Padding="8,4" Click="OnEditRulesClick"/>
-              </StackPanel>
-
-              <!-- Last match info — visible during/after log replay -->
-              <StackPanel x:Name="PropMatchPanel" IsVisible="False" Spacing="4">
-                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
-                <TextBlock Text="Last Match" Foreground="#AABBCC" FontWeight="SemiBold"/>
-                <TextBlock x:Name="PropMatchText" Foreground="#88CCAA" FontSize="11"
-                           TextWrapping="Wrap"/>
-              </StackPanel>
-
-              <!-- Graph auto-align controls -->
-              <StackPanel x:Name="PropAutoAlignPanel" IsVisible="False" Spacing="6">
-                <Border Height="1" Background="#2A3F5A" Margin="0,4,0,4"/>
-                <TextBlock Text="Graph Auto Align" Foreground="#AABBCC" FontWeight="SemiBold"/>
-
-                <TextBlock Text="Preset" Foreground="#778899" FontSize="11"/>
-                <ComboBox x:Name="PropAutoAlignPresetComboBox"
-                          SelectionChanged="OnPropAutoAlignPresetChanged"
-                          HorizontalAlignment="Left" MinWidth="170">
-                  <ComboBoxItem Content="Balanced" Tag="balanced"/>
-                  <ComboBoxItem Content="Dense Graph" Tag="dense"/>
-                  <ComboBoxItem Content="Max Separation" Tag="separated"/>
-                </ComboBox>
-
-                <TextBlock Text="Barycentric sweeps" Foreground="#778899" FontSize="11"/>
-                <NumericUpDown x:Name="PropAutoAlignSweepsBox"
-                               Minimum="1" Maximum="20" Increment="1" FormatString="0"
-                               HorizontalAlignment="Left" MinWidth="120"/>
-
-                <CheckBox x:Name="PropAutoAlignTwoPassCheck"
-                          Content="Second refinement pass"
-                          Foreground="#AABBCC"/>
-
-                <TextBlock Text="Column gap" Foreground="#778899" FontSize="11"/>
-                <NumericUpDown x:Name="PropAutoAlignColumnGapBox"
-                               Minimum="100" Maximum="700" Increment="20" FormatString="0"
-                               HorizontalAlignment="Left" MinWidth="120"/>
-
-                <TextBlock Text="Row gap" Foreground="#778899" FontSize="11"/>
-                <NumericUpDown x:Name="PropAutoAlignRowGapBox"
-                               Minimum="40" Maximum="280" Increment="8" FormatString="0"
-                               HorizontalAlignment="Left" MinWidth="120"/>
-
-                <TextBlock Text="Component gap" Foreground="#778899" FontSize="11"/>
-                <NumericUpDown x:Name="PropAutoAlignComponentGapBox"
-                               Minimum="20" Maximum="500" Increment="20" FormatString="0"
-                               HorizontalAlignment="Left" MinWidth="120"/>
-
-                <Button x:Name="PropAutoAlignApplyButton"
-                        Content="Apply Auto Align"
-                        Padding="8,4"
-                        Click="OnPropAutoAlignApplyClick"/>
-              </StackPanel>
-
-            </StackPanel>
-          </DockPanel>
-        </Border>
       </Grid>
 
       <!-- ── Welcome / Recent Workspaces overlay ─── -->
