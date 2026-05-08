@@ -42,6 +42,8 @@ public partial class LlmSummaryDialog : Window
                 SyncStatusText();
             else if (e.PropertyName is nameof(LlmSummaryViewModel.IsGenerating))
                 SyncGenerateButtons();
+            else if (e.PropertyName is nameof(LlmSummaryViewModel.ApiEndpoint) or nameof(LlmSummaryViewModel.ModelName))
+                SyncLlmSetupGuardrail();
         };
 
         _vm.ProgressMessages.CollectionChanged += (_, _) =>
@@ -66,6 +68,7 @@ public partial class LlmSummaryDialog : Window
         RebuildFileList();
 
         _vm.RefreshSummaries();
+        SyncLlmSetupGuardrail();
         SyncStatusText();
     }
 
@@ -81,10 +84,13 @@ public partial class LlmSummaryDialog : Window
 
     private async void OnOpenSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var dialog = new UserSettingsDialog();
-        await dialog.ShowDialog(this);
-        _vm.RefreshEffectiveSettingsFromConfig();
-        _vm.StatusMessage = "Settings refreshed from main Settings.";
+        await OpenSettingsAndRefreshAsync();
+    }
+
+    private async void OnSettingsLinkPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
+        await OpenSettingsAndRefreshAsync();
     }
 
     // ── Generate tab ──────────────────────────────────────────────────────────
@@ -144,6 +150,13 @@ public partial class LlmSummaryDialog : Window
 
     private async void OnGenerateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (!IsLlmSetupConfigured())
+        {
+            _vm.StatusMessage = "LLM setup is incomplete. Configure endpoint and model in Settings.";
+            SyncStatusText();
+            return;
+        }
+
         await _vm.GenerateSummariesAsync();
         SyncStatusText();
         RebuildFileList();
@@ -561,6 +574,39 @@ public partial class LlmSummaryDialog : Window
         var text = this.FindControl<TextBlock>("StatusText");
         if (text != null)
             text.Text = _vm.StatusMessage;
+    }
+
+    private async Task OpenSettingsAndRefreshAsync()
+    {
+        var dialog = new UserSettingsDialog();
+        await dialog.ShowDialog(this);
+        _vm.RefreshEffectiveSettingsFromConfig();
+        SyncLlmSetupGuardrail();
+
+        _vm.StatusMessage = IsLlmSetupConfigured()
+            ? "Settings refreshed from main Settings."
+            : "LLM setup is incomplete. Configure endpoint and model in Settings.";
+        SyncStatusText();
+    }
+
+    private bool IsLlmSetupConfigured()
+        => !string.IsNullOrWhiteSpace(_vm.ApiEndpoint)
+            && !string.IsNullOrWhiteSpace(_vm.ModelName);
+
+    private void SyncLlmSetupGuardrail()
+    {
+        var configured = IsLlmSetupConfigured();
+
+        var warningPanel = this.FindControl<Border>("LlmSetupWarningPanel");
+        if (warningPanel != null)
+            warningPanel.IsVisible = !configured;
+
+        var tabControl = this.FindControl<TabControl>("MainTabControl");
+        if (tabControl != null)
+            tabControl.IsEnabled = configured;
+
+        if (!configured)
+            _vm.StatusMessage = "LLM setup is incomplete. Configure endpoint and model in Settings.";
     }
 
     private void OnCloseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
