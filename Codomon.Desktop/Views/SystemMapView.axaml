@@ -30,6 +30,57 @@
             <ComboBoxItem Content="Flat View"/>
             <ComboBoxItem Content="Compact View"/>
           </ComboBox>
+
+          <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
+          <TextBlock Text="ORGANISE:" VerticalAlignment="Center"
+                     Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
+                     LetterSpacing="1" Margin="4,0,4,0"/>
+          <DropDownButton Content="Organise" Padding="8,3">
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Spacing="6" Margin="4" Width="220">
+
+                  <Button x:Name="CleanupNamesButton"
+                          Content="Cleanup Names"
+                          Click="OnCleanupNamesClick"
+                          HorizontalAlignment="Stretch"
+                          Padding="8,4"
+                          ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
+
+                  <Button x:Name="SortAppsFromLibrariesButton"
+                          Content="Sort Apps from Libraries"
+                          Click="OnSortAppsFromLibrariesClick"
+                          HorizontalAlignment="Stretch"
+                          Padding="8,4"
+                          ToolTip.Tip="Move app-type systems (Desktop, Web, Backend, etc.) to the top rows and class libraries to the bottom, with a separator between them."/>
+
+                  <Button x:Name="ArrangeButton"
+                          Content="Arrange"
+                          Click="OnArrangeClick"
+                          HorizontalAlignment="Stretch"
+                          Padding="8,4"
+                          ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
+
+                  <Button x:Name="SortByLayersButton"
+                          Content="Sort by Layers"
+                          Click="OnSortByLayersClick"
+                          HorizontalAlignment="Stretch"
+                          Padding="8,4"
+                          ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
+
+                  <Button x:Name="ClearCanvasButton"
+                          Content="Clear Canvas"
+                          Click="OnClearCanvasClick"
+                          HorizontalAlignment="Stretch"
+                          Padding="8,4"
+                          Background="#3A1A1A"
+                          Foreground="#FFAAAA"
+                          ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
+
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
         </StackPanel>
 
         <!-- Filters -->
@@ -374,53 +425,6 @@
                     <TextBlock Text="Details" Foreground="#778899" FontSize="10" FontWeight="Bold" LetterSpacing="1"/>
                     <ItemsControl x:Name="InspDetailsItemsControl"/>
                   </StackPanel>
-
-                  <!-- Organise section (collapsible) -->
-                  <Expander x:Name="OrganiseExpander"
-                            Header="ORGANISE" IsExpanded="False"
-                            Margin="0,10,0,0"
-                            Foreground="#4A6A8A">
-                    <StackPanel Spacing="6" Margin="0,4,0,4">
-
-                      <Button x:Name="CleanupNamesButton"
-                              Content="Cleanup Names"
-                              Click="OnCleanupNamesClick"
-                              HorizontalAlignment="Stretch"
-                              Padding="8,4"
-                              ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
-
-                      <Button x:Name="SortAppsFromLibrariesButton"
-                              Content="Sort Apps from Libraries"
-                              Click="OnSortAppsFromLibrariesClick"
-                              HorizontalAlignment="Stretch"
-                              Padding="8,4"
-                              ToolTip.Tip="Move app-type systems (Desktop, Web, Backend, etc.) to the top rows and class libraries to the bottom, with a separator between them."/>
-
-                      <Button x:Name="ArrangeButton"
-                              Content="Arrange"
-                              Click="OnArrangeClick"
-                              HorizontalAlignment="Stretch"
-                              Padding="8,4"
-                              ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
-
-                      <Button x:Name="SortByLayersButton"
-                              Content="Sort by Layers"
-                              Click="OnSortByLayersClick"
-                              HorizontalAlignment="Stretch"
-                              Padding="8,4"
-                              ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
-
-                      <Button x:Name="ClearCanvasButton"
-                              Content="Clear Canvas"
-                              Click="OnClearCanvasClick"
-                              HorizontalAlignment="Stretch"
-                              Padding="8,4"
-                              Background="#3A1A1A"
-                              Foreground="#FFAAAA"
-                              ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
-
-                    </StackPanel>
-                  </Expander>
 
                 </StackPanel>
               </ScrollViewer>
