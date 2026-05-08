@@ -432,43 +432,43 @@
                      FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,16"/>
 
           <StackPanel Spacing="10" DockPanel.Dock="Top">
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
               <Button x:Name="AnalyzeRunScanBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Run Scan" Click="OnScanClick" Padding="14,6" HorizontalAlignment="Left"/>
-              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC"/>
+                      Content="Run Scan" Click="OnScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
               <TextBlock x:Name="AnalyzeRunScanStatusText" Grid.Column="1" Grid.Row="1"
                          Text="" FontSize="10" Foreground="#556677"/>
             </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
               <Button x:Name="AnalyzeLlmSummariesBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6" HorizontalAlignment="Left"/>
+                      Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
               <TextBlock x:Name="AnalyzeLlmSummariesAvailabilityText" Grid.Column="1" Grid.Row="0"
-                         Text="" FontSize="11" Foreground="#AABBCC"/>
+                         Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
               <TextBlock x:Name="AnalyzeLlmSummariesStatusText" Grid.Column="1" Grid.Row="1"
                          Text="" FontSize="10" Foreground="#556677"/>
             </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
               <Button x:Name="AnalyzeArchitectureBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Architecture" Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left"/>
+                      Content="Architecture" Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
               <TextBlock x:Name="AnalyzeArchitectureAvailabilityText" Grid.Column="1" Grid.Row="0"
-                         Text="" FontSize="11" Foreground="#AABBCC"/>
+                         Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
               <TextBlock x:Name="AnalyzeArchitectureStatusText" Grid.Column="1" Grid.Row="1"
                          Text="" FontSize="10" Foreground="#556677"/>
             </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
               <Button x:Name="AnalyzeReplayLogsBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Replay Logs" Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left"/>
-              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC"/>
+                      Content="Replay Logs" Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
               <TextBlock Grid.Column="1" Grid.Row="1" Text="Import and replay log files." FontSize="10" Foreground="#556677"/>
             </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
               <Button x:Name="AnalyzeDevConsoleBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Dev Console" Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left"/>
-              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC"/>
+                      Content="Dev Console" Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
               <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                 <TextBlock Text="Open diagnostics window." FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
                 <CheckBox x:Name="AnalyzeDevConsoleAutoStartCheckBox" Content="Autostart"

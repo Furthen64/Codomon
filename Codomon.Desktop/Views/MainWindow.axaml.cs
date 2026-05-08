@@ -1795,10 +1795,18 @@ public partial class MainWindow : Window
 
         if (summariesStatus != null)
         {
-            var denominator = analyzedCsCount > 0 ? analyzedCsCount : summaryCount;
-            summariesStatus.Text = summaryCount == 0
-                ? "No summaries generated yet."
-                : $"Last: {FormatTime(latestSummaryAt)} · Coverage: {completion}% ({summaryCount}/{denominator})";
+            if (summaryCount == 0)
+            {
+                summariesStatus.Text = "No summaries generated yet.";
+            }
+            else if (analyzedCsCount <= 0)
+            {
+                summariesStatus.Text = $"Last: {FormatTime(latestSummaryAt)} · Coverage: unknown ({summaryCount}/unknown)";
+            }
+            else
+            {
+                summariesStatus.Text = $"Last: {FormatTime(latestSummaryAt)} · Coverage: {completion}% ({summaryCount}/{analyzedCsCount})";
+            }
         }
 
         bool hasSummaries = summaryCount > 0;
@@ -1844,7 +1852,15 @@ public partial class MainWindow : Window
 
             return files.GetArrayLength();
         }
-        catch
+        catch (IOException)
+        {
+            return 0;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return 0;
+        }
+        catch (JsonException)
         {
             return 0;
         }
