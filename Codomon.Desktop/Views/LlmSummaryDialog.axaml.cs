@@ -25,6 +25,7 @@ public partial class LlmSummaryDialog : Window
     private DispatcherTimer? _spinnerTimer;
     private int _spinnerFrame;
     private static readonly string[] SpinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    private const string IncompleteSetupStatusMessage = "LLM setup is incomplete. Configure endpoint and model in Settings.";
 
     public LlmSummaryDialog()
         : this(new LlmSummaryViewModel(new WorkspaceModel(), string.Empty))
@@ -152,7 +153,7 @@ public partial class LlmSummaryDialog : Window
     {
         if (!IsLlmSetupConfigured())
         {
-            _vm.StatusMessage = "LLM setup is incomplete. Configure endpoint and model in Settings.";
+            _vm.StatusMessage = IncompleteSetupStatusMessage;
             SyncStatusText();
             return;
         }
@@ -605,7 +606,7 @@ public partial class LlmSummaryDialog : Window
             tabControl.IsEnabled = configured;
 
         if (!configured)
-            _vm.StatusMessage = "LLM setup is incomplete. Configure endpoint and model in Settings.";
+            _vm.StatusMessage = IncompleteSetupStatusMessage;
     }
 
     private void OnCloseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
