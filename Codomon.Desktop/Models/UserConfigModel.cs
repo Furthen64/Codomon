@@ -31,6 +31,9 @@ public class UserConfigModel
     /// <summary>Default playback speed selected when the replay toolbar is first shown.</summary>
     public double DefaultReplaySpeed { get; set; } = 1.0;
 
+    /// <summary>Whether the Dev Console should auto-open after a workspace is available.</summary>
+    public bool AutoStartDevConsole { get; set; } = false;
+
     // ── Graph auto-align defaults ───────────────────────────────────────────
 
     /// <summary>

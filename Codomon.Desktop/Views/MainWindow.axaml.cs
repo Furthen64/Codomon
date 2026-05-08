@@ -9,7 +9,9 @@ using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Codomon.Desktop.Views;
@@ -103,6 +105,7 @@ public partial class MainWindow : Window
     private DateTimeOffset _lastLiveTimelineRebuild = DateTimeOffset.MinValue;
     private bool _firstRunConfigCheckDone;
     private bool _updatingAutoAlignPreset;
+    private bool _devConsoleAutoOpenedThisSession;
 
     // Tracks the currently active navigation tab.
     private string _activeNavTab = "Monitor";
@@ -133,6 +136,8 @@ public partial class MainWindow : Window
         // Apply initial nav tab state.
         UpdateNavTabStyles();
         UpdateWorkspaceNameDisplay();
+        SetupAnalyzePanel();
+        RefreshAnalyzePanel();
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
@@ -159,16 +164,23 @@ public partial class MainWindow : Window
 
     private async void OnWindowOpened(object? sender, EventArgs e)
     {
-        if (_firstRunConfigCheckDone) return;
-        _firstRunConfigCheckDone = true;
+        if (!_firstRunConfigCheckDone)
+        {
+            _firstRunConfigCheckDone = true;
 
-        if (UserConfigService.Exists()) return;
+            if (!UserConfigService.Exists())
+            {
+                var openSettings = await ShowInitialUserConfigPromptAsync();
+                if (openSettings)
+                {
+                    var dialog = new UserSettingsDialog();
+                    await dialog.ShowDialog(this);
+                }
+            }
+        }
 
-        var openSettings = await ShowInitialUserConfigPromptAsync();
-        if (!openSettings) return;
-
-        var dialog = new UserSettingsDialog();
-        await dialog.ShowDialog(this);
+        TryAutoStartDevConsole();
+        RefreshAnalyzePanel();
     }
 
 
@@ -180,6 +192,7 @@ public partial class MainWindow : Window
             UpdateWindowTitle();
             UpdateWorkspaceNameDisplay();
             RefreshLiveMonitorPanel();
+            RefreshAnalyzePanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.Workspace))
         {
@@ -189,6 +202,7 @@ public partial class MainWindow : Window
             RefreshProfileComboBox();
             RefreshRoslynConnectionsPanel();
             UpdateWorkspaceNameDisplay();  // calls RefreshSidebar() internally
+            RefreshAnalyzePanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.Timeline))
         {
@@ -1629,6 +1643,8 @@ public partial class MainWindow : Window
                 _vm.Graph.Refresh(_vm.Workspace);
             }
         });
+
+        RefreshAnalyzePanel();
     }
 
     // ── LLM Summaries ─────────────────────────────────────────────────────────
@@ -1655,6 +1671,8 @@ public partial class MainWindow : Window
             summaryVm.SaveSettings();
             _vm.IsDirty = true;
         }
+
+        RefreshAnalyzePanel();
     }
 
     // ── Architecture Hypothesis ───────────────────────────────────────────────
@@ -1718,10 +1736,119 @@ public partial class MainWindow : Window
         AppLogger.Debug($"[Hypothesis] Apply-to-canvas flow finished. IsDirty={_vm.IsDirty}; Final System Map: {DescribeSystemMap(_vm.Workspace.SystemMap)}");
         SetupTreeView();
         RefreshSidebar();
+        RefreshAnalyzePanel();
     }
 
     private static string DescribeSystemMap(SystemMapModel map)
         => $"Systems={map.Systems.Count}, Modules={map.AllModules.Count()}, CodeNodes={map.AllCodeNodes.Count()}, ExternalSystems={map.ExternalSystems.Count}, Relationships={map.Relationships.Count}";
+
+    private void SetupAnalyzePanel()
+    {
+        var autoStartCheck = this.FindControl<CheckBox>("AnalyzeDevConsoleAutoStartCheckBox");
+        if (autoStartCheck != null)
+            autoStartCheck.IsChecked = UserConfigService.Load().AutoStartDevConsole;
+    }
+
+    private void RefreshAnalyzePanel()
+    {
+        var runScanStatus = this.FindControl<TextBlock>("AnalyzeRunScanStatusText");
+        var summariesBtn = this.FindControl<Button>("AnalyzeLlmSummariesBtn");
+        var summariesAvailability = this.FindControl<TextBlock>("AnalyzeLlmSummariesAvailabilityText");
+        var summariesStatus = this.FindControl<TextBlock>("AnalyzeLlmSummariesStatusText");
+        var architectureBtn = this.FindControl<Button>("AnalyzeArchitectureBtn");
+        var architectureAvailability = this.FindControl<TextBlock>("AnalyzeArchitectureAvailabilityText");
+        var architectureStatus = this.FindControl<TextBlock>("AnalyzeArchitectureStatusText");
+
+        if (!_vm.HasWorkspace || string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath))
+        {
+            if (runScanStatus != null) runScanStatus.Text = "No workspace loaded yet.";
+            if (summariesBtn != null) summariesBtn.IsEnabled = false;
+            if (summariesAvailability != null) summariesAvailability.Text = "Requires a completed scan.";
+            if (summariesStatus != null) summariesStatus.Text = "Open a workspace and run Scan first.";
+            if (architectureBtn != null) architectureBtn.IsEnabled = false;
+            if (architectureAvailability != null) architectureAvailability.Text = "Requires LLM summaries.";
+            if (architectureStatus != null) architectureStatus.Text = "Generate summaries to enable architecture synthesis.";
+            return;
+        }
+
+        var savedScans = RoslynScanService.ListSavedScans(_vm.WorkspaceFolderPath);
+        var hasSavedScan = savedScans.Count > 0;
+        var latestScanTime = hasSavedScan ? savedScans[0].ScanTime : (DateTime?)null;
+        var hasLoadedScanData = _vm.Workspace.SystemMap.AllCodeNodes.Any();
+
+        if (runScanStatus != null)
+        {
+            runScanStatus.Text = hasSavedScan
+                ? $"Saved scans: {savedScans.Count} · Last: {FormatTime(latestScanTime)} · Loaded: {(hasLoadedScanData ? "Yes" : "No")}"
+                : "No saved scans yet.";
+        }
+
+        if (summariesBtn != null) summariesBtn.IsEnabled = hasSavedScan;
+        if (summariesAvailability != null)
+            summariesAvailability.Text = hasSavedScan ? "Available (scan found)" : "Locked until a scan is completed.";
+
+        var summaries = LlmSummaryService.ListSummaries(_vm.WorkspaceFolderPath);
+        var summaryCount = summaries.Count;
+        var analyzedCsCount = GetLatestScanAnalyzedFileCount(_vm.WorkspaceFolderPath);
+        var completion = analyzedCsCount <= 0 ? 0 : Math.Clamp((int)Math.Round(summaryCount * 100.0 / analyzedCsCount), 0, 100);
+        var latestSummaryAt = summaries.Count > 0 ? summaries.Max(s => s.GeneratedAt) : (DateTime?)null;
+
+        if (summariesStatus != null)
+        {
+            var denominator = analyzedCsCount > 0 ? analyzedCsCount : summaryCount;
+            summariesStatus.Text = summaryCount == 0
+                ? "No summaries generated yet."
+                : $"Last: {FormatTime(latestSummaryAt)} · Coverage: {completion}% ({summaryCount}/{denominator})";
+        }
+
+        bool hasSummaries = summaryCount > 0;
+        if (architectureBtn != null) architectureBtn.IsEnabled = hasSummaries;
+        if (architectureAvailability != null)
+            architectureAvailability.Text = hasSummaries ? "Available (summaries found)" : "Locked until LLM summaries are generated.";
+
+        var hypotheses = ArchitectureHypothesisService.ListHypotheses(_vm.WorkspaceFolderPath);
+        var latestHypothesisAt = hypotheses.Count > 0 ? hypotheses.Max(h => h.CreatedAt) : (DateTime?)null;
+
+        if (architectureStatus != null)
+        {
+            architectureStatus.Text = hypotheses.Count == 0
+                ? "No architecture synthesis runs yet."
+                : $"Runs: {hypotheses.Count} · Last: {FormatTime(latestHypothesisAt)}";
+        }
+    }
+
+    private void TryAutoStartDevConsole()
+    {
+        if (_devConsoleAutoOpenedThisSession || !_vm.HasWorkspace) return;
+        if (!UserConfigService.Load().AutoStartDevConsole) return;
+
+        OpenDevConsole();
+        _devConsoleAutoOpenedThisSession = true;
+    }
+
+    private static string FormatTime(DateTime? value)
+        => value.HasValue ? value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "—";
+
+    private static int GetLatestScanAnalyzedFileCount(string workspaceFolderPath)
+    {
+        var scans = RoslynScanService.ListSavedScans(workspaceFolderPath);
+        if (scans.Count == 0) return 0;
+
+        try
+        {
+            using var stream = File.OpenRead(scans[0].FilePath);
+            using var doc = JsonDocument.Parse(stream);
+
+            if (!doc.RootElement.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array)
+                return 0;
+
+            return files.GetArrayLength();
+        }
+        catch
+        {
+            return 0;
+        }
+    }
 
     // ── Connections panel (Roslyn-origin connections) ─────────────────────────
 
@@ -1829,6 +1956,9 @@ public partial class MainWindow : Window
     // ── Dev Console ───────────────────────────────────────────────────────────
 
     private void OnDevConsoleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => OpenDevConsole();
+
+    private void OpenDevConsole()
     {
         if (_devConsole != null)
         {
@@ -1841,10 +1971,21 @@ public partial class MainWindow : Window
         _devConsole.Show(this);
     }
 
+    private void OnDevConsoleAutoStartChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var autoStartCheck = this.FindControl<CheckBox>("AnalyzeDevConsoleAutoStartCheckBox");
+        if (autoStartCheck == null) return;
+
+        var config = UserConfigService.Load();
+        config.AutoStartDevConsole = autoStartCheck.IsChecked == true;
+        UserConfigService.Save(config);
+    }
+
     private async void OnSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var dialog = new UserSettingsDialog();
         await dialog.ShowDialog(this);
+        RefreshAnalyzePanel();
     }
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
