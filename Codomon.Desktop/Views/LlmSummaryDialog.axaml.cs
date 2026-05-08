@@ -583,9 +583,8 @@ public partial class LlmSummaryDialog : Window
         _vm.RefreshEffectiveSettingsFromConfig();
         SyncLlmSetupGuardrail();
 
-        _vm.StatusMessage = IsLlmSetupConfigured()
-            ? "Settings refreshed from main Settings."
-            : "LLM setup is incomplete. Configure endpoint and model in Settings.";
+        if (IsLlmSetupConfigured())
+            _vm.StatusMessage = "Settings refreshed from main Settings.";
         SyncStatusText();
     }
 
