@@ -116,18 +116,97 @@
             </StackPanel>
           </Border>
 
-          <!-- Split: progress log (left) | history (right) -->
+          <!-- Telemetry card — shown while running or after completion -->
+          <Border x:Name="TelemetryCard" DockPanel.Dock="Top"
+                  Background="#0F1A28" BorderBrush="#2A3F5A" BorderThickness="0,0,0,1"
+                  Padding="12,8" IsVisible="False">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+
+              <!-- Left: batch / summary / time -->
+              <StackPanel Grid.Column="0" Spacing="2">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <TextBlock x:Name="TelemetryStateLabel"
+                             Text="Running" FontWeight="SemiBold"
+                             Foreground="#AADDCC" FontSize="12"/>
+                  <TextBlock x:Name="TelemetryBatchLabel"
+                             Text="Batch — / —" Foreground="#88AABB" FontSize="11"/>
+                  <TextBlock x:Name="TelemetrySummariesLabel"
+                             Text="Summaries: —" Foreground="#88AABB" FontSize="11"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <TextBlock x:Name="TelemetryElapsedLabel"
+                             Text="Elapsed: —" Foreground="#667788" FontSize="11"/>
+                  <TextBlock x:Name="TelemetryEtaLabel"
+                             Text="ETA: —" Foreground="#667788" FontSize="11"/>
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Right: token counts / speed -->
+              <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <TextBlock x:Name="TelemetryPromptTokLabel"
+                             Text="Prompt tok: —" Foreground="#667788" FontSize="11"/>
+                  <TextBlock x:Name="TelemetryOutputTokLabel"
+                             Text="Output tok: —" Foreground="#667788" FontSize="11"/>
+                </StackPanel>
+                <TextBlock x:Name="TelemetrySpeedLabel"
+                           Text="Speed: —" Foreground="#556677" FontSize="10"
+                           HorizontalAlignment="Right"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Split: progress log (left) | history + batch log (right) -->
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="260" MinWidth="160"/>
+              <ColumnDefinition Width="280" MinWidth="180"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Progress log -->
+            <!-- Left: Progress log + Live Output expander -->
             <DockPanel Grid.Column="0">
               <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
                 <TextBlock Text="Progress" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
               </Border>
+
+              <!-- Live LLM Output expander — collapsed by default -->
+              <Expander x:Name="LiveOutputExpander"
+                        DockPanel.Dock="Bottom"
+                        Header="Live LLM Output"
+                        IsExpanded="False"
+                        Background="#0A1018"
+                        Foreground="#AABBCC"
+                        BorderBrush="#2A3F5A"
+                        BorderThickness="0,1,0,0">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8"
+                              Margin="8,4,8,0">
+                    <TextBlock x:Name="LiveOutputCharCountLabel"
+                               Text="0 chars" Foreground="#556677" FontSize="10"/>
+                    <Button x:Name="LiveOutputCopyButton" Content="Copy" Padding="6,2"
+                            FontSize="10" Click="OnCopyLiveOutputClick"/>
+                  </StackPanel>
+                  <Border Margin="8,4" MaxHeight="160"
+                          Background="#070D14" BorderBrush="#2A3F5A" BorderThickness="1"
+                          CornerRadius="3">
+                    <ScrollViewer x:Name="LiveOutputScroll"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                      <TextBlock x:Name="LiveOutputText"
+                                 FontFamily="Monospace" FontSize="10"
+                                 Foreground="#AABBCC"
+                                 TextWrapping="Wrap"
+                                 Margin="6,4"/>
+                    </ScrollViewer>
+                  </Border>
+                </DockPanel>
+              </Expander>
+
+              <!-- Progress log -->
               <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" Margin="8">
                 <ListBox x:Name="ProgressListBox"
                          Background="Transparent"
@@ -137,10 +216,25 @@
               </Border>
             </DockPanel>
 
-            <!-- Hypothesis history -->
+            <!-- Right: Batch log + Hypothesis history -->
             <Border Grid.Column="1" BorderBrush="#2A3F5A" BorderThickness="1,0,0,0">
               <DockPanel>
-                <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
+
+                <!-- Batch log -->
+                <DockPanel DockPanel.Dock="Top">
+                  <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435"
+                          BorderBrush="#2A3F5A" BorderThickness="0,0,0,1">
+                    <TextBlock Text="Batch Log" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+                  </Border>
+                  <ListBox x:Name="BatchLogListBox"
+                           Background="Transparent"
+                           MaxHeight="180"
+                           ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                </DockPanel>
+
+                <!-- Hypothesis history -->
+                <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435"
+                        BorderBrush="#2A3F5A" BorderThickness="0,1,0,1">
                   <TextBlock Text="History" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
                 </Border>
                 <ListBox x:Name="HistoryListBox"

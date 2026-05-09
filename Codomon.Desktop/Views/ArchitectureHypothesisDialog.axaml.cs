@@ -41,10 +41,28 @@ public partial class ArchitectureHypothesisDialog : Window
                 Dispatcher.UIThread.Post(RebuildResultTabs);
             else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.HasCanvasChanges))
                 SyncApplyToCanvasButton();
+            else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.SynthesisState))
+                SyncSynthesisState();
+            else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.LiveOutput))
+                SyncLiveOutput();
+            else if (e.PropertyName
+                is nameof(ArchitectureHypothesisViewModel.CurrentBatch)
+                or nameof(ArchitectureHypothesisViewModel.TotalBatches)
+                or nameof(ArchitectureHypothesisViewModel.ProcessedSummaries)
+                or nameof(ArchitectureHypothesisViewModel.TotalSummaries)
+                or nameof(ArchitectureHypothesisViewModel.TotalPromptTokens)
+                or nameof(ArchitectureHypothesisViewModel.TotalGeneratedTokens)
+                or nameof(ArchitectureHypothesisViewModel.ElapsedFormatted)
+                or nameof(ArchitectureHypothesisViewModel.EtaFormatted)
+                or nameof(ArchitectureHypothesisViewModel.GenerationSpeed))
+                SyncTelemetryCard();
         };
 
         _vm.ProgressMessages.CollectionChanged += (_, _) =>
             Dispatcher.UIThread.Post(ScrollProgressToBottom);
+
+        _vm.BatchLog.CollectionChanged += (_, _) =>
+            Dispatcher.UIThread.Post(RebuildBatchLog);
 
         _vm.SavedHypotheses.CollectionChanged += (_, _) =>
             Dispatcher.UIThread.Post(RebuildHistoryList);
@@ -212,6 +230,158 @@ public partial class ArchitectureHypothesisDialog : Window
         var cancelBtn = this.FindControl<Button>("CancelButton");
         if (runBtn    != null) runBtn.IsEnabled    = !_vm.IsRunning;
         if (cancelBtn != null) cancelBtn.IsEnabled =  _vm.IsRunning;
+
+        if (_vm.IsRunning)
+        {
+            var card = this.FindControl<Border>("TelemetryCard");
+            if (card != null) card.IsVisible = true;
+        }
+    }
+
+    private void SyncSynthesisState()
+    {
+        var label = this.FindControl<TextBlock>("TelemetryStateLabel");
+        if (label != null)
+        {
+            label.Text = _vm.SynthesisStateLabel;
+            label.Foreground = _vm.SynthesisState switch
+            {
+                SynthesisState.Completed             => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88CC88")),
+                SynthesisState.CompletedWithWarnings => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#CCAA44")),
+                SynthesisState.Failed                => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#CC6666")),
+                SynthesisState.Cancelled             => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#AAAAAA")),
+                _                                    => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#AADDCC")),
+            };
+        }
+
+        // Ensure the telemetry card is visible once synthesis has started.
+        var card = this.FindControl<Border>("TelemetryCard");
+        if (card != null && _vm.SynthesisState != SynthesisState.Idle)
+            card.IsVisible = true;
+    }
+
+    private void SyncTelemetryCard()
+    {
+        var batchLbl   = this.FindControl<TextBlock>("TelemetryBatchLabel");
+        var summLbl    = this.FindControl<TextBlock>("TelemetrySummariesLabel");
+        var elapsedLbl = this.FindControl<TextBlock>("TelemetryElapsedLabel");
+        var etaLbl     = this.FindControl<TextBlock>("TelemetryEtaLabel");
+        var promptLbl  = this.FindControl<TextBlock>("TelemetryPromptTokLabel");
+        var outputLbl  = this.FindControl<TextBlock>("TelemetryOutputTokLabel");
+        var speedLbl   = this.FindControl<TextBlock>("TelemetrySpeedLabel");
+
+        if (batchLbl   != null) batchLbl.Text   = $"Batch {_vm.CurrentBatch} / {_vm.TotalBatches}";
+        if (summLbl    != null) summLbl.Text     = $"Summaries: {_vm.ProcessedSummaries} / {_vm.TotalSummaries}";
+        if (elapsedLbl != null) elapsedLbl.Text  = $"Elapsed: {_vm.ElapsedFormatted}";
+        if (etaLbl     != null) etaLbl.Text      = !string.IsNullOrEmpty(_vm.EtaFormatted) ? $"ETA: {_vm.EtaFormatted}" : "ETA: —";
+        if (promptLbl  != null) promptLbl.Text   = $"Prompt tok: {_vm.TotalPromptTokens:N0}";
+        if (outputLbl  != null) outputLbl.Text   = $"Output tok: {_vm.TotalGeneratedTokens:N0}";
+        if (speedLbl   != null) speedLbl.Text    = _vm.GenerationSpeed > 0 ? $"Speed: {_vm.GenerationSpeed:F0} tok/s" : "Speed: —";
+    }
+
+    private void SyncLiveOutput()
+    {
+        var textBlock = this.FindControl<TextBlock>("LiveOutputText");
+        if (textBlock != null)
+            textBlock.Text = _vm.LiveOutput;
+
+        var countLabel = this.FindControl<TextBlock>("LiveOutputCharCountLabel");
+        if (countLabel != null)
+            countLabel.Text = $"{_vm.LiveOutput.Length:N0} chars";
+
+        // Auto-scroll the live output.
+        var scroll = this.FindControl<ScrollViewer>("LiveOutputScroll");
+        scroll?.ScrollToEnd();
+    }
+
+    private void RebuildBatchLog()
+    {
+        var listBox = this.FindControl<ListBox>("BatchLogListBox");
+        if (listBox == null) return;
+
+        listBox.Items.Clear();
+
+        if (_vm.BatchLog.Count == 0)
+        {
+            listBox.Items.Add(new ListBoxItem
+            {
+                IsEnabled = false,
+                Content = new TextBlock
+                {
+                    Text = "No batches yet.",
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677")),
+                    FontSize = 11,
+                    Margin = new Avalonia.Thickness(6, 4)
+                }
+            });
+            return;
+        }
+
+        foreach (var entry in _vm.BatchLog)
+        {
+            var statusColor = entry.Status switch
+            {
+                "Completed" => "#88BB88",
+                "Warning"   => "#CCAA44",
+                "Failed"    => "#CC6666",
+                "Split"     => "#AABBCC",
+                "Retrying"  => "#AABBDD",
+                _           => "#778899",
+            };
+
+            var panel = new StackPanel
+            {
+                Spacing = 1,
+                Margin = new Avalonia.Thickness(6, 3)
+            };
+
+            var line1 = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8 };
+            line1.Children.Add(new TextBlock
+            {
+                Text = entry.StatusIcon,
+                Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(statusColor)),
+                FontSize = 11,
+                Width = 14
+            });
+            line1.Children.Add(new TextBlock
+            {
+                Text = entry.BatchLabel,
+                Foreground = Avalonia.Media.Brushes.LightGray,
+                FontSize = 11,
+                FontWeight = Avalonia.Media.FontWeight.SemiBold
+            });
+            if (!string.IsNullOrEmpty(entry.Duration))
+                line1.Children.Add(new TextBlock
+                {
+                    Text = entry.Duration,
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#667788")),
+                    FontSize = 10
+                });
+            panel.Children.Add(line1);
+
+            if (entry.PromptTokens > 0 || entry.OutputTokens > 0)
+            {
+                panel.Children.Add(new TextBlock
+                {
+                    Text = $"  {entry.SummaryCount} summaries · {entry.PromptTokens:N0}→{entry.OutputTokens:N0} tok",
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677")),
+                    FontSize = 10
+                });
+            }
+
+            listBox.Items.Add(new ListBoxItem
+            {
+                Tag = entry,
+                Padding = new Avalonia.Thickness(2, 2),
+                Content = panel
+            });
+        }
+    }
+
+    private void OnCopyLiveOutputClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_vm.LiveOutput))
+            Clipboard?.SetTextAsync(_vm.LiveOutput);
     }
 
     private void ScrollProgressToBottom()
