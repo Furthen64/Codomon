@@ -8,6 +8,46 @@
 
   <DockPanel LastChildFill="True">
 
+    <!-- Classic Menu Bar -->
+    <Menu DockPanel.Dock="Top" Background="#161E2C" Padding="2,0">
+
+      <!-- File menu -->
+      <MenuItem Header="_File" Padding="8,4">
+        <MenuItem Header="New Workspace"       Click="OnNewWorkspaceClick"/>
+        <MenuItem Header="Open Workspace…"     Click="OnOpenWorkspaceClick"/>
+        <Separator/>
+        <MenuItem Header="Save"                Click="OnSaveWorkspaceClick"/>
+        <MenuItem Header="Save As…"            Click="OnSaveAsWorkspaceClick"/>
+        <MenuItem Header="Load Autosave…"      Click="OnLoadAutosaveClick"/>
+        <Separator/>
+        <MenuItem Header="New Profile"         Click="OnNewProfileClick"/>
+        <MenuItem Header="Rename Profile"      Click="OnRenameProfileClick"/>
+        <MenuItem Header="Duplicate Profile"   Click="OnDuplicateProfileClick"/>
+        <MenuItem Header="Delete Profile"      Click="OnDeleteProfileClick"/>
+        <Separator/>
+        <MenuItem Header="E_xit"               Click="OnExitClick"/>
+      </MenuItem>
+
+      <!-- Tools menu -->
+      <MenuItem Header="_Tools" Padding="8,4">
+        <MenuItem Header="Roslyn Scan…"              Click="OnScanClick"/>
+        <MenuItem Header="LLM Summaries…"            Click="OnSummariesClick"/>
+        <MenuItem Header="Architecture Hypothesis…"  Click="OnHypothesisClick"/>
+        <Separator/>
+        <MenuItem Header="Locator…"                  Click="OnLocatorClick"/>
+        <Separator/>
+        <MenuItem Header="Dev Console"               Click="OnDevConsoleClick"/>
+        <Separator/>
+        <MenuItem Header="_Preferences…"             Click="OnSettingsClick"/>
+      </MenuItem>
+
+      <!-- Help menu -->
+      <MenuItem Header="_Help" Padding="8,4">
+        <MenuItem Header="About codomon"             Click="OnAboutClick"/>
+      </MenuItem>
+
+    </Menu>
+
     <!-- Top Toolbar — slim nav bar -->
     <Border DockPanel.Dock="Top" Background="#1E2A3A" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
       <Grid Height="44">
