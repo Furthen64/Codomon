@@ -457,129 +457,128 @@
         <!-- ── Content area (all tab panels sit here) ── -->
         <Grid Grid.Column="1">
 
-      <!-- ── Design tab placeholder ─── -->
-      <Grid x:Name="DesignPanel" IsVisible="False" Background="#0F141E">
-        <TextBlock Text="Design" FontSize="24" Foreground="#4A6A8A"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-      </Grid>
+        <!-- ── Design tab placeholder ─── -->
+        <Grid x:Name="DesignPanel" IsVisible="False" Background="#0F141E">
+          <TextBlock Text="Design" FontSize="24" Foreground="#4A6A8A"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
 
-      <!-- ── Analyze tab panel (devtools) ─── -->
-      <Grid x:Name="ScanPanel" IsVisible="False" Background="#0F141E">
-        <DockPanel Margin="40,32">
-          <TextBlock DockPanel.Dock="Top" Text="Analyze" FontSize="18" FontWeight="Bold"
-                     Foreground="#AABBCC" Margin="0,0,0,6"/>
-          <TextBlock DockPanel.Dock="Top" Text="Run analysis in order: Scan → LLM Summaries → Architecture. Replay Logs and Dev Console are always available."
-                     FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,16"/>
+        <!-- ── Analyze tab panel (devtools) ─── -->
+        <Grid x:Name="ScanPanel" IsVisible="False" Background="#0F141E">
+          <DockPanel Margin="40,32">
+            <TextBlock DockPanel.Dock="Top" Text="Analyze" FontSize="18" FontWeight="Bold"
+                      Foreground="#AABBCC" Margin="0,0,0,6"/>
+            <TextBlock DockPanel.Dock="Top" Text="Run analysis in order: Scan → LLM Summaries → Architecture. Replay Logs and Dev Console are always available."
+                      FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,16"/>
 
-          <StackPanel Spacing="10" DockPanel.Dock="Top">
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-              <Button x:Name="AnalyzeRunScanBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Run Scan" Click="OnScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
-              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
-              <TextBlock x:Name="AnalyzeRunScanStatusText" Grid.Column="1" Grid.Row="1"
-                         Text="" FontSize="10" Foreground="#556677"/>
-            </Grid>
+            <StackPanel Spacing="10" DockPanel.Dock="Top">
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <Button x:Name="AnalyzeRunScanBtn" Grid.Column="0" Grid.RowSpan="2"
+                        Content="Run Scan" Click="OnScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+                <TextBlock x:Name="AnalyzeRunScanStatusText" Grid.Column="1" Grid.Row="1"
+                          Text="" FontSize="10" Foreground="#556677"/>
+              </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-              <Button x:Name="AnalyzeLlmSummariesBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
-              <TextBlock x:Name="AnalyzeLlmSummariesAvailabilityText" Grid.Column="1" Grid.Row="0"
-                         Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
-              <TextBlock x:Name="AnalyzeLlmSummariesStatusText" Grid.Column="1" Grid.Row="1"
-                         Text="" FontSize="10" Foreground="#556677"/>
-            </Grid>
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <Button x:Name="AnalyzeLlmSummariesBtn" Grid.Column="0" Grid.RowSpan="2"
+                        Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                <TextBlock x:Name="AnalyzeLlmSummariesAvailabilityText" Grid.Column="1" Grid.Row="0"
+                          Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+                <TextBlock x:Name="AnalyzeLlmSummariesStatusText" Grid.Column="1" Grid.Row="1"
+                          Text="" FontSize="10" Foreground="#556677"/>
+              </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-              <Button x:Name="AnalyzeArchitectureBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Architecture" Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
-              <TextBlock x:Name="AnalyzeArchitectureAvailabilityText" Grid.Column="1" Grid.Row="0"
-                         Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
-              <TextBlock x:Name="AnalyzeArchitectureStatusText" Grid.Column="1" Grid.Row="1"
-                         Text="" FontSize="10" Foreground="#556677"/>
-            </Grid>
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <Button x:Name="AnalyzeArchitectureBtn" Grid.Column="0" Grid.RowSpan="2"
+                        Content="Architecture" Click="OnHypothesisClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                <TextBlock x:Name="AnalyzeArchitectureAvailabilityText" Grid.Column="1" Grid.Row="0"
+                          Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+                <TextBlock x:Name="AnalyzeArchitectureStatusText" Grid.Column="1" Grid.Row="1"
+                          Text="" FontSize="10" Foreground="#556677"/>
+              </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-              <Button x:Name="AnalyzeReplayLogsBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Replay Logs" Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
-              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
-              <TextBlock Grid.Column="1" Grid.Row="1" Text="Import and replay log files." FontSize="10" Foreground="#556677"/>
-            </Grid>
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <Button x:Name="AnalyzeReplayLogsBtn" Grid.Column="0" Grid.RowSpan="2"
+                        Content="Replay Logs" Click="OnImportLogClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+                <TextBlock Grid.Column="1" Grid.Row="1" Text="Import and replay log files." FontSize="10" Foreground="#556677"/>
+              </Grid>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-              <Button x:Name="AnalyzeDevConsoleBtn" Grid.Column="0" Grid.RowSpan="2"
-                      Content="Dev Console" Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
-              <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
-              <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <TextBlock Text="Open diagnostics window." FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
-                <CheckBox x:Name="AnalyzeDevConsoleAutoStartCheckBox" Content="Autostart"
-                          FontSize="10" Foreground="#AABBCC"
-                          Checked="OnDevConsoleAutoStartChanged"
-                          Unchecked="OnDevConsoleAutoStartChanged"/>
-              </StackPanel>
-            </Grid>
-          </StackPanel>
-        </DockPanel>
-      </Grid>
-
-      <!-- ── Docs tab placeholder ─── -->
-      <Grid x:Name="DocsPanel" IsVisible="False" Background="#0F141E">
-        <TextBlock Text="Docs" FontSize="24" Foreground="#4A6A8A"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-      </Grid>
-
-      <!-- ── 1-column workspace layout ─── -->
-      <Grid x:Name="WorkspaceGrid" IsVisible="False">
-
-        <!-- Center Panel: Graph / System Map tabs -->
-        <Border Background="#0F141E" ClipToBounds="True">
-          <TabControl x:Name="CenterTabControl"
-                      SelectionChanged="OnCenterTabSelectionChanged"
-                      Background="Transparent"
-                      BorderThickness="0,0,0,1"
-                      BorderBrush="#2A3F5A">
-            <TabItem Header="System Map">
-              <ContentControl x:Name="SystemMapHost"
-                              HorizontalContentAlignment="Stretch"
-                              VerticalContentAlignment="Stretch"/>
-            </TabItem>
-            <TabItem Header="Graph">
-              <ContentControl x:Name="CanvasHost"
-                              HorizontalContentAlignment="Stretch"
-                              VerticalContentAlignment="Stretch"/>
-            </TabItem>
-          </TabControl>
-        </Border>
-
-      </Grid>
-
-      <!-- ── Welcome / Recent Workspaces overlay ─── -->
-      <Grid x:Name="WelcomeOverlay" Background="#0F141E" IsVisible="True">
-        <DockPanel Margin="60,40">
-
-          <!-- Header row -->
-          <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,28">
-            <TextBlock Text="codomon" FontSize="32" FontWeight="Bold" Foreground="#AABBCC"/>
-            <TextBlock Text="Recent Workspaces" FontSize="20" Foreground="#778899"/>
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,12,0,0">
-              <Button Content="✚  New Workspace"  Click="OnNewWorkspaceClick"  Padding="14,6" FontSize="13"/>
-              <Button Content="📂  Open Workspace" Click="OnOpenWorkspaceClick" Padding="14,6" FontSize="13"/>
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <Button x:Name="AnalyzeDevConsoleBtn" Grid.Column="0" Grid.RowSpan="2"
+                        Content="Dev Console" Click="OnDevConsoleClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+                <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                  <TextBlock Text="Open diagnostics window." FontSize="10" Foreground="#556677" VerticalAlignment="Center"/>
+                  <CheckBox x:Name="AnalyzeDevConsoleAutoStartCheckBox" Content="Autostart"
+                            FontSize="10" Foreground="#AABBCC"
+                            IsCheckedChanged="OnDevConsoleAutoStartChanged"/>
+                </StackPanel>
+              </Grid>
             </StackPanel>
-          </StackPanel>
+          </DockPanel>
+        </Grid>
 
-          <!-- Separator -->
-          <Border DockPanel.Dock="Top" Height="1" Background="#2A3F5A" Margin="0,0,0,16"/>
+        <!-- ── Docs tab placeholder ─── -->
+        <Grid x:Name="DocsPanel" IsVisible="False" Background="#0F141E">
+          <TextBlock Text="Docs" FontSize="24" Foreground="#4A6A8A"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
 
-          <!-- Recent workspaces list -->
-          <ScrollViewer>
-            <ListBox x:Name="RecentWorkspacesListBox"
-                     Background="Transparent"
-                     SelectionChanged="OnRecentWorkspaceSelected">
-              <!-- Items populated from code-behind -->
-            </ListBox>
-          </ScrollViewer>
+        <!-- ── 1-column workspace layout ─── -->
+        <Grid x:Name="WorkspaceGrid" IsVisible="False">
 
-        </DockPanel>
-      </Grid>
+          <!-- Center Panel: Graph / System Map tabs -->
+          <Border Background="#0F141E" ClipToBounds="True">
+            <TabControl x:Name="CenterTabControl"
+                        SelectionChanged="OnCenterTabSelectionChanged"
+                        Background="Transparent"
+                        BorderThickness="0,0,0,1"
+                        BorderBrush="#2A3F5A">
+              <TabItem Header="System Map">
+                <ContentControl x:Name="SystemMapHost"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"/>
+              </TabItem>
+              <TabItem Header="Graph">
+                <ContentControl x:Name="CanvasHost"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"/>
+              </TabItem>
+            </TabControl>
+          </Border>
+
+        </Grid>
+
+        <!-- ── Welcome / Recent Workspaces overlay ─── -->
+        <Grid x:Name="WelcomeOverlay" Background="#0F141E" IsVisible="True">
+          <DockPanel Margin="60,40">
+
+            <!-- Header row -->
+            <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,28">
+              <TextBlock Text="codomon" FontSize="32" FontWeight="Bold" Foreground="#AABBCC"/>
+              <TextBlock Text="Recent Workspaces" FontSize="20" Foreground="#778899"/>
+              <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,12,0,0">
+                <Button Content="✚  New Workspace"  Click="OnNewWorkspaceClick"  Padding="14,6" FontSize="13"/>
+                <Button Content="📂  Open Workspace" Click="OnOpenWorkspaceClick" Padding="14,6" FontSize="13"/>
+              </StackPanel>
+            </StackPanel>
+
+            <!-- Separator -->
+            <Border DockPanel.Dock="Top" Height="1" Background="#2A3F5A" Margin="0,0,0,16"/>
+
+            <!-- Recent workspaces list -->
+            <ScrollViewer>
+              <ListBox x:Name="RecentWorkspacesListBox"
+                      Background="Transparent"
+                      SelectionChanged="OnRecentWorkspaceSelected">
+                <!-- Items populated from code-behind -->
+              </ListBox>
+            </ScrollViewer>
+
+          </DockPanel>
+        </Grid>
 
         </Grid><!-- end content area Grid.Column="1" -->
 
