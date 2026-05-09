@@ -95,6 +95,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     private string _elapsedFormatted = string.Empty;
     private string _etaFormatted = string.Empty;
     private double _generationSpeed;
+    private string _tokenBudgetWarning = string.Empty;
 
     public ArchitectureHypothesisViewModel(WorkspaceModel workspace, string workspaceFolderPath)
     {
@@ -227,6 +228,13 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         private set { _generationSpeed = value; OnPropertyChanged(); }
     }
 
+    /// <summary>Preflight warning when a batch approaches context limits.</summary>
+    public string TokenBudgetWarning
+    {
+        get => _tokenBudgetWarning;
+        private set { _tokenBudgetWarning = value; OnPropertyChanged(); }
+    }
+
     /// <summary>Live output text streaming from the LLM during the current batch call.</summary>
     public string LiveOutput
     {
@@ -352,6 +360,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         ElapsedFormatted = string.Empty;
         EtaFormatted = string.Empty;
         GenerationSpeed = 0;
+        TokenBudgetWarning = string.Empty;
         _synthesisStartTime = DateTime.UtcNow;
         _averageBatchDuration = TimeSpan.Zero;
 
@@ -448,6 +457,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         // Update telemetry card counters.
         CurrentBatch = t.BatchNumber;
         TotalBatches = t.TotalBatches;
+        TokenBudgetWarning = t.PreflightWarning ?? string.Empty;
 
         // Accumulate token counts for completed batches.
         if (t.Status is "Completed" or "Warning" or "Failed")

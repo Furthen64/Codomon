@@ -56,6 +56,8 @@ public partial class ArchitectureHypothesisDialog : Window
                 or nameof(ArchitectureHypothesisViewModel.EtaFormatted)
                 or nameof(ArchitectureHypothesisViewModel.GenerationSpeed))
                 SyncTelemetryCard();
+            else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.TokenBudgetWarning))
+                SyncTokenBudgetWarning();
         };
 
         _vm.ProgressMessages.CollectionChanged += (_, _) =>
@@ -277,6 +279,16 @@ public partial class ArchitectureHypothesisDialog : Window
         if (promptLbl  != null) promptLbl.Text   = $"Prompt tok: {_vm.TotalPromptTokens:N0}";
         if (outputLbl  != null) outputLbl.Text   = $"Output tok: {_vm.TotalGeneratedTokens:N0}";
         if (speedLbl   != null) speedLbl.Text    = _vm.GenerationSpeed > 0 ? $"Speed: {_vm.GenerationSpeed:F0} tok/s" : "Speed: —";
+    }
+
+    private void SyncTokenBudgetWarning()
+    {
+        var warningPanel = this.FindControl<Border>("TokenBudgetWarningPanel");
+        var warningText = this.FindControl<TextBlock>("TokenBudgetWarningText");
+        if (warningText != null)
+            warningText.Text = _vm.TokenBudgetWarning;
+        if (warningPanel != null)
+            warningPanel.IsVisible = !string.IsNullOrWhiteSpace(_vm.TokenBudgetWarning);
     }
 
     private void SyncLiveOutput()
