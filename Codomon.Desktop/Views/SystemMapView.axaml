@@ -47,12 +47,12 @@
                           Padding="8,4"
                           ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
 
-                  <Button x:Name="SortAppsFromLibrariesButton"
-                          Content="Sort Apps from Libraries"
-                          Click="OnSortAppsFromLibrariesClick"
+                  <Button x:Name="SortAllButton"
+                          Content="Sort All"
+                          Click="OnSortAllClick"
                           HorizontalAlignment="Stretch"
                           Padding="8,4"
-                          ToolTip.Tip="Move app-type systems (Desktop, Web, Backend, etc.) to the top rows and class libraries to the bottom, with a separator between them."/>
+                          ToolTip.Tip="Sort all systems by kind sections: Desktop App first, then Backend Service, then Class Libraries."/>
 
                   <Button x:Name="ArrangeButton"
                           Content="Arrange"
