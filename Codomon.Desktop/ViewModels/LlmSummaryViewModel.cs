@@ -329,6 +329,28 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
             StatusMessage = "Generating summaries…";
         }
 
+        // Preflight: verify endpoint/model reachability before queuing per-file calls.
+        try
+        {
+            ReportProgress("Checking LLM connectivity before generation...");
+            var (llmReachable, connectionMessage) = await LlmSummaryService.TestConnectionAsync(
+                ApiEndpoint, ModelName, ct);
+            if (!llmReachable)
+                throw new InvalidOperationException($"LLM preflight failed: {connectionMessage}");
+            ReportProgress("LLM connectivity verified.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            ReportProgress($"  ✖ {ex.Message}");
+            AppLogger.Error($"[LLM] GenerateSummaries preflight failed: {ex.GetType().Name}: {ex.Message}");
+            StatusMessage = $"Cannot connect to LLM: {ex.Message}";
+            return;
+        }
+
         var sourcePath = _workspace.SourceProjectPath;
         var searchRoot = Directory.Exists(sourcePath)
             ? sourcePath
