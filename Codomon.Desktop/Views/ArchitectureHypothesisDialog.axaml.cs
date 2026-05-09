@@ -13,7 +13,7 @@ namespace Codomon.Desktop.Views;
 
 /// <summary>
 /// Architecture Hypothesis dialog.
-/// Five tabs: Setup (prompt editor), Run (synthesis + history), Systems, High-Value Nodes, Accept.
+/// Five tabs: Setup - Run - Systems - High-Value Nodes - Accept.
 /// </summary>
 public partial class ArchitectureHypothesisDialog : Window
 {
