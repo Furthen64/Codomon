@@ -68,6 +68,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private GraphRenderMode _renderMode = GraphRenderMode.SystemMap;
     private string? _moduleSystemId;
     private string? _codeNodeModuleId;
+    private int _autoAlignRequestToken;
     private readonly Dictionary<string, Point> _savedPositions = new(StringComparer.Ordinal);
     private string _breadcrumbSystemLabel = "System Map";
     private string _breadcrumbModuleLabel = "Module";
@@ -164,6 +165,12 @@ public class GraphViewModel : INotifyPropertyChanged
     public bool CanNavigateToCodeNodes => !string.IsNullOrWhiteSpace(_breadcrumbModuleId);
     public string? BreadcrumbSystemId => _breadcrumbSystemId;
     public string? BreadcrumbModuleId => _breadcrumbModuleId;
+
+    public int AutoAlignRequestToken
+    {
+        get => _autoAlignRequestToken;
+        private set { _autoAlignRequestToken = value; OnPropertyChanged(); }
+    }
 
     public NodeViewModel? SelectedNode
     {
@@ -305,6 +312,7 @@ public class GraphViewModel : INotifyPropertyChanged
         _moduleSystemId = systemId;
         _codeNodeModuleId = null;
         ApplyFilters();
+        AutoAlignRequestToken++;
     }
 
     /// <summary>
@@ -318,6 +326,7 @@ public class GraphViewModel : INotifyPropertyChanged
         _moduleSystemId = null;
         _codeNodeModuleId = moduleId;
         ApplyFilters();
+        AutoAlignRequestToken++;
     }
 
     public void SelectNode(NodeViewModel? node)
@@ -912,6 +921,8 @@ public class GraphViewModel : INotifyPropertyChanged
             for (int pass = 0; pass < passes; pass++)
                 OrderLayersByBarycenter(layers, predecessors, successors, sweeps);
 
+            MoveLeafNodesToRightmostLayer(layers, successors);
+
             double componentBottom = componentY;
 
             for (int col = 0; col < layers.Count; col++)
@@ -1468,6 +1479,28 @@ public class GraphViewModel : INotifyPropertyChanged
             layers[depth[node]].Add(node);
 
         return layers;
+    }
+
+
+    private static void MoveLeafNodesToRightmostLayer(
+        List<List<NodeViewModel>> layers,
+        IReadOnlyDictionary<NodeViewModel, List<NodeViewModel>> successors)
+    {
+        if (layers.Count <= 1)
+            return;
+
+        var leafNodes = layers
+            .SelectMany(layer => layer)
+            .Where(node => successors[node].Count == 0)
+            .ToHashSet();
+
+        if (leafNodes.Count == 0)
+            return;
+
+        foreach (var layer in layers)
+            layer.RemoveAll(leafNodes.Contains);
+
+        layers[^1].AddRange(leafNodes);
     }
 
     private static void RemoveEmptyLayers(List<List<NodeViewModel>> layers)
