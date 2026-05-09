@@ -2004,6 +2004,53 @@ public partial class MainWindow : Window
         RefreshAnalyzePanel();
     }
 
+    private void OnExitClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Close();
+
+    private async void OnAboutClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var dialog = new Window
+        {
+            Title = "About codomon",
+            Width = 340,
+            Height = 180,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
+        };
+
+        var closeBtn = new Button { Content = "Close", Padding = new Avalonia.Thickness(20, 4), IsDefault = true };
+        closeBtn.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(24, 20),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = $"codomon {BuildInfo.AppVersion}", FontSize = 16, FontWeight = Avalonia.Media.FontWeight.Bold, Foreground = Avalonia.Media.Brushes.White },
+                new TextBlock { Text = $"Build: {BuildInfo.BuildDate}", FontSize = 12, Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88AABB")) },
+                new TextBlock { Text = "Architecture intelligence for software teams.", FontSize = 11, Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677")), TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, Children = { closeBtn } }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async void OnLocatorClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before using Locator.");
+            return;
+        }
+
+        var dialog = new LocatorWindow(_vm.Workspace, _vm.WorkspaceFolderPath);
+        await dialog.ShowDialog(this);
+    }
+
+
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (!_vm.IsDirty) return;

@@ -1,0 +1,117 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.LocatorWindow"
+        Title="Locator"
+        Width="760" Height="620"
+        MinWidth="540" MinHeight="420"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <StackPanel Spacing="2">
+        <TextBlock Text="Locator" FontSize="16" FontWeight="Bold" Foreground="White"/>
+        <TextBlock Text="Ask the LLM a plain-English question and let it search your architecture notes and summaries."
+                   FontSize="12" Foreground="#88AABB" TextWrapping="Wrap"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Bottom button bar -->
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button Content="Close" Click="OnCloseClick" Padding="16,6" DockPanel.Dock="Left"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <TextBlock x:Name="StatusText" Text="" Foreground="#88AABB" FontSize="11"
+                     VerticalAlignment="Center"/>
+          <Button x:Name="CancelButton" Content="⏹ Cancel" Click="OnCancelClick"
+                  Padding="12,6" IsEnabled="False"/>
+          <Button x:Name="AskButton" Content="🔍 Ask" Click="OnAskClick"
+                  Padding="16,6" Background="#1A3A5A" Foreground="White" IsEnabled="False"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Main content -->
+    <DockPanel Margin="0">
+
+      <!-- Requirements panel — docked at the top -->
+      <Border x:Name="RequirementsPanel" DockPanel.Dock="Top"
+              Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="0,0,0,1"
+              Padding="16,10">
+        <StackPanel Spacing="4">
+          <TextBlock Text="REQUIREMENTS" FontSize="9" FontWeight="Bold"
+                     Foreground="#4A6A8A" LetterSpacing="1"/>
+          <Grid ColumnDefinitions="16,*">
+            <TextBlock x:Name="LlmCheckMark"      Grid.Column="0" Text="○" Foreground="#556677" FontSize="12" VerticalAlignment="Center"/>
+            <TextBlock x:Name="LlmCheckLabel"     Grid.Column="1" Text="LLM configured (endpoint + model)"
+                       Foreground="#556677" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center"/>
+          </Grid>
+          <Grid ColumnDefinitions="16,*">
+            <TextBlock x:Name="SummaryCheckMark"  Grid.Column="0" Text="○" Foreground="#556677" FontSize="12" VerticalAlignment="Center"/>
+            <TextBlock x:Name="SummaryCheckLabel" Grid.Column="1" Text="Summaries produced"
+                       Foreground="#556677" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center"/>
+          </Grid>
+          <Grid ColumnDefinitions="16,*">
+            <TextBlock x:Name="ArchCheckMark"     Grid.Column="0" Text="○" Foreground="#556677" FontSize="12" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ArchCheckLabel"    Grid.Column="1" Text="Architecture notes produced"
+                       Foreground="#556677" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center"/>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Question input — docked at the top -->
+      <Border DockPanel.Dock="Top" Padding="16,12,16,0">
+        <StackPanel Spacing="6">
+          <TextBlock Text="Your question" Foreground="#AABBCC" FontWeight="SemiBold"/>
+          <TextBox x:Name="QuestionBox"
+                   AcceptsReturn="True"
+                   MinHeight="72"
+                   MaxHeight="140"
+                   FontSize="12"
+                   Background="#0F141E"
+                   Foreground="#CCDDEE"
+                   Watermark="e.g. Where in this codebase can the user expect to change settings for MQTT?"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   TextWrapping="Wrap"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Include summaries toggle -->
+      <Border DockPanel.Dock="Top" Padding="16,8,16,4">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <CheckBox x:Name="IncludeSummariesCheckBox" IsChecked="True"
+                    Content="Include summaries in context (uses more tokens)"
+                    Foreground="#88AABB" FontSize="11"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Divider -->
+      <Border DockPanel.Dock="Top" Height="1" Background="#1E2A3A" Margin="0,4,0,0"/>
+
+      <!-- Answer area -->
+      <DockPanel Margin="0">
+        <Border DockPanel.Dock="Top" Background="#1A2435" Padding="16,8"
+                BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+          <TextBlock Text="Answer" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+        </Border>
+        <Border Background="#0D1219" Margin="0">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                        Padding="16,12">
+            <TextBlock x:Name="AnswerText"
+                       Text="Ask a question above and click Ask."
+                       Foreground="#88AABB"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       LineHeight="20"/>
+          </ScrollViewer>
+        </Border>
+      </DockPanel>
+
+    </DockPanel>
+  </DockPanel>
+</Window>
