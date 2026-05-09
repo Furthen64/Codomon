@@ -382,9 +382,9 @@ public class MainViewModel : INotifyPropertyChanged
     {
         var workspace = await WorkspaceSerializer.CreateNewAsync(
             folderPath, workspaceName, sourceProjectPath, profileName, initialSystemNames);
-        HasWorkspace = true;
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
+        HasWorkspace = true;
         IsDirty = false;
         ClearSelection();
         StatusMessage = $"New workspace created: {folderPath}";
@@ -396,9 +396,9 @@ public class MainViewModel : INotifyPropertyChanged
     public async Task OpenWorkspaceAsync(string folderPath)
     {
         var workspace = await WorkspaceSerializer.LoadAsync(folderPath);
-        HasWorkspace = true;
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
+        HasWorkspace = true;
         IsDirty = false;
         ClearSelection();
         StatusMessage = $"Opened: {folderPath}";

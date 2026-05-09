@@ -204,6 +204,11 @@ public partial class MainWindow : Window
             UpdateWorkspaceNameDisplay();  // calls RefreshSidebar() internally
             RefreshAnalyzePanel();
         }
+        else if (e.PropertyName == nameof(MainViewModel.WorkspaceFolderPath))
+        {
+            UpdateWorkspaceNameDisplay();
+            RefreshAnalyzePanel();
+        }
         else if (e.PropertyName == nameof(MainViewModel.Timeline))
         {
             // A new workspace was loaded — replace the timeline control.
