@@ -337,7 +337,7 @@ public static class ArchitectureHypothesisService
                 "Hypothesis prompt template is empty. Open the Architecture dialog Setup tab and save a prompt first.");
 
         // Preflight: verify endpoint/model reachability before running many batched calls.
-        progress?.Report("Checking LLM connectivity before synthesis…");
+        progress?.Report("Checking LLM connectivity before synthesis...");
         var (llmReachable, llmMessage) = await LlmSummaryService.TestConnectionAsync(
             apiEndpoint, modelName, cancellationToken);
         if (!llmReachable)
