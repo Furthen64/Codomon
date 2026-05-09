@@ -1246,20 +1246,31 @@ public partial class SystemMapView : UserControl
     /// </summary>
     private void AddKindSeparators(Canvas canvas)
     {
-        static bool IsDesktopApp(SystemItemVm s) =>
-            string.Equals(s.KindLabel, nameof(SystemKind.DesktopApp), StringComparison.Ordinal);
-
-        static bool IsBackendService(SystemItemVm s) =>
-            string.Equals(s.KindLabel, nameof(SystemKind.BackendService), StringComparison.Ordinal);
-
-        static bool IsLibrary(SystemItemVm s) =>
-            string.Equals(s.KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal) || s.IsLibrary;
+        var desktopApps = _vm.Systems
+            .Where(SystemMapViewModel.IsDesktopAppKind)
+            .ToList();
+        var backendServices = _vm.Systems
+            .Where(s => SystemMapViewModel.IsBackendServiceKind(s) && !SystemMapViewModel.IsDesktopAppKind(s))
+            .ToList();
+        var classLibraries = _vm.Systems
+            .Where(s =>
+                SystemMapViewModel.IsLibraryOnlyKind(s) &&
+                !SystemMapViewModel.IsDesktopAppKind(s) &&
+                !SystemMapViewModel.IsBackendServiceKind(s))
+            .ToList();
+        var otherSystems = _vm.Systems
+            .Where(s =>
+                !SystemMapViewModel.IsDesktopAppKind(s) &&
+                !SystemMapViewModel.IsBackendServiceKind(s) &&
+                !SystemMapViewModel.IsLibraryOnlyKind(s))
+            .ToList();
 
         var sections = new[]
         {
-            new { Label = "DESKTOP APPS", Systems = _vm.Systems.Where(IsDesktopApp).ToList() },
-            new { Label = "BACKEND SERVICES", Systems = _vm.Systems.Where(s => IsBackendService(s) && !IsDesktopApp(s)).ToList() },
-            new { Label = "CLASS LIBRARIES", Systems = _vm.Systems.Where(s => IsLibrary(s) && !IsDesktopApp(s) && !IsBackendService(s)).ToList() }
+            new { Label = "DESKTOP APPS", Systems = desktopApps },
+            new { Label = "BACKEND SERVICES", Systems = backendServices },
+            new { Label = "CLASS LIBRARIES", Systems = classLibraries },
+            new { Label = "OTHER SYSTEMS", Systems = otherSystems }
         }
         .Where(s => s.Systems.Count > 0)
         .Select(s => new { s.Label, Systems = s.Systems, MinY = s.Systems.Min(item => item.Y) })

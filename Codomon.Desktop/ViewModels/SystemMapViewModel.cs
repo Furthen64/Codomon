@@ -749,26 +749,20 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// </summary>
     public List<(string Id, double X, double Y)> SortAll()
     {
-        static bool IsDesktopApp(SystemItemVm s) =>
-            string.Equals(s.KindLabel, nameof(SystemKind.DesktopApp), StringComparison.Ordinal);
-
-        static bool IsBackendService(SystemItemVm s) =>
-            string.Equals(s.KindLabel, nameof(SystemKind.BackendService), StringComparison.Ordinal);
-
         var desktopApps = _allSystems
-            .Where(IsDesktopApp)
+            .Where(IsDesktopAppKind)
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var backendServices = _allSystems
-            .Where(s => IsBackendService(s) && !IsDesktopApp(s))
+            .Where(s => IsBackendServiceKind(s) && !IsDesktopAppKind(s))
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var libraries = _allSystems
-            .Where(s => s.IsLibrary && !IsDesktopApp(s) && !IsBackendService(s))
+            .Where(s => IsLibraryOnlyKind(s) && !IsDesktopAppKind(s) && !IsBackendServiceKind(s))
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var others = _allSystems
-            .Where(s => !IsDesktopApp(s) && !IsBackendService(s) && !s.IsLibrary)
+            .Where(s => !IsDesktopAppKind(s) && !IsBackendServiceKind(s) && !IsLibraryOnlyKind(s))
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -795,6 +789,15 @@ public class SystemMapViewModel : INotifyPropertyChanged
         ApplyFilters();
         return updates;
     }
+
+    internal static bool IsDesktopAppKind(SystemItemVm s) =>
+        string.Equals(s.KindLabel, nameof(SystemKind.DesktopApp), StringComparison.Ordinal);
+
+    internal static bool IsBackendServiceKind(SystemItemVm s) =>
+        string.Equals(s.KindLabel, nameof(SystemKind.BackendService), StringComparison.Ordinal);
+
+    internal static bool IsLibraryOnlyKind(SystemItemVm s) =>
+        string.Equals(s.KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal) || s.IsLibrary;
 
     /// <summary>
     /// Sorts all system cards alphabetically by name and reassigns their grid positions
