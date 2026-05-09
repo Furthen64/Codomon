@@ -750,19 +750,19 @@ public class SystemMapViewModel : INotifyPropertyChanged
     public List<(string Id, double X, double Y)> SortAll()
     {
         var desktopApps = _allSystems
-            .Where(IsDesktopAppKind)
+            .Where(s => GetSortAllSectionRank(s) == 0)
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var backendServices = _allSystems
-            .Where(s => IsBackendServiceKind(s) && !IsDesktopAppKind(s))
+            .Where(s => GetSortAllSectionRank(s) == 1)
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var libraries = _allSystems
-            .Where(s => IsLibraryOnlyKind(s) && !IsDesktopAppKind(s) && !IsBackendServiceKind(s))
+            .Where(s => GetSortAllSectionRank(s) == 2)
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var others = _allSystems
-            .Where(s => !IsDesktopAppKind(s) && !IsBackendServiceKind(s) && !IsLibraryOnlyKind(s))
+            .Where(s => GetSortAllSectionRank(s) == 3)
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -797,7 +797,15 @@ public class SystemMapViewModel : INotifyPropertyChanged
         string.Equals(s.KindLabel, nameof(SystemKind.BackendService), StringComparison.Ordinal);
 
     internal static bool IsLibraryOnlyKind(SystemItemVm s) =>
-        string.Equals(s.KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal) || s.IsLibrary;
+        string.Equals(s.KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal);
+
+    internal static int GetSortAllSectionRank(SystemItemVm s)
+    {
+        if (IsDesktopAppKind(s)) return 0;
+        if (IsBackendServiceKind(s)) return 1;
+        if (IsLibraryOnlyKind(s)) return 2;
+        return 3;
+    }
 
     /// <summary>
     /// Sorts all system cards alphabetically by name and reassigns their grid positions

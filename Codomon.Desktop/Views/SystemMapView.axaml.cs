@@ -1247,22 +1247,16 @@ public partial class SystemMapView : UserControl
     private void AddKindSeparators(Canvas canvas)
     {
         var desktopApps = _vm.Systems
-            .Where(SystemMapViewModel.IsDesktopAppKind)
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 0)
             .ToList();
         var backendServices = _vm.Systems
-            .Where(s => SystemMapViewModel.IsBackendServiceKind(s) && !SystemMapViewModel.IsDesktopAppKind(s))
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 1)
             .ToList();
         var classLibraries = _vm.Systems
-            .Where(s =>
-                SystemMapViewModel.IsLibraryOnlyKind(s) &&
-                !SystemMapViewModel.IsDesktopAppKind(s) &&
-                !SystemMapViewModel.IsBackendServiceKind(s))
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 2)
             .ToList();
         var otherSystems = _vm.Systems
-            .Where(s =>
-                !SystemMapViewModel.IsDesktopAppKind(s) &&
-                !SystemMapViewModel.IsBackendServiceKind(s) &&
-                !SystemMapViewModel.IsLibraryOnlyKind(s))
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 3)
             .ToList();
 
         var sections = new[]
