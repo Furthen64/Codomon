@@ -338,10 +338,10 @@ public static class ArchitectureHypothesisService
 
         // Preflight: verify endpoint/model reachability before running many batched calls.
         progress?.Report("Checking LLM connectivity before synthesis...");
-        var (llmReachable, llmMessage) = await LlmSummaryService.TestConnectionAsync(
+        var (llmReachable, connectionMessage) = await LlmSummaryService.TestConnectionAsync(
             apiEndpoint, modelName, cancellationToken);
         if (!llmReachable)
-            throw new InvalidOperationException($"LLM preflight failed: {llmMessage}");
+            throw new InvalidOperationException($"LLM preflight failed: {connectionMessage}");
         progress?.Report("LLM connectivity verified.");
 
         // Determine batches based on the token threshold.
