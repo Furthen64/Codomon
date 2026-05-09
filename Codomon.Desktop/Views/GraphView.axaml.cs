@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Input;
 using Codomon.Desktop.ViewModels;
 using Nodify;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -12,6 +13,8 @@ namespace Codomon.Desktop.Views;
 
 public partial class GraphView : UserControl
 {
+    private int _lastHandledAutoAlignToken = -1;
+    private GraphViewModel? _subscribedViewModel;
     public event Action? NavigateToSystemMapRequested;
     public event Action<string>? NavigateToModuleRequested;
     public event Action<string>? NavigateToCodeNodesRequested;
@@ -66,6 +69,33 @@ public partial class GraphView : UserControl
             if (string.IsNullOrWhiteSpace(vm.BreadcrumbModuleId)) return;
             NavigateToCodeNodesRequested?.Invoke(vm.BreadcrumbModuleId);
         };
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        if (_subscribedViewModel != null)
+            _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+        if (DataContext is GraphViewModel vm)
+        {
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+            _subscribedViewModel = vm;
+        }
+        else
+            _subscribedViewModel = null;
+
+        base.OnDataContextChanged(e);
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not GraphViewModel vm) return;
+        if (!string.Equals(e.PropertyName, nameof(GraphViewModel.AutoAlignRequestToken), StringComparison.Ordinal)) return;
+        if (vm.AutoAlignRequestToken == _lastHandledAutoAlignToken) return;
+
+        _lastHandledAutoAlignToken = vm.AutoAlignRequestToken;
+        vm.AutoAlign();
+        Editor.FitToScreen();
     }
 
     private void ApplyFilterChange()
