@@ -18,6 +18,10 @@ namespace Codomon.Desktop.Services;
 /// </summary>
 public static class ArchitectureHypothesisService
 {
+    private const int DefaultContextBudgetTokens = 65_535;
+    private const double PreflightPromptBudgetFraction = 0.45;
+    private const double ExpectedOutputFractionOfPrompt = 0.60;
+
     private const string HypothesesFolder = "hypotheses";
     private const string PromptFileName = "hypothesis_prompt.md";
         private const string PromptTemplatesFolder = "prompts/architecture-hypothesis";
@@ -395,7 +399,47 @@ public static class ArchitectureHypothesisService
             var summariesBlock = await BuildSummariesBlockAsync(batch, cancellationToken);
             var prompt = promptTemplate.Replace("{Summaries}", summariesBlock);
             var estimatedPromptTokens = LlmHelper.EstimateTokenCount(prompt);
+            var contextBudgetTokens = tokenThreshold > 0 ? tokenThreshold : DefaultContextBudgetTokens;
+            var remainingContextTokens = Math.Max(0, contextBudgetTokens - estimatedPromptTokens);
+            var expectedOutputTokens = Math.Max(256, (int)Math.Ceiling(estimatedPromptTokens * ExpectedOutputFractionOfPrompt));
+            var preflightWarning = string.Empty;
+            var preflightThreshold = (int)Math.Floor(contextBudgetTokens * PreflightPromptBudgetFraction);
+            if (estimatedPromptTokens > preflightThreshold)
+            {
+                preflightWarning =
+                    $"Batch {batchLabel} is approaching model context limits. " +
+                    $"Prompt ~{estimatedPromptTokens:N0}/{contextBudgetTokens:N0} tok, remaining ~{remainingContextTokens:N0}, expected output ~{expectedOutputTokens:N0}.";
+                progress?.Report($"⚠ {preflightWarning}");
+            }
             AppLogger.Debug($"[Hypothesis] {batchLabel}: Prompt length={prompt.Length} chars (~{estimatedPromptTokens} tokens)");
+
+            if (estimatedPromptTokens > preflightThreshold && batch.Count > 1)
+            {
+                progress?.Report($"⚠ {batchLabel}: prompt exceeds {PreflightPromptBudgetFraction:P0} of context. Splitting before send.");
+                telemetryProgress?.Report(new BatchTelemetry
+                {
+                    BatchNumber = batchNumber,
+                    TotalBatches = totalQueued,
+                    BatchLabel = batchLabel,
+                    SummaryCount = batch.Count,
+                    PromptTokens = estimatedPromptTokens,
+                    Status = "Split",
+                    IsRetry = isRetry,
+                    WasSplit = true,
+                    ContextBudgetTokens = contextBudgetTokens,
+                    RemainingContextTokens = remainingContextTokens,
+                    ExpectedOutputTokens = expectedOutputTokens,
+                    PreflightWarning = preflightWarning,
+                });
+
+                var half = batch.Count / 2;
+                var subA = batch.Take(half).ToList();
+                var subB = batch.Skip(half).ToList();
+                processQueue.Enqueue((subA, $"{batchLabel}A", true));
+                processQueue.Enqueue((subB, $"{batchLabel}B", true));
+                totalQueued += 2;
+                continue;
+            }
 
             // Call the LLM with streaming support.
             var batchStart = DateTime.UtcNow;
@@ -424,6 +468,10 @@ public static class ArchitectureHypothesisService
                     Status = "Failed",
                     FailureReason = ex.Message,
                     IsRetry = isRetry,
+                    ContextBudgetTokens = contextBudgetTokens,
+                    RemainingContextTokens = remainingContextTokens,
+                    ExpectedOutputTokens = expectedOutputTokens,
+                    PreflightWarning = preflightWarning,
                 });
                 throw;
             }
@@ -451,6 +499,10 @@ public static class ArchitectureHypothesisService
                     Status = "Split",
                     IsRetry = isRetry,
                     WasSplit = true,
+                    ContextBudgetTokens = contextBudgetTokens,
+                    RemainingContextTokens = remainingContextTokens,
+                    ExpectedOutputTokens = expectedOutputTokens,
+                    PreflightWarning = preflightWarning,
                 });
 
                 var half = batch.Count / 2;
@@ -481,6 +533,10 @@ public static class ArchitectureHypothesisService
                 FinishReason = result.FinishReason,
                 Status = batchStatus,
                 IsRetry = isRetry,
+                ContextBudgetTokens = contextBudgetTokens,
+                RemainingContextTokens = remainingContextTokens,
+                ExpectedOutputTokens = expectedOutputTokens,
+                PreflightWarning = preflightWarning,
             });
 
             progress?.Report($"✔ {batchLabel}: {batchDuration.TotalSeconds:F0}s  ~{estimatedPromptTokens}→{result.OutputTokens} tok  finish={result.FinishReason}");
@@ -1127,6 +1183,15 @@ public sealed class BatchTelemetry
     /// <summary>Estimated or reported number of tokens generated by the LLM.</summary>
     public int OutputTokens { get; set; }
 
+    /// <summary>Estimated context budget used for this batch preflight.</summary>
+    public int ContextBudgetTokens { get; set; }
+
+    /// <summary>Estimated remaining context tokens before sending this batch.</summary>
+    public int RemainingContextTokens { get; set; }
+
+    /// <summary>Estimated completion tokens expected for this batch call.</summary>
+    public int ExpectedOutputTokens { get; set; }
+
     /// <summary>Wall-clock duration of the LLM call.</summary>
     public TimeSpan Duration { get; set; }
 
@@ -1140,6 +1205,9 @@ public sealed class BatchTelemetry
 
     /// <summary>Human-readable failure reason, populated when <see cref="Status"/> is "Failed".</summary>
     public string? FailureReason { get; set; }
+
+    /// <summary>Human-readable preflight warning, populated for near-budget batches.</summary>
+    public string? PreflightWarning { get; set; }
 
     /// <summary>True when this batch was automatically retried due to a previous failure.</summary>
     public bool IsRetry { get; set; }

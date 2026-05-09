@@ -120,44 +120,59 @@
           <Border x:Name="TelemetryCard" DockPanel.Dock="Top"
                   Background="#0F1A28" BorderBrush="#2A3F5A" BorderThickness="0,0,0,1"
                   Padding="12,8" IsVisible="False">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-              </Grid.ColumnDefinitions>
+            <StackPanel Spacing="8">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-              <!-- Left: batch / summary / time -->
-              <StackPanel Grid.Column="0" Spacing="2">
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                  <TextBlock x:Name="TelemetryStateLabel"
-                             Text="Running" FontWeight="SemiBold"
-                             Foreground="#AADDCC" FontSize="12"/>
-                  <TextBlock x:Name="TelemetryBatchLabel"
-                             Text="Batch — / —" Foreground="#88AABB" FontSize="11"/>
-                  <TextBlock x:Name="TelemetrySummariesLabel"
-                             Text="Summaries: —" Foreground="#88AABB" FontSize="11"/>
+                <!-- Left: batch / summary / time -->
+                <StackPanel Grid.Column="0" Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="16">
+                    <TextBlock x:Name="TelemetryStateLabel"
+                               Text="Running" FontWeight="SemiBold"
+                               Foreground="#AADDCC" FontSize="12"/>
+                    <TextBlock x:Name="TelemetryBatchLabel"
+                               Text="Batch — / —" Foreground="#88AABB" FontSize="11"/>
+                    <TextBlock x:Name="TelemetrySummariesLabel"
+                               Text="Summaries: —" Foreground="#88AABB" FontSize="11"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="16">
+                    <TextBlock x:Name="TelemetryElapsedLabel"
+                               Text="Elapsed: —" Foreground="#667788" FontSize="11"/>
+                    <TextBlock x:Name="TelemetryEtaLabel"
+                               Text="ETA: —" Foreground="#667788" FontSize="11"/>
+                  </StackPanel>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                  <TextBlock x:Name="TelemetryElapsedLabel"
-                             Text="Elapsed: —" Foreground="#667788" FontSize="11"/>
-                  <TextBlock x:Name="TelemetryEtaLabel"
-                             Text="ETA: —" Foreground="#667788" FontSize="11"/>
-                </StackPanel>
-              </StackPanel>
 
-              <!-- Right: token counts / speed -->
-              <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <TextBlock x:Name="TelemetryPromptTokLabel"
-                             Text="Prompt tok: —" Foreground="#667788" FontSize="11"/>
-                  <TextBlock x:Name="TelemetryOutputTokLabel"
-                             Text="Output tok: —" Foreground="#667788" FontSize="11"/>
+                <!-- Right: token counts / speed -->
+                <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right">
+                  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock x:Name="TelemetryPromptTokLabel"
+                               Text="Prompt tok: —" Foreground="#667788" FontSize="11"/>
+                    <TextBlock x:Name="TelemetryOutputTokLabel"
+                               Text="Output tok: —" Foreground="#667788" FontSize="11"/>
+                  </StackPanel>
+                  <TextBlock x:Name="TelemetrySpeedLabel"
+                             Text="Speed: —" Foreground="#556677" FontSize="10"
+                             HorizontalAlignment="Right"/>
                 </StackPanel>
-                <TextBlock x:Name="TelemetrySpeedLabel"
-                           Text="Speed: —" Foreground="#556677" FontSize="10"
-                           HorizontalAlignment="Right"/>
-              </StackPanel>
-            </Grid>
+              </Grid>
+
+              <Border x:Name="TokenBudgetWarningPanel"
+                      IsVisible="False"
+                      Background="#3A2912"
+                      BorderBrush="#CCAA44"
+                      BorderThickness="1"
+                      CornerRadius="4"
+                      Padding="8,6">
+                <TextBlock x:Name="TokenBudgetWarningText"
+                           Foreground="#FFDD88"
+                           FontSize="11"
+                           TextWrapping="Wrap"/>
+              </Border>
+            </StackPanel>
           </Border>
 
           <!-- Split: progress log (left) | history + batch log (right) -->
@@ -241,6 +256,27 @@
                          Background="Transparent"
                          DoubleTapped="OnHistoryDoubleTapped"
                          SelectionChanged="OnHistorySelectionChanged"/>
+
+                <Border DockPanel.Dock="Bottom"
+                        Padding="10,8"
+                        Background="#0E1622"
+                        BorderBrush="#2A3F5A"
+                        BorderThickness="0,1,0,0">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="What Codomon is building"
+                               Foreground="#AABBCC"
+                               FontWeight="SemiBold"
+                               FontSize="12"/>
+                    <TextBlock Text="Architecture Synthesis infers systems, modules, boundaries, relationships, and architectural anchors from generated summaries."
+                               Foreground="#88AABB"
+                               FontSize="10"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="After synthesis you can review inferred systems, refine names and boundaries, confirm relationships, and apply updates to the canvas."
+                               Foreground="#667788"
+                               FontSize="10"
+                               TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
               </DockPanel>
             </Border>
 
