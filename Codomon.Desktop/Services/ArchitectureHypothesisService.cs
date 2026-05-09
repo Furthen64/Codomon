@@ -336,6 +336,14 @@ public static class ArchitectureHypothesisService
             throw new InvalidOperationException(
                 "Hypothesis prompt template is empty. Open the Architecture dialog Setup tab and save a prompt first.");
 
+        // Preflight: verify endpoint/model reachability before running many batched calls.
+        progress?.Report("Checking LLM connectivity before synthesis…");
+        var (llmReachable, llmMessage) = await LlmSummaryService.TestConnectionAsync(
+            apiEndpoint, modelName, cancellationToken);
+        if (!llmReachable)
+            throw new InvalidOperationException($"LLM preflight failed: {llmMessage}");
+        progress?.Report("LLM connectivity verified.");
+
         // Determine batches based on the token threshold.
         List<List<SummaryEntry>> initialBatches;
         if (tokenThreshold > 0)
