@@ -25,7 +25,7 @@ public partial class SystemMapView : UserControl
 
     private readonly SystemMapViewModel _vm;
     private DragState? _dragState;
-    private bool _showAppLibSeparator;
+    private bool _showKindSeparators;
     private bool _showLayerBands;
     private LayoutViewMode _layoutViewMode = LayoutViewMode.Flat;
     private bool _suppressLayoutComboChange;
@@ -116,7 +116,7 @@ public partial class SystemMapView : UserControl
         _vm.PropertyChanged   += OnViewModelPropertyChanged;
         _vm.Systems.CollectionChanged           += (_, _) =>
         {
-            if (_vm.Systems.Count == 0) _showAppLibSeparator = false;
+            if (_vm.Systems.Count == 0) _showKindSeparators = false;
             RefreshSystemOverview();
         };
         _vm.ExternalSystems.CollectionChanged   += (_, _) => RefreshSystemOverview();
@@ -234,7 +234,7 @@ public partial class SystemMapView : UserControl
 
         if (_layoutViewMode == LayoutViewMode.Layered)
         {
-            _showAppLibSeparator = false;
+            _showKindSeparators = false;
             var (updates, hasMultipleLayers) = _vm.SortByLayers();
             _showLayerBands = hasMultipleLayers;
             foreach (var (id, x, y) in updates)
@@ -723,8 +723,8 @@ public partial class SystemMapView : UserControl
             Canvas.SetTop(card, system.Y);
         }
 
-        if (_showAppLibSeparator)
-            AddAppLibrarySeparator(systemsCanvas);
+        if (_showKindSeparators)
+            AddKindSeparators(systemsCanvas);
 
         // External system cards are placed on the same unified canvas, below the system section.
         if (_vm.ShowExternalSystems && _vm.ExternalSystems.Count > 0)
@@ -1056,7 +1056,7 @@ public partial class SystemMapView : UserControl
 
     public void OnClearCanvasClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _showAppLibSeparator = false;
+        _showKindSeparators = false;
         _showLayerBands = false;
         _layoutViewMode = LayoutViewMode.Flat;
         SyncLayoutCombo(1);
@@ -1071,13 +1071,13 @@ public partial class SystemMapView : UserControl
         RefreshModuleView();
     }
 
-    public void OnSortAppsFromLibrariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    public void OnSortAllClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _showLayerBands = false;
         _layoutViewMode = LayoutViewMode.Flat;
         SyncLayoutCombo(1);
-        var updates = _vm.SortAppsFromLibraries();
-        _showAppLibSeparator = updates.Count > 0;
+        var updates = _vm.SortAll();
+        _showKindSeparators = updates.Count > 0;
         foreach (var (id, x, y) in updates)
             LayoutPositionChanged?.Invoke(id, false, x, y);
         RefreshSystemOverview();
@@ -1085,7 +1085,7 @@ public partial class SystemMapView : UserControl
 
     public void OnArrangeClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _showAppLibSeparator = false;
+        _showKindSeparators = false;
         _showLayerBands = false;
         _layoutViewMode = LayoutViewMode.Flat;
         SyncLayoutCombo(1);
@@ -1097,7 +1097,7 @@ public partial class SystemMapView : UserControl
 
     public void OnSortByLayersClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _showAppLibSeparator = false;
+        _showKindSeparators = false;
         var (updates, hasMultipleLayers) = _vm.SortByLayers();
         _showLayerBands = hasMultipleLayers;
         if (hasMultipleLayers)
@@ -1241,44 +1241,72 @@ public partial class SystemMapView : UserControl
     }
 
     /// <summary>
-    /// Adds a horizontal separator line and a "CLASS LIBRARIES" section header to the
-    /// canvas when systems from both groups are present.
+    /// Adds kind section labels and separator lines for Desktop Apps, Backend Services
+    /// and Class Libraries based on the current system card Y positions.
     /// </summary>
-    private void AddAppLibrarySeparator(Canvas canvas)
+    private void AddKindSeparators(Canvas canvas)
     {
-        var apps = _vm.Systems.Where(s => !s.IsLibrary).ToList();
-        var libs = _vm.Systems.Where(s =>  s.IsLibrary).ToList();
+        var desktopApps = _vm.Systems
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 0)
+            .ToList();
+        var backendServices = _vm.Systems
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 1)
+            .ToList();
+        var classLibraries = _vm.Systems
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 2)
+            .ToList();
+        var otherSystems = _vm.Systems
+            .Where(s => SystemMapViewModel.GetSortAllSectionRank(s) == 3)
+            .ToList();
 
-        if (apps.Count == 0 || libs.Count == 0)
+        var sections = new[]
+        {
+            new { Label = "DESKTOP APPS", Systems = desktopApps },
+            new { Label = "BACKEND SERVICES", Systems = backendServices },
+            new { Label = "CLASS LIBRARIES", Systems = classLibraries },
+            new { Label = "OTHER SYSTEMS", Systems = otherSystems }
+        }
+        .Where(s => s.Systems.Count > 0)
+        .Select(s => new { s.Label, Systems = s.Systems, MinY = s.Systems.Min(item => item.Y) })
+        .OrderBy(s => s.MinY)
+        .ToList();
+
+        if (sections.Count == 0)
             return;
 
-        double libMinY = libs.Min(s => s.Y);
-        double appMaxY = apps.Max(s => s.Y);
+        const double labelOffsetY = 16.0;
+        const double lineOffsetY = 6.0;
 
-        // Place the separator line halfway between the last app row and first library row.
-        double sepY = appMaxY + (libMinY - appMaxY) / 2.0;
-
-        var separatorLine = new Border
+        for (int i = 0; i < sections.Count; i++)
         {
-            Height     = 1,
-            Width      = 2000,
-            Background = new SolidColorBrush(Color.Parse("#2A3F5A"))
-        };
-        Canvas.SetLeft(separatorLine, 0);
-        Canvas.SetTop(separatorLine, sepY);
-        canvas.Children.Add(separatorLine);
+            double labelY = Math.Max(2.0, sections[i].MinY - labelOffsetY);
+            var label = new TextBlock
+            {
+                Text          = sections[i].Label,
+                FontSize      = 9,
+                FontWeight    = FontWeight.Bold,
+                Foreground    = new SolidColorBrush(Color.Parse("#4A6A8A")),
+                LetterSpacing = 1,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(label, 24);
+            Canvas.SetTop(label, labelY);
+            canvas.Children.Add(label);
 
-        var sectionLabel = new TextBlock
-        {
-            Text          = "CLASS LIBRARIES",
-            FontSize      = 9,
-            FontWeight    = FontWeight.Bold,
-            Foreground    = new SolidColorBrush(Color.Parse("#4A6A8A")),
-            LetterSpacing = 1
-        };
-        Canvas.SetLeft(sectionLabel, 24);
-        Canvas.SetTop(sectionLabel, sepY + 6);
-        canvas.Children.Add(sectionLabel);
+            if (i == 0) continue;
+
+            double lineY = sections[i].MinY - lineOffsetY;
+            var line = new Border
+            {
+                Height     = 1,
+                Width      = 2000,
+                Background = new SolidColorBrush(Color.Parse("#2A3F5A")),
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(line, 0);
+            Canvas.SetTop(line, lineY);
+            canvas.Children.Add(line);
+        }
     }
 
     /// <summary>

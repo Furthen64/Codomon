@@ -743,41 +743,68 @@ public class SystemMapViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Rearranges system card positions so that app-type systems occupy the top rows
-    /// and LibraryOnly systems are placed below them (separated by one empty row).
-    /// Returns the list of (id, newX, newY) updates so the caller can persist them.
+    /// Sorts systems by kind sections in this order: DesktopApp, BackendService,
+    /// LibraryOnly, then all other kinds. Each section is alphabetised and separated
+    /// by one empty row. Returns the list of (id, newX, newY) updates.
     /// </summary>
-    public List<(string Id, double X, double Y)> SortAppsFromLibraries()
+    public List<(string Id, double X, double Y)> SortAll()
     {
-        var apps      = _allSystems.Where(s => !s.IsLibrary).ToList();
-        var libraries = _allSystems.Where(s =>  s.IsLibrary).ToList();
+        var desktopApps = _allSystems
+            .Where(s => GetSortAllSectionRank(s) == 0)
+            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var backendServices = _allSystems
+            .Where(s => GetSortAllSectionRank(s) == 1)
+            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var libraries = _allSystems
+            .Where(s => GetSortAllSectionRank(s) == 2)
+            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var others = _allSystems
+            .Where(s => GetSortAllSectionRank(s) == 3)
+            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
+        var sections = new List<List<SystemItemVm>> { desktopApps, backendServices, libraries, others };
         var updates = new List<(string, double, double)>();
+        int currentBaseRow = 0;
 
-        int appIndex = 0;
-        foreach (var app in apps)
+        foreach (var section in sections)
         {
-            var pos = CreateGridPosition(appIndex++, baseRow: 0);
-            app.X = pos.X;
-            app.Y = pos.Y;
-            updates.Add((app.Id, app.X, app.Y));
-        }
+            if (section.Count == 0) continue;
 
-        // Leave one blank row as a visual gap before the library section.
-        int appRowCount    = apps.Count == 0 ? 0 : (apps.Count + CardsPerRow - 1) / CardsPerRow;
-        int libraryBaseRow = appRowCount + 1;
+            for (int i = 0; i < section.Count; i++)
+            {
+                var pos = CreateGridPosition(i, baseRow: currentBaseRow);
+                section[i].X = pos.X;
+                section[i].Y = pos.Y;
+                updates.Add((section[i].Id, pos.X, pos.Y));
+            }
 
-        int libIndex = 0;
-        foreach (var lib in libraries)
-        {
-            var pos = CreateGridPosition(libIndex++, baseRow: libraryBaseRow);
-            lib.X = pos.X;
-            lib.Y = pos.Y;
-            updates.Add((lib.Id, lib.X, lib.Y));
+            int rowsUsed = (section.Count + CardsPerRow - 1) / CardsPerRow;
+            currentBaseRow += rowsUsed + 1;
         }
 
         ApplyFilters();
         return updates;
+    }
+
+    internal static bool IsDesktopAppKind(SystemItemVm s) =>
+        string.Equals(s.KindLabel, nameof(SystemKind.DesktopApp), StringComparison.Ordinal);
+
+    internal static bool IsBackendServiceKind(SystemItemVm s) =>
+        string.Equals(s.KindLabel, nameof(SystemKind.BackendService), StringComparison.Ordinal);
+
+    internal static bool IsLibraryOnlyKind(SystemItemVm s) =>
+        string.Equals(s.KindLabel, nameof(SystemKind.LibraryOnly), StringComparison.Ordinal);
+
+    internal static int GetSortAllSectionRank(SystemItemVm s)
+    {
+        if (IsDesktopAppKind(s)) return 0;
+        if (IsBackendServiceKind(s)) return 1;
+        if (IsLibraryOnlyKind(s)) return 2;
+        return 3;
     }
 
     /// <summary>
