@@ -63,7 +63,7 @@ public partial class LocatorWindow : Window
                 if (!llmOk)     missing.Add("LLM configuration (Preferences)");
                 if (!archOk)    missing.Add("Architecture notes (Architecture Hypothesis dialog)");
                 if (!summaryOk) missing.Add("Summaries (LLM Summaries dialog)");
-                answer.Text = $"Requirements not met. Please set up: {string.Join(", ", missing)}.";
+                answer.Text = $"Requirements not met. Please set up the following: {string.Join(", ", missing)}.";
             }
         }
     }

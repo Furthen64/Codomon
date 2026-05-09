@@ -315,7 +315,7 @@ public static class LocatorService
     private sealed class ChatRequest
     {
         [JsonPropertyName("model")]    public string Model    { get; set; } = string.Empty;
-        [JsonPropertyName("messages")] public ChatMessage[] Messages { get; set; } = Array.Empty<ChatMessage>();
+        [JsonPropertyName("messages")] public ChatMessage[] Messages { get; set; } = [];
     }
 
     private sealed class ChatMessage
