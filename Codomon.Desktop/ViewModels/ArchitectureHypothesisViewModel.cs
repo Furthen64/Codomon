@@ -6,8 +6,56 @@ using Codomon.Desktop.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Codomon.Desktop.ViewModels;
+
+/// <summary>Tracks the overall state of a synthesis run.</summary>
+public enum SynthesisState
+{
+    Idle,
+    Preparing,
+    Running,
+    Retrying,
+    Completed,
+    CompletedWithWarnings,
+    Failed,
+    Cancelled,
+}
+
+/// <summary>A single row in the structured batch log shown in the Run tab.</summary>
+public sealed class BatchLogEntry : INotifyPropertyChanged
+{
+    private string _status = "Running";
+
+    public string BatchLabel { get; set; } = string.Empty;
+    public int SummaryCount { get; set; }
+    public int PromptTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public string Duration { get; set; } = string.Empty;
+    public string FinishReason { get; set; } = string.Empty;
+    public bool IsRetry { get; set; }
+
+    public string Status
+    {
+        get => _status;
+        set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusIcon)); }
+    }
+
+    public string StatusIcon => Status switch
+    {
+        "Completed" => "✔",
+        "Warning"   => "⚠",
+        "Failed"    => "✖",
+        "Split"     => "⇢",
+        "Retrying"  => "↺",
+        _           => "…",
+    };
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
 
 /// <summary>
 /// ViewModel for the Architecture Hypothesis dialog.
@@ -32,6 +80,21 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     private int _acceptedCount;
     private int _appliedSuggestionCount;
     private bool _hasCanvasChanges;
+
+    // ── Telemetry / synthesis state ──────────────────────────────────────────
+    private SynthesisState _synthesisState = SynthesisState.Idle;
+    private int _currentBatch;
+    private int _totalBatches;
+    private int _processedSummaries;
+    private int _totalSummaries;
+    private int _totalPromptTokens;
+    private int _totalGeneratedTokens;
+    private DateTime _synthesisStartTime;
+    private TimeSpan _averageBatchDuration;
+    private string _liveOutput = string.Empty;
+    private string _elapsedFormatted = string.Empty;
+    private string _etaFormatted = string.Empty;
+    private double _generationSpeed;
 
     public ArchitectureHypothesisViewModel(WorkspaceModel workspace, string workspaceFolderPath)
     {
@@ -78,6 +141,99 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         set { _statusMessage = value; OnPropertyChanged(); }
     }
 
+    // ── Synthesis state & telemetry ───────────────────────────────────────────
+
+    /// <summary>High-level state of the current (or last completed) synthesis run.</summary>
+    public SynthesisState SynthesisState
+    {
+        get => _synthesisState;
+        private set { _synthesisState = value; OnPropertyChanged(); OnPropertyChanged(nameof(SynthesisStateLabel)); }
+    }
+
+    /// <summary>Human-readable synthesis state label for display.</summary>
+    public string SynthesisStateLabel => SynthesisState switch
+    {
+        SynthesisState.Idle                  => "Idle",
+        SynthesisState.Preparing             => "Preparing…",
+        SynthesisState.Running               => "Running",
+        SynthesisState.Retrying              => "Retrying",
+        SynthesisState.Completed             => "Completed",
+        SynthesisState.CompletedWithWarnings => "Completed with warnings",
+        SynthesisState.Failed                => "Failed",
+        SynthesisState.Cancelled             => "Cancelled",
+        _                                    => string.Empty,
+    };
+
+    /// <summary>Current batch number (1-based) during synthesis.</summary>
+    public int CurrentBatch
+    {
+        get => _currentBatch;
+        private set { _currentBatch = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Total number of batches queued (may grow due to auto-split).</summary>
+    public int TotalBatches
+    {
+        get => _totalBatches;
+        private set { _totalBatches = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Number of summaries processed so far across all completed batches.</summary>
+    public int ProcessedSummaries
+    {
+        get => _processedSummaries;
+        private set { _processedSummaries = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Total number of summaries in the workspace.</summary>
+    public int TotalSummaries
+    {
+        get => _totalSummaries;
+        private set { _totalSummaries = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Cumulative estimated prompt tokens sent across all batches.</summary>
+    public int TotalPromptTokens
+    {
+        get => _totalPromptTokens;
+        private set { _totalPromptTokens = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Cumulative estimated generated tokens received across all batches.</summary>
+    public int TotalGeneratedTokens
+    {
+        get => _totalGeneratedTokens;
+        private set { _totalGeneratedTokens = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Elapsed time for the current synthesis run, formatted for display.</summary>
+    public string ElapsedFormatted
+    {
+        get => _elapsedFormatted;
+        private set { _elapsedFormatted = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Estimated time remaining for the current synthesis run, formatted for display.</summary>
+    public string EtaFormatted
+    {
+        get => _etaFormatted;
+        private set { _etaFormatted = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Estimated generation speed in tokens per second for the last completed batch.</summary>
+    public double GenerationSpeed
+    {
+        get => _generationSpeed;
+        private set { _generationSpeed = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Live output text streaming from the LLM during the current batch call.</summary>
+    public string LiveOutput
+    {
+        get => _liveOutput;
+        private set { _liveOutput = value; OnPropertyChanged(); }
+    }
+
     /// <summary>
     /// Count of suggestions that have been accepted into the System Map during this session.
     /// Used by the caller to decide whether to mark the workspace dirty.
@@ -122,6 +278,9 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 
     /// <summary>Progress messages emitted during the synthesis pass.</summary>
     public ObservableCollection<string> ProgressMessages { get; } = new();
+
+    /// <summary>Structured per-batch telemetry log for display in the batch log table.</summary>
+    public ObservableCollection<BatchLogEntry> BatchLog { get; } = new();
 
     /// <summary>Suggested systems from the current hypothesis.</summary>
     public ObservableCollection<HypothesisSystemModel> Systems { get; } = new();
@@ -180,22 +339,66 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         }
 
         IsRunning = true;
+        SynthesisState = SynthesisState.Preparing;
         ProgressMessages.Clear();
+        BatchLog.Clear();
+        LiveOutput = string.Empty;
+        TotalPromptTokens = 0;
+        TotalGeneratedTokens = 0;
+        CurrentBatch = 0;
+        TotalBatches = 0;
+        ProcessedSummaries = 0;
+        TotalSummaries = LlmSummaryService.ListSummaries(_workspaceFolderPath).Count;
+        ElapsedFormatted = string.Empty;
+        EtaFormatted = string.Empty;
+        GenerationSpeed = 0;
+        _synthesisStartTime = DateTime.UtcNow;
+        _averageBatchDuration = TimeSpan.Zero;
+
         StatusMessage = "Running synthesis…";
         _cts = new CancellationTokenSource();
+
+        // Elapsed-time ticker — must be stopped and disposed in the finally block.
+        var elapsedTimer = new System.Timers.Timer(1000);
+        elapsedTimer.Elapsed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateElapsed);
+        elapsedTimer.Start();
 
         try
         {
             var progress = new Progress<string>(msg =>
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => ProgressMessages.Add(msg)));
 
+            // Streaming token progress — append tokens to LiveOutput.
+            var liveOutputSb = new StringBuilder();
+            var streamingProgress = new Progress<string>(token =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    liveOutputSb.Append(token);
+                    LiveOutput = liveOutputSb.ToString();
+                }));
+
+            // Telemetry progress — update batch log and telemetry card.
+            var telemetryProgress = new Progress<BatchTelemetry>(t =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyBatchTelemetry(t, liveOutputSb)));
+
+            SynthesisState = SynthesisState.Running;
+
             var hypothesis = await ArchitectureHypothesisService.RunSynthesisAsync(
                 _apiEndpoint, _modelName, _workspaceFolderPath,
                 _hypothesisTokenThreshold,
-                progress, _cts.Token);
+                progress,
+                streamingProgress,
+                telemetryProgress,
+                _cts.Token);
 
             CurrentHypothesis = hypothesis;
             RefreshSavedHypotheses();
+
+            var hasWarnings = BatchLog.Any(b => b.Status is "Warning" or "Split");
+            SynthesisState = hasWarnings
+                ? SynthesisState.CompletedWithWarnings
+                : SynthesisState.Completed;
+
             StatusMessage = $"Synthesis complete — {hypothesis.Systems.Count} system(s), " +
                             $"{hypothesis.HighValueNodes.Count} high-value node(s).";
             AppLogger.Info($"[Hypothesis] Synthesis done: {hypothesis.Systems.Count} systems, " +
@@ -203,22 +406,113 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         }
         catch (OperationCanceledException)
         {
+            SynthesisState = SynthesisState.Cancelled;
             StatusMessage = "Synthesis cancelled.";
             AppLogger.Warn("[Hypothesis] Synthesis cancelled by user.");
             ReportProgress("Cancelled.");
         }
         catch (Exception ex)
         {
+            SynthesisState = SynthesisState.Failed;
             StatusMessage = $"Synthesis failed: {ex.Message}";
             AppLogger.Error($"[Hypothesis] Synthesis failed: {ex.GetType().Name}: {ex.Message}");
             ReportProgress($"✖ {ex.Message}");
         }
         finally
         {
+            elapsedTimer.Stop();
+            elapsedTimer.Dispose();
             IsRunning = false;
             _cts?.Dispose();
             _cts = null;
+            UpdateElapsed();
         }
+    }
+
+    /// <summary>Applies a <see cref="BatchTelemetry"/> update to the batch log and telemetry card.</summary>
+    private void ApplyBatchTelemetry(BatchTelemetry t, StringBuilder liveOutputSb)
+    {
+        // Reset live output for each new batch call.
+        if (t.Status is "Running" or "Retrying")
+        {
+            liveOutputSb.Clear();
+            LiveOutput = string.Empty;
+        }
+
+        // Update synthesis state label to reflect retrying.
+        if (t.Status == "Retrying" && SynthesisState == SynthesisState.Running)
+            SynthesisState = SynthesisState.Retrying;
+        else if (t.Status is "Running" && SynthesisState == SynthesisState.Retrying)
+            SynthesisState = SynthesisState.Running;
+
+        // Update telemetry card counters.
+        CurrentBatch = t.BatchNumber;
+        TotalBatches = t.TotalBatches;
+
+        // Accumulate token counts for completed batches.
+        if (t.Status is "Completed" or "Warning" or "Failed")
+        {
+            TotalPromptTokens += t.PromptTokens;
+            TotalGeneratedTokens += t.OutputTokens;
+            ProcessedSummaries += t.SummaryCount;
+
+            if (t.Duration > TimeSpan.Zero)
+            {
+                var speed = t.OutputTokens / t.Duration.TotalSeconds;
+                GenerationSpeed = speed;
+
+                _averageBatchDuration = _averageBatchDuration == TimeSpan.Zero
+                    ? t.Duration
+                    : TimeSpan.FromSeconds(
+                        (_averageBatchDuration.TotalSeconds + t.Duration.TotalSeconds) / 2.0);
+
+                UpdateEta();
+            }
+        }
+
+        // Find or create the batch log entry.
+        var existing = BatchLog.FirstOrDefault(b => b.BatchLabel == t.BatchLabel);
+        if (existing == null)
+        {
+            existing = new BatchLogEntry
+            {
+                BatchLabel = t.BatchLabel,
+                SummaryCount = t.SummaryCount,
+                IsRetry = t.IsRetry,
+            };
+            BatchLog.Add(existing);
+        }
+
+        existing.PromptTokens = t.PromptTokens > 0 ? t.PromptTokens : existing.PromptTokens;
+        existing.OutputTokens = t.OutputTokens > 0 ? t.OutputTokens : existing.OutputTokens;
+        existing.Duration = t.Duration > TimeSpan.Zero
+            ? $"{t.Duration.TotalSeconds:F0}s"
+            : existing.Duration;
+        existing.FinishReason = !string.IsNullOrEmpty(t.FinishReason)
+            ? t.FinishReason
+            : existing.FinishReason;
+        existing.Status = t.Status;
+    }
+
+    private void UpdateElapsed()
+    {
+        if (!IsRunning && SynthesisState == SynthesisState.Idle) return;
+        var elapsed = DateTime.UtcNow - _synthesisStartTime;
+        ElapsedFormatted = $"{(int)elapsed.TotalMinutes:D2}m {elapsed.Seconds:D2}s";
+    }
+
+    private void UpdateEta()
+    {
+        if (_averageBatchDuration == TimeSpan.Zero || TotalBatches == 0) return;
+        var remaining = TotalBatches - CurrentBatch;
+        if (remaining <= 0)
+        {
+            EtaFormatted = "~done";
+            return;
+        }
+        var etaSec = remaining * _averageBatchDuration.TotalSeconds;
+        var eta = TimeSpan.FromSeconds(etaSec);
+        EtaFormatted = $"~{(int)eta.TotalMinutes:D2}m {eta.Seconds:D2}s";
     }
 
     /// <summary>Cancels an in-progress synthesis pass.</summary>

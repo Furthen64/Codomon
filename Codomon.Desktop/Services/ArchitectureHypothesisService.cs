@@ -1,7 +1,9 @@
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.ArchitectureHypothesis;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -298,12 +300,21 @@ public static class ArchitectureHypothesisService
     /// Maximum estimated token count per LLM call.
     /// Pass 0 or a negative value to disable batching (no split, single call).
     /// </param>
+    /// <param name="streamingTokenProgress">
+    /// Optional callback that receives individual tokens as they stream from the LLM.
+    /// Used to populate the live output panel in the UI.
+    /// </param>
+    /// <param name="telemetryProgress">
+    /// Optional callback that receives per-batch telemetry data after each LLM call completes.
+    /// </param>
     public static async Task<ArchitectureHypothesisModel> RunSynthesisAsync(
         string apiEndpoint,
         string modelName,
         string workspaceFolderPath,
         int tokenThreshold = 0,
         IProgress<string>? progress = null,
+        IProgress<string>? streamingTokenProgress = null,
+        IProgress<BatchTelemetry>? telemetryProgress = null,
         CancellationToken cancellationToken = default)
     {
         // Load summaries.
@@ -322,7 +333,7 @@ public static class ArchitectureHypothesisService
                 "Hypothesis prompt template is empty. Open the Architecture dialog Setup tab and save a prompt first.");
 
         // Determine batches based on the token threshold.
-        List<List<SummaryEntry>> batches;
+        List<List<SummaryEntry>> initialBatches;
         if (tokenThreshold > 0)
         {
             var estimatedTokens = await LlmHelper.EstimateTokenCountAsync(summaries, cancellationToken);
@@ -330,43 +341,152 @@ public static class ArchitectureHypothesisService
 
             if (estimatedTokens > tokenThreshold)
             {
-                batches = await LlmHelper.SplitIntoBatchesAsync(summaries, tokenThreshold, cancellationToken);
-                AppLogger.Info($"[Hypothesis] Token threshold exceeded — splitting into {batches.Count} batch(es).");
-                progress?.Report($"Token budget exceeded ({estimatedTokens} estimated tokens). Splitting into {batches.Count} batch(es).");
+                initialBatches = await LlmHelper.SplitIntoBatchesAsync(summaries, tokenThreshold, cancellationToken);
+                AppLogger.Info($"[Hypothesis] Token threshold exceeded — splitting into {initialBatches.Count} batch(es).");
+                progress?.Report($"Token budget exceeded ({estimatedTokens} estimated tokens). Splitting into {initialBatches.Count} batch(es).");
             }
             else
             {
-                batches = new List<List<SummaryEntry>> { summaries };
+                initialBatches = new List<List<SummaryEntry>> { summaries };
             }
         }
         else
         {
-            batches = new List<List<SummaryEntry>> { summaries };
+            initialBatches = new List<List<SummaryEntry>> { summaries };
         }
 
-        // Run synthesis for each batch and merge the results.
-        ArchitectureHypothesisModel? merged = null;
-        for (int i = 0; i < batches.Count; i++)
+        // Use a queue to support automatic split-and-retry when the LLM hits its token limit.
+        var processQueue = new Queue<(List<SummaryEntry> Batch, string Label, bool IsRetry)>();
+        for (int i = 0; i < initialBatches.Count; i++)
         {
-            var batch = batches[i];
-            var batchLabel = batches.Count > 1 ? $"batch {i + 1}/{batches.Count}" : "all summaries";
+            var label = initialBatches.Count > 1
+                ? $"batch {i + 1}/{initialBatches.Count}"
+                : "all summaries";
+            processQueue.Enqueue((initialBatches[i], label, false));
+        }
 
-            progress?.Report($"Calling LLM for {batchLabel} ({batch.Count} summaries) — this may take a while…");
+        int totalQueued = processQueue.Count;
+        int batchNumber = 0;
+
+        ArchitectureHypothesisModel? merged = null;
+
+        while (processQueue.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var (batch, batchLabel, isRetry) = processQueue.Dequeue();
+            batchNumber++;
+
+            // Emit "starting" telemetry so the UI can show "Running".
+            telemetryProgress?.Report(new BatchTelemetry
+            {
+                BatchNumber = batchNumber,
+                TotalBatches = totalQueued,
+                BatchLabel = batchLabel,
+                SummaryCount = batch.Count,
+                Status = isRetry ? "Retrying" : "Running",
+                IsRetry = isRetry,
+            });
+
+            var retryPrefix = isRetry ? "↺ [retry] " : string.Empty;
+            progress?.Report($"{retryPrefix}Calling LLM for {batchLabel} ({batch.Count} summaries) — this may take a while…");
 
             // Build the combined summaries block for this batch.
             var summariesBlock = await BuildSummariesBlockAsync(batch, cancellationToken);
             var prompt = promptTemplate.Replace("{Summaries}", summariesBlock);
-            AppLogger.Debug($"[Hypothesis] {batchLabel}: Prompt length={prompt.Length} chars");
+            var estimatedPromptTokens = LlmHelper.EstimateTokenCount(prompt);
+            AppLogger.Debug($"[Hypothesis] {batchLabel}: Prompt length={prompt.Length} chars (~{estimatedPromptTokens} tokens)");
 
-            // Call the LLM.
-            var rawResponse = await CallLlmAsync(apiEndpoint, modelName, prompt, cancellationToken);
-            AppLogger.Debug($"[Hypothesis] {batchLabel}: LLM responded: {rawResponse.Length} chars");
-            AppLogger.Debug($"[Hypothesis] {batchLabel}: LLM raw output:\n{rawResponse}");
+            // Call the LLM with streaming support.
+            var batchStart = DateTime.UtcNow;
+            LlmCallResult result;
+            try
+            {
+                result = await CallLlmStreamingAsync(
+                    apiEndpoint, modelName, prompt, streamingTokenProgress, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var duration = DateTime.UtcNow - batchStart;
+                AppLogger.Error($"[Hypothesis] {batchLabel}: LLM call failed: {ex.Message}");
+                telemetryProgress?.Report(new BatchTelemetry
+                {
+                    BatchNumber = batchNumber,
+                    TotalBatches = totalQueued,
+                    BatchLabel = batchLabel,
+                    SummaryCount = batch.Count,
+                    PromptTokens = estimatedPromptTokens,
+                    Duration = duration,
+                    Status = "Failed",
+                    FailureReason = ex.Message,
+                    IsRetry = isRetry,
+                });
+                throw;
+            }
 
+            var batchDuration = DateTime.UtcNow - batchStart;
+            AppLogger.Debug($"[Hypothesis] {batchLabel}: LLM responded: {result.Content.Length} chars, finish={result.FinishReason}, dur={batchDuration.TotalSeconds:F1}s");
+
+            // Auto-retry: when the LLM hit its token limit and we have multiple summaries, split.
+            if (string.Equals(result.FinishReason, "length", StringComparison.OrdinalIgnoreCase)
+                && batch.Count > 1)
+            {
+                AppLogger.Warn($"[Hypothesis] {batchLabel}: token limit hit (finish_reason=length). Splitting into sub-batches.");
+                progress?.Report($"⚠ {batchLabel}: token limit hit. Splitting into sub-batches and retrying…");
+
+                telemetryProgress?.Report(new BatchTelemetry
+                {
+                    BatchNumber = batchNumber,
+                    TotalBatches = totalQueued,
+                    BatchLabel = batchLabel,
+                    SummaryCount = batch.Count,
+                    PromptTokens = estimatedPromptTokens,
+                    OutputTokens = result.OutputTokens,
+                    Duration = batchDuration,
+                    FinishReason = result.FinishReason,
+                    Status = "Split",
+                    IsRetry = isRetry,
+                    WasSplit = true,
+                });
+
+                var half = batch.Count / 2;
+                var subA = batch.Take(half).ToList();
+                var subB = batch.Skip(half).ToList();
+                processQueue.Enqueue((subA, $"{batchLabel}A", true));
+                processQueue.Enqueue((subB, $"{batchLabel}B", true));
+                totalQueued += 2;
+                continue;
+            }
+
+            AppLogger.Debug($"[Hypothesis] {batchLabel}: LLM raw output:\n{result.Content}");
             progress?.Report($"Parsing LLM response for {batchLabel}…");
 
+            // Report completed batch telemetry.
+            var batchStatus = string.Equals(result.FinishReason, "length", StringComparison.OrdinalIgnoreCase)
+                ? "Warning"
+                : "Completed";
+            telemetryProgress?.Report(new BatchTelemetry
+            {
+                BatchNumber = batchNumber,
+                TotalBatches = totalQueued,
+                BatchLabel = batchLabel,
+                SummaryCount = batch.Count,
+                PromptTokens = estimatedPromptTokens,
+                OutputTokens = result.OutputTokens,
+                Duration = batchDuration,
+                FinishReason = result.FinishReason,
+                Status = batchStatus,
+                IsRetry = isRetry,
+            });
+
+            progress?.Report($"✔ {batchLabel}: {batchDuration.TotalSeconds:F0}s  ~{estimatedPromptTokens}→{result.OutputTokens} tok  finish={result.FinishReason}");
+
             // Extract and parse the JSON.
-            var batchHypothesis = ParseHypothesis(rawResponse);
+            var batchHypothesis = ParseHypothesis(result.Content);
 
             if (merged == null)
             {
@@ -510,7 +630,7 @@ public static class ArchitectureHypothesisService
         List<SummaryEntry> summaries,
         CancellationToken cancellationToken)
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         foreach (var s in summaries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -543,66 +663,130 @@ public static class ArchitectureHypothesisService
         return filePath;
     }
 
-    private static async Task<string> CallLlmAsync(
+    /// <summary>
+    /// Calls the LLM using the OpenAI-compatible streaming endpoint (server-sent events).
+    /// Appends individual tokens to <paramref name="tokenProgress"/> as they arrive so the
+    /// UI can display live output. Returns the complete generated content and the
+    /// <c>finish_reason</c> reported by the server.
+    /// </summary>
+    private static async Task<LlmCallResult> CallLlmStreamingAsync(
         string apiEndpoint,
         string modelName,
         string prompt,
+        IProgress<string>? tokenProgress,
         CancellationToken cancellationToken)
     {
         var url = BuildChatCompletionsUrl(apiEndpoint);
-        AppLogger.Debug($"[Hypothesis] CallLlm → POST {url}  model={modelName}  promptLength={prompt.Length}");
+        AppLogger.Debug($"[Hypothesis] CallLlm(stream) → POST {url}  model={modelName}  promptLength={prompt.Length}");
 
-        var payload = new ChatRequest
+        var payload = new ChatStreamRequest
         {
             Model = modelName,
-            Messages = new[] { new ChatMessage { Role = "user", Content = prompt } }
+            Messages = new[] { new ChatMessage { Role = "user", Content = prompt } },
+            Stream = true,
         };
 
         try
         {
-            using var response = await Http.PostAsJsonAsync(url, payload, LlmJsonOptions, cancellationToken);
-            AppLogger.Debug($"[Hypothesis] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}");
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Content = JsonContent.Create(payload, options: LlmJsonOptions);
+
+            using var response = await Http.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            AppLogger.Debug($"[Hypothesis] CallLlm(stream) ← {(int)response.StatusCode} {response.ReasonPhrase}");
 
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 var snippet = body.Length > 500 ? body[..500] + "…" : body;
-                AppLogger.Error($"[Hypothesis] CallLlm error body: {snippet}");
+                AppLogger.Error($"[Hypothesis] CallLlm(stream) error body: {snippet}");
                 throw new InvalidOperationException(
                     $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
             }
 
-            var result = await response.Content.ReadFromJsonAsync<ChatResponse>(LlmJsonOptions, cancellationToken)
-                         ?? throw new InvalidOperationException("LLM API returned an empty response.");
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream);
 
-            var firstChoice = result.Choices?.FirstOrDefault();
-            var finishReason = firstChoice?.FinishReason ?? "(null)";
-            var content = firstChoice?.Message?.Content;
+            var sb = new StringBuilder();
+            string? finishReason = null;
+            int promptTokens = 0;
+            int outputTokens = 0;
 
-            AppLogger.Debug($"[Hypothesis] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}");
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var line = await reader.ReadLineAsync();
+                if (line == null) break;
+                if (!line.StartsWith("data: ", StringComparison.Ordinal)) continue;
+
+                var data = line[6..]; // skip "data: "
+                if (data == "[DONE]") break;
+
+                ChatStreamChunk? chunk;
+                try { chunk = JsonSerializer.Deserialize<ChatStreamChunk>(data, LlmJsonOptions); }
+                catch (JsonException jex)
+                {
+                    AppLogger.Debug($"[Hypothesis] CallLlm(stream): skipped malformed SSE frame: {jex.Message}");
+                    continue;
+                }
+
+                var choice = chunk?.Choices?.FirstOrDefault();
+                var token = choice?.Delta?.Content;
+                if (token != null && token.Length > 0)
+                {
+                    sb.Append(token);
+                    tokenProgress?.Report(token);
+                }
+
+                if (choice?.FinishReason is { Length: > 0 } fr)
+                    finishReason = fr;
+
+                if (chunk?.Usage is { } usage)
+                {
+                    if (usage.PromptTokens > 0) promptTokens = usage.PromptTokens;
+                    if (usage.CompletionTokens > 0) outputTokens = usage.CompletionTokens;
+                }
+            }
+
+            var content = sb.ToString();
+            finishReason ??= "stop";
+
+            // Fall back to estimation when the server did not report usage.
+            if (outputTokens == 0)
+            {
+                outputTokens = LlmHelper.EstimateTokenCount(content);
+                AppLogger.Debug($"[Hypothesis] CallLlm(stream): server did not report completion_tokens; using heuristic estimate={outputTokens}");
+            }
+            if (promptTokens == 0)
+            {
+                promptTokens = LlmHelper.EstimateTokenCount(prompt);
+                AppLogger.Debug($"[Hypothesis] CallLlm(stream): server did not report prompt_tokens; using heuristic estimate={promptTokens}");
+            }
+
+            AppLogger.Debug($"[Hypothesis] CallLlm(stream) done: {content.Length} chars, finish={finishReason}, promptTok≈{promptTokens}, outTok≈{outputTokens}");
 
             if (string.IsNullOrWhiteSpace(content))
             {
-                AppLogger.Warn($"[Hypothesis] CallLlm: response content is empty. finish_reason={finishReason}");
+                AppLogger.Warn($"[Hypothesis] CallLlm(stream): response content is empty. finish_reason={finishReason}");
                 throw new InvalidOperationException("LLM API returned a response with empty content.");
             }
 
-            if (finishReason == "length")
-            {
-                AppLogger.Warn($"[Hypothesis] CallLlm: LLM response was cut off at the token limit (finish_reason=length, {content.Length} chars). The hypothesis JSON may be incomplete.");
-                throw new InvalidOperationException(
-                    "The LLM response was cut off because the model reached its token limit (finish_reason=length). " +
-                    "To fix this, try: reducing the number of summaries, shortening the prompt template, or using a model with a larger maximum output.");
-            }
-
-            return content;
+            return new LlmCallResult(content, finishReason, promptTokens, outputTokens);
         }
         catch (OperationCanceledException oce)
         {
-            AppLogger.Warn($"[Hypothesis] CallLlm cancelled. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
+            AppLogger.Warn($"[Hypothesis] CallLlm(stream) cancelled. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
             throw;
         }
     }
+
+    /// <summary>Result returned by the streaming LLM call.</summary>
+    private readonly record struct LlmCallResult(
+        string Content,
+        string FinishReason,
+        int PromptTokens = 0,
+        int OutputTokens = 0);
 
     /// <summary>
     /// Extracts and parses the JSON block from the LLM response.
@@ -718,7 +902,7 @@ public static class ArchitectureHypothesisService
             return false;
         }
 
-        var sb = new System.Text.StringBuilder(json.TrimEnd());
+        var sb = new StringBuilder(json.TrimEnd());
 
         // Close any unclosed string literal.
         if (inString)
@@ -824,6 +1008,7 @@ public static class ArchitectureHypothesisService
 
     // ── OpenAI-compatible JSON DTOs ───────────────────────────────────────────
 
+    // Non-streaming request (kept for potential fallback use).
     private sealed class ChatRequest
     {
         [JsonPropertyName("model")]
@@ -831,6 +1016,19 @@ public static class ArchitectureHypothesisService
 
         [JsonPropertyName("messages")]
         public ChatMessage[] Messages { get; set; } = Array.Empty<ChatMessage>();
+    }
+
+    // Streaming request — identical but adds "stream": true.
+    private sealed class ChatStreamRequest
+    {
+        [JsonPropertyName("model")]
+        public string Model { get; set; } = string.Empty;
+
+        [JsonPropertyName("messages")]
+        public ChatMessage[] Messages { get; set; } = Array.Empty<ChatMessage>();
+
+        [JsonPropertyName("stream")]
+        public bool Stream { get; set; } = true;
     }
 
     private sealed class ChatMessage
@@ -842,6 +1040,7 @@ public static class ArchitectureHypothesisService
         public string Content { get; set; } = string.Empty;
     }
 
+    // Non-streaming response.
     private sealed class ChatResponse
     {
         [JsonPropertyName("choices")]
@@ -856,7 +1055,41 @@ public static class ArchitectureHypothesisService
         [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
     }
-}
+
+    // Streaming (SSE) response chunk.
+    private sealed class ChatStreamChunk
+    {
+        [JsonPropertyName("choices")]
+        public ChatStreamChoice[]? Choices { get; set; }
+
+        [JsonPropertyName("usage")]
+        public ChatUsage? Usage { get; set; }
+    }
+
+    private sealed class ChatStreamChoice
+    {
+        [JsonPropertyName("delta")]
+        public ChatStreamDelta? Delta { get; set; }
+
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
+    }
+
+    private sealed class ChatStreamDelta
+    {
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
+    }
+
+    private sealed class ChatUsage
+    {
+        [JsonPropertyName("prompt_tokens")]
+        public int PromptTokens { get; set; }
+
+        [JsonPropertyName("completion_tokens")]
+        public int CompletionTokens { get; set; }
+    }
+} // end ArchitectureHypothesisService
 
 /// <summary>Represents a saved hypothesis snapshot entry.</summary>
 public class HypothesisEntry
@@ -868,4 +1101,49 @@ public class HypothesisEntry
     public DateTime CreatedAt { get; set; }
 
     public string DisplayName => $"Hypothesis  {CreatedAt:yyyy-MM-dd HH:mm}";
+}
+
+/// <summary>
+/// Telemetry data reported after (or during) each LLM batch call.
+/// Consumed by the UI to populate the telemetry card and structured batch log.
+/// </summary>
+public sealed class BatchTelemetry
+{
+    /// <summary>Sequential number of this batch in the current run (1-based).</summary>
+    public int BatchNumber { get; set; }
+
+    /// <summary>Total number of batches queued (may grow if auto-split occurs).</summary>
+    public int TotalBatches { get; set; }
+
+    /// <summary>Human-readable label for this batch, e.g. "batch 2/5" or "all summaries".</summary>
+    public string BatchLabel { get; set; } = string.Empty;
+
+    /// <summary>Number of summaries included in this batch.</summary>
+    public int SummaryCount { get; set; }
+
+    /// <summary>Estimated number of tokens in the prompt sent to the LLM.</summary>
+    public int PromptTokens { get; set; }
+
+    /// <summary>Estimated or reported number of tokens generated by the LLM.</summary>
+    public int OutputTokens { get; set; }
+
+    /// <summary>Wall-clock duration of the LLM call.</summary>
+    public TimeSpan Duration { get; set; }
+
+    /// <summary>The <c>finish_reason</c> reported by the LLM, e.g. "stop" or "length".</summary>
+    public string FinishReason { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Status string for display. One of: Running, Retrying, Completed, Warning, Failed, Split.
+    /// </summary>
+    public string Status { get; set; } = "Running";
+
+    /// <summary>Human-readable failure reason, populated when <see cref="Status"/> is "Failed".</summary>
+    public string? FailureReason { get; set; }
+
+    /// <summary>True when this batch was automatically retried due to a previous failure.</summary>
+    public bool IsRetry { get; set; }
+
+    /// <summary>True when this batch was split into sub-batches due to a token-limit hit.</summary>
+    public bool WasSplit { get; set; }
 }
