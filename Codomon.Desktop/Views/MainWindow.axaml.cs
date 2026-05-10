@@ -1262,11 +1262,11 @@ public partial class MainWindow : Window
         SetStatusPill(_statusBarEventsTb,  hasEvents, $"Events: {_vm.TotalEventCount:N0}");
     }
 
-    private static void SetStatusPill(TextBlock? tb, bool visible, string text)
+    private static void SetStatusPill(TextBlock? textBlock, bool visible, string text)
     {
-        if (tb == null) return;
-        tb.IsVisible = visible;
-        if (visible) tb.Text = text;
+        if (textBlock == null) return;
+        textBlock.IsVisible = visible;
+        if (visible) textBlock.Text = text;
     }
 
     // ── Roslyn Scan ───────────────────────────────────────────────────────────

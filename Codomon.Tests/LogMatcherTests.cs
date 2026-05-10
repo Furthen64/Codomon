@@ -16,14 +16,14 @@ public class LogMatcherTests
         string systemName,
         string? moduleName = null)
     {
-        var ws  = new WorkspaceModel();
+        var workspace = new WorkspaceModel();
         var sys = new SystemBoxModel { Id = "sys-1", Name = systemName };
         if (moduleName != null)
         {
             sys.Modules.Add(new ModuleBoxModel { Id = "mod-1", Name = moduleName });
         }
-        ws.Systems.Add(sys);
-        return ws;
+        workspace.Systems.Add(sys);
+        return workspace;
     }
 
     private static LogEntryModel Entry(string source = "", string message = "") =>
@@ -34,8 +34,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_EmptySourceAndMessage_ReturnsNoMatch()
     {
-        var ws     = BuildWorkspace("PaymentService");
-        var result = LogMatcher.Match(Entry(), ws);
+        var workspace = BuildWorkspace("PaymentService");
+        var result = LogMatcher.Match(Entry(), workspace);
         Assert.Equal(MatchStrength.None, result.Strength);
         Assert.Null(result.System);
         Assert.Null(result.Module);
@@ -44,8 +44,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_UnrelatedSource_ReturnsNoMatch()
     {
-        var ws     = BuildWorkspace("PaymentService");
-        var result = LogMatcher.Match(Entry("com.company.unrelated.SomeClass"), ws);
+        var workspace = BuildWorkspace("PaymentService");
+        var result = LogMatcher.Match(Entry("com.company.unrelated.SomeClass"), workspace);
         Assert.Equal(MatchStrength.None, result.Strength);
     }
 
@@ -54,8 +54,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_SystemNameInSource_ReturnsSystemOnlyMatch()
     {
-        var ws     = BuildWorkspace("OrderService");
-        var result = LogMatcher.Match(Entry(source: "com.company.OrderService.Handler"), ws);
+        var workspace = BuildWorkspace("OrderService");
+        var result = LogMatcher.Match(Entry(source: "com.company.OrderService.Handler"), workspace);
         Assert.Equal(MatchStrength.SystemOnly, result.Strength);
         Assert.Equal("OrderService", result.System?.Name);
         Assert.Null(result.Module);
@@ -64,8 +64,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_ModuleNameInSource_ReturnsModuleExactMatch()
     {
-        var ws     = BuildWorkspace("OrderService", "PaymentModule");
-        var result = LogMatcher.Match(Entry(source: "OrderService.PaymentModule.Processor"), ws);
+        var workspace = BuildWorkspace("OrderService", "PaymentModule");
+        var result = LogMatcher.Match(Entry(source: "OrderService.PaymentModule.Processor"), workspace);
         Assert.Equal(MatchStrength.ModuleExact, result.Strength);
         Assert.Equal("PaymentModule", result.Module?.Name);
     }
@@ -75,10 +75,10 @@ public class LogMatcherTests
     [Fact]
     public void Match_SystemNameInMessage_ReturnsSystemOnlyMatch()
     {
-        var ws     = BuildWorkspace("BillingService");
+        var workspace = BuildWorkspace("BillingService");
         var result = LogMatcher.Match(
             Entry(source: "com.company.unrelated", message: "Error in BillingService"),
-            ws);
+            workspace);
         Assert.Equal(MatchStrength.SystemOnly, result.Strength);
         Assert.Equal("BillingService", result.System?.Name);
     }
@@ -86,10 +86,10 @@ public class LogMatcherTests
     [Fact]
     public void Match_ModuleNameInMessage_ReturnsModuleExactMatch()
     {
-        var ws     = BuildWorkspace("OrderService", "InvoiceModule");
+        var workspace = BuildWorkspace("OrderService", "InvoiceModule");
         var result = LogMatcher.Match(
             Entry(source: "com.unrelated", message: "InvoiceModule raised an exception"),
-            ws);
+            workspace);
         Assert.Equal(MatchStrength.ModuleExact, result.Strength);
         Assert.Equal("InvoiceModule", result.Module?.Name);
     }
@@ -99,10 +99,10 @@ public class LogMatcherTests
     [Fact]
     public void Match_ModuleInSourceAndSystemInMessage_PrefersSourceMatch()
     {
-        var ws     = BuildWorkspace("OrderService", "PaymentModule");
+        var workspace = BuildWorkspace("OrderService", "PaymentModule");
         var result = LogMatcher.Match(
             Entry(source: "OrderService.PaymentModule", message: "Error in OrderService"),
-            ws);
+            workspace);
         // Module match via source should win over system match via message.
         Assert.Equal(MatchStrength.ModuleExact, result.Strength);
     }
@@ -112,8 +112,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_EmptyWorkspace_ReturnsNoMatch()
     {
-        var ws     = new WorkspaceModel();
-        var result = LogMatcher.Match(Entry("SomeService.Handler"), ws);
+        var workspace = new WorkspaceModel();
+        var result = LogMatcher.Match(Entry("SomeService.Handler"), workspace);
         Assert.Equal(MatchStrength.None, result.Strength);
     }
 
@@ -122,8 +122,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_ModuleMatch_ReasonContainsModuleName()
     {
-        var ws     = BuildWorkspace("OrderService", "PaymentModule");
-        var result = LogMatcher.Match(Entry("OrderService.PaymentModule.x"), ws);
+        var workspace = BuildWorkspace("OrderService", "PaymentModule");
+        var result = LogMatcher.Match(Entry("OrderService.PaymentModule.x"), workspace);
         Assert.Equal(MatchStrength.ModuleExact, result.Strength);
         Assert.Contains("PaymentModule", result.MatchReason, StringComparison.OrdinalIgnoreCase);
     }
@@ -131,8 +131,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_SystemMatch_ReasonContainsSystemName()
     {
-        var ws     = BuildWorkspace("AuthService");
-        var result = LogMatcher.Match(Entry("com.company.AuthService.Login"), ws);
+        var workspace = BuildWorkspace("AuthService");
+        var result = LogMatcher.Match(Entry("com.company.AuthService.Login"), workspace);
         Assert.Equal(MatchStrength.SystemOnly, result.Strength);
         Assert.Contains("AuthService", result.MatchReason, StringComparison.OrdinalIgnoreCase);
     }
@@ -142,8 +142,8 @@ public class LogMatcherTests
     [Fact]
     public void Match_IsCaseInsensitiveForSourceComparison()
     {
-        var ws     = BuildWorkspace("OrderService");
-        var result = LogMatcher.Match(Entry("ORDERSERVICE.handler"), ws);
+        var workspace = BuildWorkspace("OrderService");
+        var result = LogMatcher.Match(Entry("ORDERSERVICE.handler"), workspace);
         // The name-based matching uses Contains with case-insensitive comparison.
         // Expect SystemOnly at minimum.
         Assert.NotEqual(MatchStrength.None, result.Strength);
