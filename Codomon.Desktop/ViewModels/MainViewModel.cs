@@ -393,9 +393,11 @@ public class MainViewModel : INotifyPropertyChanged
         await TryCreateAutosaveAsync();
     }
 
-    public async Task OpenWorkspaceAsync(string folderPath)
+    public async Task OpenWorkspaceAsync(
+        string folderPath,
+        IProgress<WorkspaceSerializer.WorkspaceLoadProgress>? progress = null)
     {
-        var workspace = await WorkspaceSerializer.LoadAsync(folderPath);
+        var workspace = await WorkspaceSerializer.LoadAsync(folderPath, progress);
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
         HasWorkspace = true;

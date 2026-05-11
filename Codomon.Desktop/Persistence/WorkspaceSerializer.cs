@@ -9,6 +9,8 @@ namespace Codomon.Desktop.Persistence;
 
 public static class WorkspaceSerializer
 {
+    public readonly record struct WorkspaceLoadProgress(double Percent, string Status);
+
     private const string SystemMapLayoutPrefix = "systemmap:";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -221,28 +223,38 @@ public static class WorkspaceSerializer
         }
     }
 
-    public static async Task<WorkspaceModel> LoadAsync(string folderPath)
+    public static async Task<WorkspaceModel> LoadAsync(
+        string folderPath,
+        IProgress<WorkspaceLoadProgress>? progress = null)
     {
+        progress?.Report(new WorkspaceLoadProgress(5, "Validating workspace..."));
         ValidateFolder(folderPath);
 
+        progress?.Report(new WorkspaceLoadProgress(15, "Loading workspace metadata..."));
         var workspaceDto = await ReadJsonAsync<WorkspaceFileDto>(Path.Combine(folderPath, WorkspaceFile));
+        progress?.Report(new WorkspaceLoadProgress(25, "Loading systems..."));
         var systemsDto = await ReadJsonAsync<SystemsFileDto>(Path.Combine(folderPath, SystemsFile));
+        progress?.Report(new WorkspaceLoadProgress(35, "Loading modules..."));
         var modulesDto = await ReadJsonAsync<ModulesFileDto>(Path.Combine(folderPath, ModulesFile));
+        progress?.Report(new WorkspaceLoadProgress(45, "Loading connections..."));
         var connectionsDto = await ReadJsonAsync<ConnectionsFileDto>(Path.Combine(folderPath, ConnectionsFile));
 
         // rules.json is optional (backward-compatible with pre-Phase-08 workspaces).
+        progress?.Report(new WorkspaceLoadProgress(55, "Loading mapping rules..."));
         var rulesPath = Path.Combine(folderPath, RulesFile);
         var rulesDto = File.Exists(rulesPath)
             ? await ReadJsonAsync<MappingRulesFileDto>(rulesPath)
             : new MappingRulesFileDto();
 
         // systemmap.json is optional (backward-compatible with pre-Phase-01 workspaces).
+        progress?.Report(new WorkspaceLoadProgress(65, "Loading system map..."));
         var systemMapPath = Path.Combine(folderPath, SystemMapFile);
         var systemMapDto = File.Exists(systemMapPath)
             ? await ReadJsonAsync<SystemMapFileDto>(systemMapPath)
             : new SystemMapFileDto();
 
         // Load all profiles from profiles/*.json
+        progress?.Report(new WorkspaceLoadProgress(75, "Loading profiles..."));
         var profiles = new List<ProfileModel>();
         var profilesDir = Path.Combine(folderPath, ProfilesFolder);
         if (Directory.Exists(profilesDir))
@@ -266,6 +278,8 @@ public static class WorkspaceSerializer
                 : profiles[0].Id;
 
         var activeProfile = profiles.First(p => p.Id == activeProfileId);
+
+        progress?.Report(new WorkspaceLoadProgress(85, "Rebuilding workspace..."));
 
         var modulesBySystem = modulesDto.Modules
             .GroupBy(m => m.SystemId)
@@ -353,6 +367,8 @@ public static class WorkspaceSerializer
 
         workspace.SystemMap = DtoToSystemMap(systemMapDto);
 
+        progress?.Report(new WorkspaceLoadProgress(95, "Finalizing workspace..."));
+
         // Re-apply any stored manual overrides so that human curation is always
         // the final authority, regardless of which analysis pass last ran.
         ManualOverrideService.Apply(workspace.SystemMap, workspace.SystemMap.ManualOverrides);
@@ -363,6 +379,7 @@ public static class WorkspaceSerializer
         else
             AppLogger.Debug("[SystemMap] Validation after load found no issues.");
 
+        progress?.Report(new WorkspaceLoadProgress(100, "Workspace loaded."));
         return workspace;
     }
 

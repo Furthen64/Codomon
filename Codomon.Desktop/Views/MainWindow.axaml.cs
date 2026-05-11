@@ -388,9 +388,9 @@ public partial class MainWindow : Window
 
         var folderPath = folders[0].Path.LocalPath;
 
-        await ExecuteSafeAsync(async () =>
+        await ExecuteWithWorkspaceLoadingAsync(async progress =>
         {
-            await _vm.OpenWorkspaceAsync(folderPath);
+            await _vm.OpenWorkspaceAsync(folderPath, progress);
             UpdateWindowTitle();
             AppLogger.Info($"Workspace opened: {folderPath}");
         });
@@ -834,9 +834,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        await ExecuteSafeAsync(async () =>
+        await ExecuteWithWorkspaceLoadingAsync(async progress =>
         {
-            await _vm.OpenWorkspaceAsync(entry.FolderPath);
+            await _vm.OpenWorkspaceAsync(entry.FolderPath, progress);
             UpdateWindowTitle();
             AppLogger.Info($"Workspace opened from recent list: {entry.FolderPath}");
         });
@@ -2934,6 +2934,40 @@ public partial class MainWindow : Window
         {
             await ShowErrorAsync(ex.Message);
         }
+    }
+
+    private async Task ExecuteWithWorkspaceLoadingAsync(
+        Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
+    {
+        var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
+            SetWorkspaceLoadingState(true, update.Percent, update.Status));
+
+        try
+        {
+            SetWorkspaceLoadingState(true, 0, "Preparing workspace...");
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+            await ExecuteSafeAsync(() => action(progress));
+        }
+        finally
+        {
+            SetWorkspaceLoadingState(false, 0, "Preparing workspace...");
+        }
+    }
+
+    private void SetWorkspaceLoadingState(bool isVisible, double progressValue, string status)
+    {
+        var overlay = this.FindControl<Grid>("WorkspaceLoadingOverlay");
+        var progressBar = this.FindControl<ProgressBar>("WorkspaceLoadingProgressBar");
+        var statusText = this.FindControl<TextBlock>("WorkspaceLoadingStatusText");
+
+        if (progressBar != null)
+            progressBar.Value = Math.Clamp(progressValue, 0, 100);
+
+        if (statusText != null)
+            statusText.Text = status;
+
+        if (overlay != null)
+            overlay.IsVisible = isVisible;
     }
 
     private async Task ShowErrorAsync(string message)
