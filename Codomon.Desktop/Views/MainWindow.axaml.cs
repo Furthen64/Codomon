@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Codomon.Desktop.Views;
@@ -93,6 +94,7 @@ public partial class MainWindow : Window
     private Grid? _workspaceLoadingOverlay;
     private ProgressBar? _workspaceLoadingProgressBar;
     private TextBlock? _workspaceLoadingStatusText;
+    private int _workspaceLoadingOperationId;
 
     // Tracks whether the log list is currently bound to live-monitor entries.
     private bool _logListShowingLive;
@@ -2945,23 +2947,43 @@ public partial class MainWindow : Window
     private async Task ExecuteWithWorkspaceLoadingAsync(
         Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
     {
+        var operationId = Interlocked.Increment(ref _workspaceLoadingOperationId);
         var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
             Dispatcher.UIThread.Post(
-                () => SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status),
+                () =>
+                {
+                    if (Volatile.Read(ref _workspaceLoadingOperationId) != operationId)
+                        return;
+
+                    SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status);
+                },
                 DispatcherPriority.Background));
 
         try
         {
             await Dispatcher.UIThread.InvokeAsync(
-                () => SetWorkspaceLoadingState(true, 0, "Preparing workspace..."),
+                () =>
+                {
+                    if (Volatile.Read(ref _workspaceLoadingOperationId) != operationId)
+                        return;
+
+                    SetWorkspaceLoadingState(true, 0, "Preparing workspace...");
+                },
                 DispatcherPriority.Render);
             await ExecuteSafeAsync(() => action(progress));
         }
         finally
         {
+            Interlocked.CompareExchange(ref _workspaceLoadingOperationId, 0, operationId);
             await Dispatcher.UIThread.InvokeAsync(
-                () => SetWorkspaceLoadingState(false, 0, string.Empty),
-                DispatcherPriority.Background);
+                () =>
+                {
+                    if (Volatile.Read(ref _workspaceLoadingOperationId) != 0)
+                        return;
+
+                    SetWorkspaceLoadingState(false, 0, string.Empty);
+                },
+                DispatcherPriority.Render);
         }
     }
 
