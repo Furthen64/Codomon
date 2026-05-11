@@ -2946,7 +2946,9 @@ public partial class MainWindow : Window
         Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
     {
         var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
-            SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status));
+            Dispatcher.UIThread.Post(
+                () => SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status),
+                DispatcherPriority.Background));
 
         try
         {
