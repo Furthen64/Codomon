@@ -90,6 +90,9 @@ public partial class MainWindow : Window
 
     // Timeline control instance; re-created when the workspace changes.
     private TimelineControl? _timelineControl;
+    private Grid? _workspaceLoadingOverlay;
+    private ProgressBar? _workspaceLoadingProgressBar;
+    private TextBlock? _workspaceLoadingStatusText;
 
     // Tracks whether the log list is currently bound to live-monitor entries.
     private bool _logListShowingLive;
@@ -138,6 +141,9 @@ public partial class MainWindow : Window
         UpdateWorkspaceNameDisplay();
         SetupAnalyzePanel();
         RefreshAnalyzePanel();
+        _workspaceLoadingOverlay = this.FindControl<Grid>("WorkspaceLoadingOverlay");
+        _workspaceLoadingProgressBar = this.FindControl<ProgressBar>("WorkspaceLoadingProgressBar");
+        _workspaceLoadingStatusText = this.FindControl<TextBlock>("WorkspaceLoadingStatusText");
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
@@ -388,9 +394,9 @@ public partial class MainWindow : Window
 
         var folderPath = folders[0].Path.LocalPath;
 
-        await ExecuteSafeAsync(async () =>
+        await ExecuteWithWorkspaceLoadingAsync(async progress =>
         {
-            await _vm.OpenWorkspaceAsync(folderPath);
+            await _vm.OpenWorkspaceAsync(folderPath, progress);
             UpdateWindowTitle();
             AppLogger.Info($"Workspace opened: {folderPath}");
         });
@@ -834,9 +840,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        await ExecuteSafeAsync(async () =>
+        await ExecuteWithWorkspaceLoadingAsync(async progress =>
         {
-            await _vm.OpenWorkspaceAsync(entry.FolderPath);
+            await _vm.OpenWorkspaceAsync(entry.FolderPath, progress);
             UpdateWindowTitle();
             AppLogger.Info($"Workspace opened from recent list: {entry.FolderPath}");
         });
@@ -2934,6 +2940,39 @@ public partial class MainWindow : Window
         {
             await ShowErrorAsync(ex.Message);
         }
+    }
+
+    private async Task ExecuteWithWorkspaceLoadingAsync(
+        Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
+    {
+        var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
+            Dispatcher.UIThread.Post(
+                () => SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status),
+                DispatcherPriority.Background));
+
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(
+                () => SetWorkspaceLoadingState(true, 0, "Preparing workspace..."),
+                DispatcherPriority.Render);
+            await ExecuteSafeAsync(() => action(progress));
+        }
+        finally
+        {
+            SetWorkspaceLoadingState(false, 0, string.Empty);
+        }
+    }
+
+    private void SetWorkspaceLoadingState(bool isVisible, double progressValue, string status)
+    {
+        if (_workspaceLoadingProgressBar != null)
+            _workspaceLoadingProgressBar.Value = Math.Clamp(progressValue, 0, 100);
+
+        if (_workspaceLoadingStatusText != null)
+            _workspaceLoadingStatusText.Text = status;
+
+        if (_workspaceLoadingOverlay != null)
+            _workspaceLoadingOverlay.IsVisible = isVisible;
     }
 
     private async Task ShowErrorAsync(string message)
