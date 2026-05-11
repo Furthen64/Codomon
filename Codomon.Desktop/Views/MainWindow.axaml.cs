@@ -2959,7 +2959,9 @@ public partial class MainWindow : Window
         }
         finally
         {
-            SetWorkspaceLoadingState(false, 0, string.Empty);
+            await Dispatcher.UIThread.InvokeAsync(
+                () => SetWorkspaceLoadingState(false, 0, string.Empty),
+                DispatcherPriority.Background);
         }
     }
 
