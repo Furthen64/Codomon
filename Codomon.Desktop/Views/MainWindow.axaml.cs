@@ -2940,7 +2940,7 @@ public partial class MainWindow : Window
         Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
     {
         var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
-            SetWorkspaceLoadingState(true, update.Percent, update.Status));
+            SetWorkspaceLoadingState(true, update.PercentComplete, update.Status));
 
         try
         {
@@ -2950,7 +2950,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            SetWorkspaceLoadingState(false, 0, "Preparing workspace...");
+            SetWorkspaceLoadingState(false, 0, string.Empty);
         }
     }
 

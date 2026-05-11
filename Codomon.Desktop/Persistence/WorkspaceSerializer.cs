@@ -9,7 +9,7 @@ namespace Codomon.Desktop.Persistence;
 
 public static class WorkspaceSerializer
 {
-    public readonly record struct WorkspaceLoadProgress(double Percent, string Status);
+    public readonly record struct WorkspaceLoadProgress(double PercentComplete, string Status);
 
     private const string SystemMapLayoutPrefix = "systemmap:";
     private static readonly JsonSerializerOptions JsonOptions = new()
