@@ -90,6 +90,9 @@ public partial class MainWindow : Window
 
     // Timeline control instance; re-created when the workspace changes.
     private TimelineControl? _timelineControl;
+    private Grid? _workspaceLoadingOverlay;
+    private ProgressBar? _workspaceLoadingProgressBar;
+    private TextBlock? _workspaceLoadingStatusText;
 
     // Tracks whether the log list is currently bound to live-monitor entries.
     private bool _logListShowingLive;
@@ -138,6 +141,9 @@ public partial class MainWindow : Window
         UpdateWorkspaceNameDisplay();
         SetupAnalyzePanel();
         RefreshAnalyzePanel();
+        _workspaceLoadingOverlay = this.FindControl<Grid>("WorkspaceLoadingOverlay");
+        _workspaceLoadingProgressBar = this.FindControl<ProgressBar>("WorkspaceLoadingProgressBar");
+        _workspaceLoadingStatusText = this.FindControl<TextBlock>("WorkspaceLoadingStatusText");
 
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
@@ -2940,12 +2946,13 @@ public partial class MainWindow : Window
         Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
     {
         var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
-            SetWorkspaceLoadingState(true, update.PercentComplete, update.Status));
+            SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status));
 
         try
         {
-            SetWorkspaceLoadingState(true, 0, "Preparing workspace...");
-            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+            await Dispatcher.UIThread.InvokeAsync(
+                () => SetWorkspaceLoadingState(true, 0, "Preparing workspace..."),
+                DispatcherPriority.Render);
             await ExecuteSafeAsync(() => action(progress));
         }
         finally
@@ -2956,18 +2963,14 @@ public partial class MainWindow : Window
 
     private void SetWorkspaceLoadingState(bool isVisible, double progressValue, string status)
     {
-        var overlay = this.FindControl<Grid>("WorkspaceLoadingOverlay");
-        var progressBar = this.FindControl<ProgressBar>("WorkspaceLoadingProgressBar");
-        var statusText = this.FindControl<TextBlock>("WorkspaceLoadingStatusText");
+        if (_workspaceLoadingProgressBar != null)
+            _workspaceLoadingProgressBar.Value = Math.Clamp(progressValue, 0, 100);
 
-        if (progressBar != null)
-            progressBar.Value = Math.Clamp(progressValue, 0, 100);
+        if (_workspaceLoadingStatusText != null)
+            _workspaceLoadingStatusText.Text = status;
 
-        if (statusText != null)
-            statusText.Text = status;
-
-        if (overlay != null)
-            overlay.IsVisible = isVisible;
+        if (_workspaceLoadingOverlay != null)
+            _workspaceLoadingOverlay.IsVisible = isVisible;
     }
 
     private async Task ShowErrorAsync(string message)

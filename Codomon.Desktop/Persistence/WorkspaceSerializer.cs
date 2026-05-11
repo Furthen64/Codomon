@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text.Json;
 using Codomon.Desktop.Models;
@@ -9,7 +10,17 @@ namespace Codomon.Desktop.Persistence;
 
 public static class WorkspaceSerializer
 {
-    public readonly record struct WorkspaceLoadProgress(double PercentComplete, string Status);
+    public readonly record struct WorkspaceLoadProgress
+    {
+        public WorkspaceLoadProgress(double progressPercent, string status)
+        {
+            ProgressPercent = Math.Clamp(progressPercent, 0, 100);
+            Status = status;
+        }
+
+        public double ProgressPercent { get; }
+        public string Status { get; }
+    }
 
     private const string SystemMapLayoutPrefix = "systemmap:";
     private static readonly JsonSerializerOptions JsonOptions = new()
