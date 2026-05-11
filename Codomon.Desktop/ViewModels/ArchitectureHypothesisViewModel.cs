@@ -34,6 +34,7 @@ public sealed class BatchLogEntry : INotifyPropertyChanged
     public int OutputTokens { get; set; }
     public string Duration { get; set; } = string.Empty;
     public string FinishReason { get; set; } = string.Empty;
+    public string FailureReason { get; set; } = string.Empty;
     public bool IsRetry { get; set; }
 
     public string Status
@@ -96,6 +97,8 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
     private string _etaFormatted = string.Empty;
     private double _generationSpeed;
     private string _tokenBudgetWarning = string.Empty;
+    private int _liveOutputTokenEstimate;
+    private string _latestRawResponse = string.Empty;
 
     public ArchitectureHypothesisViewModel(WorkspaceModel workspace, string workspaceFolderPath)
     {
@@ -242,6 +245,20 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         private set { _liveOutput = value; OnPropertyChanged(); }
     }
 
+    /// <summary>Estimated token count for <see cref="LiveOutput"/>.</summary>
+    public int LiveOutputTokenEstimate
+    {
+        get => _liveOutputTokenEstimate;
+        private set { _liveOutputTokenEstimate = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Most recent raw LLM response captured from the latest completed batch.</summary>
+    public string LatestRawResponse
+    {
+        get => _latestRawResponse;
+        private set { _latestRawResponse = value; OnPropertyChanged(); }
+    }
+
     /// <summary>
     /// Count of suggestions that have been accepted into the System Map during this session.
     /// Used by the caller to decide whether to mark the workspace dirty.
@@ -351,6 +368,8 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         ProgressMessages.Clear();
         BatchLog.Clear();
         LiveOutput = string.Empty;
+        LiveOutputTokenEstimate = 0;
+        LatestRawResponse = string.Empty;
         TotalPromptTokens = 0;
         TotalGeneratedTokens = 0;
         CurrentBatch = 0;
@@ -384,6 +403,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
                 {
                     liveOutputSb.Append(token);
                     LiveOutput = liveOutputSb.ToString();
+                    LiveOutputTokenEstimate = LlmHelper.EstimateTokenCount(LiveOutput);
                 }));
 
             // Telemetry progress — update batch log and telemetry card.
@@ -446,6 +466,7 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         {
             liveOutputSb.Clear();
             LiveOutput = string.Empty;
+            LiveOutputTokenEstimate = 0;
         }
 
         // Update synthesis state label to reflect retrying.
@@ -501,7 +522,13 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         existing.FinishReason = !string.IsNullOrEmpty(t.FinishReason)
             ? t.FinishReason
             : existing.FinishReason;
+        existing.FailureReason = !string.IsNullOrEmpty(t.FailureReason)
+            ? t.FailureReason
+            : existing.FailureReason;
         existing.Status = t.Status;
+
+        if (!string.IsNullOrWhiteSpace(t.RawResponse))
+            LatestRawResponse = t.RawResponse!;
     }
 
     private void UpdateElapsed()
