@@ -438,6 +438,7 @@ public static class ArchitectureHypothesisService
                     RemainingContextTokens = remainingContextTokens,
                     ExpectedOutputTokens = expectedOutputTokens,
                     PreflightWarning = preflightWarning,
+                    RawResponse = result.Content,
                 });
 
                 var half = batch.Count / 2;
@@ -545,6 +546,7 @@ public static class ArchitectureHypothesisService
                 RemainingContextTokens = remainingContextTokens,
                 ExpectedOutputTokens = expectedOutputTokens,
                 PreflightWarning = preflightWarning,
+                RawResponse = result.Content,
             });
 
             progress?.Report($"✔ {batchLabel}: {batchDuration.TotalSeconds:F0}s  ~{estimatedPromptTokens}→{result.OutputTokens} tok  finish={result.FinishReason}");
@@ -1216,6 +1218,9 @@ public sealed class BatchTelemetry
 
     /// <summary>Human-readable preflight warning, populated for near-budget batches.</summary>
     public string? PreflightWarning { get; set; }
+
+    /// <summary>Raw LLM response content for this batch, when available.</summary>
+    public string? RawResponse { get; set; }
 
     /// <summary>True when this batch was automatically retried due to a previous failure.</summary>
     public bool IsRetry { get; set; }

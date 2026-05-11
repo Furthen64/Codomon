@@ -42,7 +42,12 @@ public partial class ArchitectureHypothesisDialog : Window
             else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.HasCanvasChanges))
                 SyncApplyToCanvasButton();
             else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.SynthesisState))
+            {
                 SyncSynthesisState();
+                SyncRunButtons();
+                SyncApplyToCanvasButton();
+                UpdateWizardButtons();
+            }
             else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.LiveOutput))
                 SyncLiveOutput();
             else if (e.PropertyName
@@ -56,6 +61,8 @@ public partial class ArchitectureHypothesisDialog : Window
                 or nameof(ArchitectureHypothesisViewModel.EtaFormatted)
                 or nameof(ArchitectureHypothesisViewModel.GenerationSpeed))
                 SyncTelemetryCard();
+            else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.LiveOutputTokenEstimate))
+                SyncLiveOutput();
             else if (e.PropertyName is nameof(ArchitectureHypothesisViewModel.TokenBudgetWarning))
                 SyncTokenBudgetWarning();
         };
@@ -230,7 +237,13 @@ public partial class ArchitectureHypothesisDialog : Window
     {
         var runBtn    = this.FindControl<Button>("RunButton");
         var cancelBtn = this.FindControl<Button>("CancelButton");
-        if (runBtn    != null) runBtn.IsEnabled    = !_vm.IsRunning;
+        if (runBtn != null)
+        {
+            runBtn.IsEnabled = !_vm.IsRunning;
+            runBtn.Content = _vm.SynthesisState is SynthesisState.Failed or SynthesisState.Cancelled
+                ? "↺ Retry Synthesis"
+                : "▶ Run Synthesis";
+        }
         if (cancelBtn != null) cancelBtn.IsEnabled =  _vm.IsRunning;
 
         if (_vm.IsRunning)
@@ -301,9 +314,25 @@ public partial class ArchitectureHypothesisDialog : Window
         if (countLabel != null)
             countLabel.Text = $"{_vm.LiveOutput.Length:N0} chars";
 
+        var tokenLabel = this.FindControl<TextBlock>("LiveOutputTokenCountLabel");
+        if (tokenLabel != null)
+            tokenLabel.Text = $"~{_vm.LiveOutputTokenEstimate:N0} tok";
+
         // Auto-scroll the live output.
-        var scroll = this.FindControl<ScrollViewer>("LiveOutputScroll");
-        scroll?.ScrollToEnd();
+        if (IsLiveOutputAutoScrollEnabled())
+        {
+            var scroll = this.FindControl<ScrollViewer>("LiveOutputScroll");
+            scroll?.ScrollToEnd();
+        }
+    }
+
+    private bool IsLiveOutputAutoScrollEnabled()
+        => this.FindControl<CheckBox>("LiveOutputAutoScrollToggle")?.IsChecked != false;
+
+    private void OnLiveOutputAutoScrollChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (IsLiveOutputAutoScrollEnabled())
+            this.FindControl<ScrollViewer>("LiveOutputScroll")?.ScrollToEnd();
     }
 
     private void RebuildBatchLog()
@@ -381,6 +410,17 @@ public partial class ArchitectureHypothesisDialog : Window
                 });
             }
 
+            if (!string.IsNullOrWhiteSpace(entry.FailureReason))
+            {
+                panel.Children.Add(new TextBlock
+                {
+                    Text = $"  Reason: {entry.FailureReason}",
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#CC8888")),
+                    FontSize = 10,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                });
+            }
+
             listBox.Items.Add(new ListBoxItem
             {
                 Tag = entry,
@@ -394,6 +434,75 @@ public partial class ArchitectureHypothesisDialog : Window
     {
         if (!string.IsNullOrEmpty(_vm.LiveOutput))
             Clipboard?.SetTextAsync(_vm.LiveOutput);
+    }
+
+    private async void OnExportLogClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var storageProvider = StorageProvider;
+        if (storageProvider == null) return;
+
+        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Synthesis Log",
+            SuggestedFileName = $"synthesis_log_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt"
+        });
+        if (file == null) return;
+
+        var content = BuildSynthesisLogText();
+        await using var stream = await file.OpenWriteAsync();
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(content);
+
+        _vm.StatusMessage = $"Exported synthesis log: {file.Name}";
+        SyncStatusText();
+    }
+
+    private async void OnCopyDiagnosticsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var text = BuildDiagnosticsText();
+        await (Clipboard?.SetTextAsync(text) ?? Task.CompletedTask);
+        _vm.StatusMessage = "Diagnostics copied to clipboard.";
+        SyncStatusText();
+    }
+
+    private void OnOpenRawResponseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_vm.LatestRawResponse))
+        {
+            _vm.StatusMessage = "No raw response captured yet.";
+            SyncStatusText();
+            return;
+        }
+
+        var viewer = new Window
+        {
+            Title = "Raw LLM Response",
+            Width = 820,
+            Height = 620,
+            MinWidth = 500,
+            MinHeight = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820")),
+            Content = new Border
+            {
+                Padding = new Avalonia.Thickness(10),
+                Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820")),
+                Child = new TextBox
+                {
+                    Text = _vm.LatestRawResponse,
+                    IsReadOnly = true,
+                    AcceptsReturn = true,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    FontFamily = "Monospace",
+                    FontSize = 11,
+                    Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F141E")),
+                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#CCDDEE")),
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                }
+            }
+        };
+        viewer.Show(this);
     }
 
     private void ScrollProgressToBottom()
@@ -891,7 +1000,8 @@ public partial class ArchitectureHypothesisDialog : Window
         var next = this.FindControl<Button>("NextStepButton");
         if (tabs == null || back == null || next == null) return;
         back.IsEnabled = tabs.SelectedIndex > 0;
-        next.IsEnabled = tabs.SelectedIndex < tabs.ItemCount - 1;
+        next.IsEnabled = tabs.SelectedIndex < tabs.ItemCount - 1
+            && _vm.SynthesisState != SynthesisState.Failed;
     }
     // ── Shared ────────────────────────────────────────────────────────────────
 
@@ -906,7 +1016,52 @@ public partial class ArchitectureHypothesisDialog : Window
     {
         var btn = this.FindControl<Button>("ApplyToCanvasFooterButton");
         if (btn != null)
-            btn.IsEnabled = _vm.HasCanvasChanges;
+            btn.IsEnabled = _vm.HasCanvasChanges && _vm.SynthesisState != SynthesisState.Failed;
+    }
+
+    private string BuildDiagnosticsText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Codomon Architecture Synthesis Diagnostics");
+        sb.AppendLine($"Timestamp (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"State: {_vm.SynthesisStateLabel}");
+        sb.AppendLine($"Batches: {_vm.CurrentBatch}/{_vm.TotalBatches}");
+        sb.AppendLine($"Summaries: {_vm.ProcessedSummaries}/{_vm.TotalSummaries}");
+        sb.AppendLine($"Prompt tokens: {_vm.TotalPromptTokens:N0}");
+        sb.AppendLine($"Output tokens: {_vm.TotalGeneratedTokens:N0}");
+        sb.AppendLine($"Elapsed: {_vm.ElapsedFormatted}");
+        sb.AppendLine($"ETA: {_vm.EtaFormatted}");
+        sb.AppendLine($"Generation speed: {(_vm.GenerationSpeed > 0 ? $"{_vm.GenerationSpeed:F0} tok/s" : "—")}");
+        if (!string.IsNullOrWhiteSpace(_vm.TokenBudgetWarning))
+            sb.AppendLine($"Token warning: {_vm.TokenBudgetWarning}");
+        sb.AppendLine();
+        sb.AppendLine("Batch log:");
+        foreach (var batch in _vm.BatchLog)
+        {
+            sb.AppendLine($"- {batch.BatchLabel} [{batch.Status}] summaries={batch.SummaryCount}, prompt={batch.PromptTokens}, output={batch.OutputTokens}, finish={batch.FinishReason}, duration={batch.Duration}");
+            if (!string.IsNullOrWhiteSpace(batch.FailureReason))
+                sb.AppendLine($"  failure={batch.FailureReason}");
+        }
+        return sb.ToString();
+    }
+
+    private string BuildSynthesisLogText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(BuildDiagnosticsText());
+        sb.AppendLine();
+        sb.AppendLine("Progress messages:");
+        foreach (var msg in _vm.ProgressMessages)
+            sb.AppendLine($"- {msg}");
+
+        if (!string.IsNullOrWhiteSpace(_vm.LatestRawResponse))
+        {
+            sb.AppendLine();
+            sb.AppendLine("Latest raw response:");
+            sb.AppendLine(_vm.LatestRawResponse);
+        }
+
+        return sb.ToString();
     }
 
     private static ListBoxItem MakePlaceholderItem(string message) =>
