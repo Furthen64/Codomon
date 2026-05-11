@@ -327,7 +327,7 @@ public partial class ArchitectureHypothesisDialog : Window
     }
 
     private bool IsLiveOutputAutoScrollEnabled()
-        => this.FindControl<CheckBox>("LiveOutputAutoScrollToggle")?.IsChecked != false;
+        => this.FindControl<CheckBox>("LiveOutputAutoScrollToggle")?.IsChecked ?? true;
 
     private void OnLiveOutputAutoScrollChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -444,7 +444,7 @@ public partial class ArchitectureHypothesisDialog : Window
         var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Export Synthesis Log",
-            SuggestedFileName = $"synthesis_log_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt"
+            SuggestedFileName = $"synthesis-log-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt"
         });
         if (file == null) return;
 
@@ -497,8 +497,6 @@ public partial class ArchitectureHypothesisDialog : Window
                     FontSize = 11,
                     Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F141E")),
                     Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#CCDDEE")),
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 }
             }
         };

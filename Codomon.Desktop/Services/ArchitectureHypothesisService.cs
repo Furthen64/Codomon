@@ -438,7 +438,6 @@ public static class ArchitectureHypothesisService
                     RemainingContextTokens = remainingContextTokens,
                     ExpectedOutputTokens = expectedOutputTokens,
                     PreflightWarning = preflightWarning,
-                    RawResponse = result.Content,
                 });
 
                 var half = batch.Count / 2;
