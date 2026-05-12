@@ -438,11 +438,12 @@ public partial class SystemMapView : UserControl
             });
         }
 
+        bool isFlatSelected = _vm.SelectedSystem?.Id == item.Id;
         var card = new Border
         {
             Background      = new SolidColorBrush(Color.Parse("#141C28")),
-            BorderBrush     = new SolidColorBrush(Color.Parse("#2A3F5A")),
-            BorderThickness = new Avalonia.Thickness(1),
+            BorderBrush     = new SolidColorBrush(Color.Parse(isFlatSelected ? "#4A90D9" : "#2A3F5A")),
+            BorderThickness = new Avalonia.Thickness(isFlatSelected ? 2 : 1),
             CornerRadius    = new Avalonia.CornerRadius(6),
             Padding         = new Avalonia.Thickness(14, 10),
             Margin          = new Avalonia.Thickness(0, 0, 10, 10),
@@ -457,7 +458,6 @@ public partial class SystemMapView : UserControl
             WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
             {
                 _vm.SelectSystem(item);
-                _vm.SetActiveView(SystemMapViewKind.ModuleView);
             });
         }
 
@@ -903,6 +903,11 @@ public partial class SystemMapView : UserControl
         // Recent Activity placeholder — show when system is selected
         if (compActivity != null)
             compActivity.IsVisible = isSystem;
+
+        // View Modules navigation button — show when system is selected
+        var btnViewModules = this.FindControl<Button>("BtnViewModulesFromInspector");
+        if (btnViewModules != null)
+            btnViewModules.IsVisible = isSystem;
     }
 
     private void UpdateConnectionsTab()
@@ -1027,6 +1032,10 @@ public partial class SystemMapView : UserControl
                 RefreshCodeDetailView();
                 break;
 
+            case nameof(SystemMapViewModel.SelectedSystem):
+                RefreshSystemOverview();
+                break;
+
             case nameof(SystemMapViewModel.ShowExternalSystems):
                 RefreshSystemOverview();
                 break;
@@ -1040,6 +1049,12 @@ public partial class SystemMapView : UserControl
         if (e.AddedItems.Count == 0) return;
         if (e.AddedItems[0] is CodeNodeItemVm node)
             _vm.SelectCodeNode(node);
+    }
+
+    public void OnViewModulesFromInspectorClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm.SelectedSystem == null) return;
+        _vm.SetActiveView(SystemMapViewKind.ModuleView);
     }
 
     public void OnShowDetailedRelationshipsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1227,13 +1242,16 @@ public partial class SystemMapView : UserControl
             Child           = new StackPanel { Children = { header, body } }
         };
 
+        bool isLayeredSelected = _vm.SelectedSystem?.Id == item.Id;
+        card.BorderBrush     = new SolidColorBrush(Color.Parse(isLayeredSelected ? "#4A90D9" : accentColor));
+        card.BorderThickness = new Avalonia.Thickness(isLayeredSelected ? 2.5 : 1.5);
+
         var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
         if (systemsCanvas != null)
         {
             WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
             {
                 _vm.SelectSystem(item);
-                _vm.SetActiveView(SystemMapViewKind.ModuleView);
             });
         }
 

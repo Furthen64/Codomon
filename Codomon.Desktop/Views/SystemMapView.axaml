@@ -348,6 +348,16 @@
                     </Border>
                   </StackPanel>
 
+                  <!-- View Modules navigation button (visible when a system is selected) -->
+                  <Button x:Name="BtnViewModulesFromInspector"
+                          IsVisible="False"
+                          Content="View Modules →"
+                          Click="OnViewModulesFromInspectorClick"
+                          HorizontalAlignment="Stretch"
+                          Padding="10,6"
+                          Margin="0,8,0,0"
+                          ToolTip.Tip="Switch to Module View for this system."/>
+
                 </StackPanel>
               </ScrollViewer>
             </TabItem>

@@ -87,22 +87,31 @@ public partial class App : Application
         }
 
         var main = new MainWindow();
-        // Apply saved window state preference from user config.
-        try
-        {
-            var userCfg = UserConfigService.Load();
-            main.WindowState = userCfg.StartMaximized ? Avalonia.Controls.WindowState.Maximized : Avalonia.Controls.WindowState.Normal;
-        }
-        catch
-        {
-            // ignore and proceed with default state
-        }
         desktop.MainWindow = main;
+        main.Opened += OnMainWindowOpened;
         main.Show();
 
         if (splash is not null)
         {
             await Dispatcher.UIThread.InvokeAsync(() => splash.Close());
+        }
+    }
+
+    private static void OnMainWindowOpened(object? sender, EventArgs e)
+    {
+        if (sender is not Window main)
+            return;
+
+        main.Opened -= OnMainWindowOpened;
+
+        try
+        {
+            var userCfg = UserConfigService.Load();
+            main.WindowState = userCfg.StartMaximized ? WindowState.Maximized : WindowState.Normal;
+        }
+        catch
+        {
+            // ignore and proceed with default state
         }
     }
 

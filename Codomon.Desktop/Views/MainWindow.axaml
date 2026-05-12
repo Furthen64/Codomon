@@ -75,9 +75,15 @@
         <!-- Left: codomon wordmark + workspace dropdown -->
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
                     VerticalAlignment="Center" Margin="10,0,0,0">
-          <TextBlock Text="◈" FontSize="18" Foreground="#4A90D9" VerticalAlignment="Center"/>
-          <TextBlock Text="codomon" FontSize="13" FontWeight="Bold" Foreground="#8AB4D4"
-                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <Button Click="OnLogoClick" Padding="0" Background="Transparent"
+                  BorderThickness="0" Cursor="Hand" VerticalAlignment="Center"
+                  ToolTip.Tip="Go to System Overview">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="◈" FontSize="18" Foreground="#4A90D9" VerticalAlignment="Center"/>
+              <TextBlock Text="codomon" FontSize="13" FontWeight="Bold" Foreground="#8AB4D4"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
           <!-- Workspace name dropdown -->
           <Button x:Name="WorkspaceDropBtn" Padding="8,3" VerticalAlignment="Center">
             <Button.Flyout>

@@ -324,6 +324,12 @@ public partial class MainWindow : Window
         SetActiveNavTab(tab);
     }
 
+    private void OnLogoClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        SetActiveNavTab("Monitor");
+        _vm.SystemMap.SetActiveView(SystemMapViewKind.SystemOverview);
+    }
+
     private void SetActiveNavTab(string tab)
     {
         _activeNavTab = tab;
