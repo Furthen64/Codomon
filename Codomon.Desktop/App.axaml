@@ -11,7 +11,7 @@
         <ResourceInclude Source="avares://Nodify/Theme.axaml"/>
       </ResourceDictionary.MergedDictionaries>
 
-      <!-- Architecture layer accent colours -->
+      <!-- ═══ Architecture layer accent colours ═══════════════════════════ -->
       <Color x:Key="LayerPresentationColor">#9B59B6</Color>
       <Color x:Key="LayerApplicationColor">#27AE60</Color>
       <Color x:Key="LayerDomainColor">#F39C12</Color>
@@ -21,6 +21,54 @@
       <SolidColorBrush x:Key="LayerApplicationBrush"  Color="{StaticResource LayerApplicationColor}"/>
       <SolidColorBrush x:Key="LayerDomainBrush"       Color="{StaticResource LayerDomainColor}"/>
       <SolidColorBrush x:Key="LayerInfrastructureBrush" Color="{StaticResource LayerInfrastructureColor}"/>
+
+      <!-- ═══ Window chrome colour palette ════════════════════════════════
+           These are the canonical tokens for every dark-UI surface in the
+           application.  Prefer {StaticResource} over inline hex literals
+           in XAML, and the matching C# constants in MainWindow.Colors.cs
+           for code-behind brushes.                                        -->
+
+      <!-- Panel backgrounds (darkest → lightest) -->
+      <Color x:Key="PanelBgDarkest">#111820</Color>
+      <Color x:Key="PanelBgDark">#141C28</Color>
+      <Color x:Key="PanelBgMenu">#161E2C</Color>
+      <Color x:Key="PanelBgBase">#1E2A3A</Color>
+      <Color x:Key="PanelBgCard">#1A2435</Color>
+      <Color x:Key="PanelBgContent">#0F141E</Color>
+
+      <!-- Border / divider -->
+      <Color x:Key="BorderDefault">#2A3F5A</Color>
+      <Color x:Key="BorderSubtle">#1E2A3A</Color>
+
+      <!-- Text hierarchy -->
+      <Color x:Key="TextPrimary">#AABBCC</Color>
+      <Color x:Key="TextSecondary">#88AABB</Color>
+      <Color x:Key="TextMuted">#778899</Color>
+      <Color x:Key="TextFaint">#556677</Color>
+      <Color x:Key="TextColumnHeader">#4A6A8A</Color>
+
+      <!-- Accent -->
+      <Color x:Key="AccentBlue">#4A90D9</Color>
+      <Color x:Key="AccentGreen">#44CC44</Color>
+      <Color x:Key="AccentAmber">#FFAA44</Color>
+
+      <!-- Brush counterparts for the tokens above -->
+      <SolidColorBrush x:Key="PanelBgDarkestBrush"   Color="{StaticResource PanelBgDarkest}"/>
+      <SolidColorBrush x:Key="PanelBgDarkBrush"      Color="{StaticResource PanelBgDark}"/>
+      <SolidColorBrush x:Key="PanelBgMenuBrush"      Color="{StaticResource PanelBgMenu}"/>
+      <SolidColorBrush x:Key="PanelBgBaseBrush"      Color="{StaticResource PanelBgBase}"/>
+      <SolidColorBrush x:Key="PanelBgCardBrush"      Color="{StaticResource PanelBgCard}"/>
+      <SolidColorBrush x:Key="PanelBgContentBrush"   Color="{StaticResource PanelBgContent}"/>
+      <SolidColorBrush x:Key="BorderDefaultBrush"    Color="{StaticResource BorderDefault}"/>
+      <SolidColorBrush x:Key="BorderSubtleBrush"     Color="{StaticResource BorderSubtle}"/>
+      <SolidColorBrush x:Key="TextPrimaryBrush"      Color="{StaticResource TextPrimary}"/>
+      <SolidColorBrush x:Key="TextSecondaryBrush"    Color="{StaticResource TextSecondary}"/>
+      <SolidColorBrush x:Key="TextMutedBrush"        Color="{StaticResource TextMuted}"/>
+      <SolidColorBrush x:Key="TextFaintBrush"        Color="{StaticResource TextFaint}"/>
+      <SolidColorBrush x:Key="TextColumnHeaderBrush" Color="{StaticResource TextColumnHeader}"/>
+      <SolidColorBrush x:Key="AccentBlueBrush"       Color="{StaticResource AccentBlue}"/>
+      <SolidColorBrush x:Key="AccentGreenBrush"      Color="{StaticResource AccentGreen}"/>
+      <SolidColorBrush x:Key="AccentAmberBrush"      Color="{StaticResource AccentAmber}"/>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

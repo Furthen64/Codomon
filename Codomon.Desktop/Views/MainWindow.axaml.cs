@@ -115,9 +115,59 @@ public partial class MainWindow : Window
     // Tracks the currently active navigation tab.
     private string _activeNavTab = "Monitor";
 
+    // ── Cached control references ────────────────────────────────────────────
+    // Initialized once in the constructor to avoid repeated string-based FindControl
+    // lookups in hot paths such as RefreshStatusBar and RefreshLiveMonitorPanel.
+    private TextBlock? _statusScanDotTb;
+    private TextBlock? _statusScanLabelTb;
+    private TextBlock? _statusBarFilesTb;
+    private TextBlock? _statusBarSep1Tb;
+    private TextBlock? _statusBarClassesTb;
+    private TextBlock? _statusBarSep2Tb;
+    private TextBlock? _statusBarMethodsTb;
+    private TextBlock? _statusBarSep3Tb;
+    private TextBlock? _statusBarLogPtsTb;
+    private TextBlock? _statusBarSep4Tb;
+    private TextBlock? _statusBarRuntimeTb;
+    private TextBlock? _statusBarSep5Tb;
+    private TextBlock? _statusBarEventsTb;
+    private TextBlock? _statusTextTb;
+    private Border?    _logStreamIndicatorBorder;
+    private TextBlock? _logStreamIndicatorText;
+    private Border?    _runningIndicatorBorder;
+    private Button?    _topBarStopBtn;
+    private Button?    _importLogBtn;
+    private Button?    _replayPlayBtn;
+    private Button?    _replayPauseBtn;
+    private Button?    _replayStopBtn;
+
     public MainWindow()
     {
         InitializeComponent();
+
+        // Cache frequently-accessed controls to avoid repeated string lookups.
+        _statusScanDotTb          = this.FindControl<TextBlock>("StatusScanDot");
+        _statusScanLabelTb        = this.FindControl<TextBlock>("StatusScanLabel");
+        _statusBarFilesTb         = this.FindControl<TextBlock>("StatusBarFilesText");
+        _statusBarSep1Tb          = this.FindControl<TextBlock>("StatusBarSep1");
+        _statusBarClassesTb       = this.FindControl<TextBlock>("StatusBarClassesText");
+        _statusBarSep2Tb          = this.FindControl<TextBlock>("StatusBarSep2");
+        _statusBarMethodsTb       = this.FindControl<TextBlock>("StatusBarMethodsText");
+        _statusBarSep3Tb          = this.FindControl<TextBlock>("StatusBarSep3");
+        _statusBarLogPtsTb        = this.FindControl<TextBlock>("StatusBarLogPtsText");
+        _statusBarSep4Tb          = this.FindControl<TextBlock>("StatusBarSep4");
+        _statusBarRuntimeTb       = this.FindControl<TextBlock>("StatusBarRuntimeText");
+        _statusBarSep5Tb          = this.FindControl<TextBlock>("StatusBarSep5");
+        _statusBarEventsTb        = this.FindControl<TextBlock>("StatusBarEventsText");
+        _statusTextTb             = this.FindControl<TextBlock>("StatusText");
+        _logStreamIndicatorBorder = this.FindControl<Border>("LogStreamIndicatorBorder");
+        _logStreamIndicatorText   = this.FindControl<TextBlock>("LogStreamIndicatorText");
+        _runningIndicatorBorder   = this.FindControl<Border>("RunningIndicatorBorder");
+        _topBarStopBtn            = this.FindControl<Button>("TopBarStopBtn");
+        _importLogBtn             = this.FindControl<Button>("ImportLogButton");
+        _replayPlayBtn            = this.FindControl<Button>("ReplayPlayButton");
+        _replayPauseBtn           = this.FindControl<Button>("ReplayPauseButton");
+        _replayStopBtn            = this.FindControl<Button>("ReplayStopButton");
 
         _vm = new MainViewModel();
         DataContext = _vm;
@@ -236,9 +286,8 @@ public partial class MainWindow : Window
         }
         else if (e.PropertyName == nameof(MainViewModel.StatusMessage))
         {
-            var statusText = this.FindControl<TextBlock>("StatusText");
-            if (statusText != null)
-                statusText.Text = _vm.StatusMessage;
+            if (_statusTextTb != null)
+                _statusTextTb.Text = _vm.StatusMessage;
         }
         else if (e.PropertyName == nameof(MainViewModel.IsDirty))
         {
@@ -582,176 +631,6 @@ public partial class MainWindow : Window
 
     // ── Input dialog ─────────────────────────────────────────────────────────
 
-    private async Task<bool> ShowInitialUserConfigPromptAsync()
-    {
-        bool openSettings = false;
-
-        var dialog = new Window
-        {
-            Title = "First Run Setup",
-            Width = 520,
-            Height = 220,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var openBtn = new Button { Content = "Setup LLM", Padding = new Avalonia.Thickness(20, 4) };
-        var laterBtn = new Button { Content = "Later", Padding = new Avalonia.Thickness(20, 4) };
-
-        openBtn.Click += (_, _) => { openSettings = true; dialog.Close(); };
-        laterBtn.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 16,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = "No user settings file was found. Configure your default LLM endpoint and model now?",
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = Avalonia.Media.Brushes.White
-                },
-                new TextBlock
-                {
-                    Text = $"Expected path: {UserConfigService.GetConfigFilePath()}",
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88AABB")),
-                    FontSize = 11
-                },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    Children = { openBtn, laterBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return openSettings;
-    }
-
-    private async Task<string?> ShowInputDialogAsync(string title, string prompt, string defaultValue = "")
-    {
-        string? result = null;
-
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 420,
-            Height = 160,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var inputBox = new TextBox
-        {
-            Text = defaultValue,
-            Foreground = Avalonia.Media.Brushes.White,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#1A2435")),
-            Padding = new Avalonia.Thickness(6, 4)
-        };
-
-        var okBtn = new Button
-        {
-            Content = "OK",
-            Padding = new Avalonia.Thickness(20, 4),
-            IsDefault = true
-        };
-        var cancelBtn = new Button
-        {
-            Content = "Cancel",
-            Padding = new Avalonia.Thickness(20, 4),
-            IsCancel = true
-        };
-
-        okBtn.Click += (_, _) => { result = inputBox.Text; dialog.Close(); };
-        cancelBtn.Click += (_, _) => dialog.Close();
-        inputBox.KeyDown += (_, ke) =>
-        {
-            if (ke.Key == Avalonia.Input.Key.Enter) { result = inputBox.Text; dialog.Close(); }
-        };
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(16),
-            Spacing = 10,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = prompt,
-                    Foreground = Avalonia.Media.Brushes.White,
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
-                },
-                inputBox,
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                    Children = { okBtn, cancelBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return result;
-    }
-
-    // ── Confirm-delete profile dialog ─────────────────────────────────────────
-
-    private async Task<bool> ShowConfirmDeleteProfileAsync(string profileName)
-    {
-        bool confirmed = false;
-
-        var dialog = new Window
-        {
-            Title = "Delete Profile",
-            Width = 420,
-            Height = 160,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var deleteBtn = new Button { Content = "Delete", Padding = new Avalonia.Thickness(20, 4) };
-        var cancelBtn = new Button { Content = "Cancel", Padding = new Avalonia.Thickness(20, 4) };
-
-        deleteBtn.Click += (_, _) => { confirmed = true; dialog.Close(); };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 16,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = $"Delete profile \"{profileName}\"? This cannot be undone.",
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = Avalonia.Media.Brushes.White
-                },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    Children = { deleteBtn, cancelBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return confirmed;
-    }
-
     // ── Welcome / Recent Workspaces ──────────────────────────────────────────
 
     private void PopulateRecentWorkspaces()
@@ -850,186 +729,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private async Task<bool> ShowRemoveStaleRecentAsync(string workspaceName)
-    {
-        bool remove = false;
-
-        var dialog = new Window
-        {
-            Title = "Workspace Not Found",
-            Width = 440,
-            Height = 180,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var removeBtn = new Button { Content = "Remove from List", Padding = new Avalonia.Thickness(20, 4) };
-        var cancelBtn = new Button { Content = "Keep",             Padding = new Avalonia.Thickness(20, 4) };
-
-        removeBtn.Click += (_, _) => { remove = true; dialog.Close(); };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 16,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = $"The workspace \"{workspaceName}\" could not be found on disk. Remove it from the recent list?",
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = Avalonia.Media.Brushes.White
-                },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    Children = { removeBtn, cancelBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return remove;
-    }
-
     // ── Autosave dialogs ─────────────────────────────────────────────────────
-
-    private async Task<Codomon.Desktop.Persistence.AutosaveEntry?> ShowAutosavePickerAsync(
-        List<Codomon.Desktop.Persistence.AutosaveEntry> entries)
-    {
-        Codomon.Desktop.Persistence.AutosaveEntry? result = null;
-
-        var dialog = new Window
-        {
-            Title = "Load Autosave",
-            Width = 480,
-            Height = 320,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var listBox = new ListBox
-        {
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#1A2435")),
-            Margin = new Avalonia.Thickness(0, 0, 0, 8)
-        };
-
-        foreach (var entry in entries)
-        {
-            listBox.Items.Add(new ListBoxItem
-            {
-                Content = new TextBlock
-                {
-                    Text = entry.DisplayName,
-                    Foreground = Avalonia.Media.Brushes.White,
-                    FontFamily = new Avalonia.Media.FontFamily("Monospace"),
-                    Padding = new Avalonia.Thickness(4, 2)
-                },
-                Tag = entry
-            });
-        }
-
-        var loadBtn = new Button
-        {
-            Content = "Load Selected",
-            Padding = new Avalonia.Thickness(20, 4),
-            IsEnabled = false
-        };
-        var cancelBtn = new Button
-        {
-            Content = "Cancel",
-            Padding = new Avalonia.Thickness(20, 4)
-        };
-
-        listBox.SelectionChanged += (_, _) =>
-            loadBtn.IsEnabled = listBox.SelectedItem != null;
-
-        loadBtn.Click += (_, _) =>
-        {
-            if (listBox.SelectedItem is ListBoxItem item &&
-                item.Tag is Codomon.Desktop.Persistence.AutosaveEntry entry)
-                result = entry;
-            dialog.Close();
-        };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(16),
-            Spacing = 8,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = "Select an autosave to restore:",
-                    Foreground = Avalonia.Media.Brushes.White,
-                    FontWeight = Avalonia.Media.FontWeight.SemiBold
-                },
-                listBox,
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                    Children = { loadBtn, cancelBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return result;
-    }
-
-    private async Task<bool> ShowAutosaveWarningAsync(string autosaveName)
-    {
-        bool confirmed = false;
-
-        var dialog = new Window
-        {
-            Title = "Restore Autosave",
-            Width = 440,
-            Height = 180,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var restoreBtn = new Button { Content = "Restore", Padding = new Avalonia.Thickness(20, 4) };
-        var cancelBtn = new Button { Content = "Cancel", Padding = new Avalonia.Thickness(20, 4) };
-
-        restoreBtn.Click += (_, _) => { confirmed = true; dialog.Close(); };
-        cancelBtn.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 16,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = $"Restoring autosave \"{autosaveName}\" will overwrite the current workspace metadata and profile settings. This cannot be undone.\n\nContinue?",
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = Avalonia.Media.Brushes.White
-                },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    Children = { restoreBtn, cancelBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return confirmed;
-    }
 
     // ── Log import + replay handlers ─────────────────────────────────────────
 
@@ -1142,30 +842,14 @@ public partial class MainWindow : Window
         // When live monitoring is active, the log list belongs to the live monitor.
         if (_logListShowingLive) return;
 
-        var replay   = _vm.LogReplay;
-        var listBox  = this.FindControl<ListBox>("ImportedLogsListBox");
-        var playBtn  = this.FindControl<Button>("ReplayPlayButton");
-        var pauseBtn = this.FindControl<Button>("ReplayPauseButton");
-        var stopBtn  = this.FindControl<Button>("ReplayStopButton");
-        var statusTb = this.FindControl<TextBlock>("ReplayStatusText");
+        var replay  = _vm.LogReplay;
+        var listBox = this.FindControl<ListBox>("ImportedLogsListBox");
 
         bool hasEntries = replay.Entries.Count > 0;
 
-        if (playBtn  != null) playBtn.IsEnabled  = hasEntries && !_vm.LiveMonitor.IsWatching;
-        if (pauseBtn != null) pauseBtn.IsEnabled = replay.IsPlaying;
-        if (stopBtn  != null) stopBtn.IsEnabled  = hasEntries;
-
-        if (statusTb != null)
-        {
-            if (!hasEntries)
-                statusTb.Text = "No log loaded";
-            else if (replay.IsPlaying)
-                statusTb.Text = $"Replaying… {replay.CurrentIndex + 1} / {replay.Entries.Count}";
-            else if (replay.CurrentIndex < 0)
-                statusTb.Text = $"{replay.Entries.Count} entries — press ▶ to replay";
-            else
-                statusTb.Text = $"Paused at {replay.CurrentIndex + 1} / {replay.Entries.Count}";
-        }
+        if (_replayPlayBtn  != null) _replayPlayBtn.IsEnabled  = hasEntries && !_vm.LiveMonitor.IsWatching;
+        if (_replayPauseBtn != null) _replayPauseBtn.IsEnabled = replay.IsPlaying;
+        if (_replayStopBtn  != null) _replayStopBtn.IsEnabled  = hasEntries;
 
         // (Re-)bind the log list if the entry set has changed.
         if (listBox != null && !ReferenceEquals(listBox.ItemsSource, replay.Entries))
@@ -1416,11 +1100,10 @@ public partial class MainWindow : Window
         _vm.TotalEventCount = _vm.LiveMonitor.Entries.Count;
 
         // Update streaming indicator label with live count.
-        var indicatorText = this.FindControl<TextBlock>("LogStreamIndicatorText");
-        if (indicatorText != null && _vm.LiveMonitor.IsWatching)
+        if (_logStreamIndicatorText != null && _vm.LiveMonitor.IsWatching)
         {
             var pausedSuffix = _logStreamPaused ? " (paused)" : string.Empty;
-            indicatorText.Text = $"● Streaming…  {_vm.LiveMonitor.Entries.Count:N0} lines{pausedSuffix}";
+            _logStreamIndicatorText.Text = $"● Streaming…  {_vm.LiveMonitor.Entries.Count:N0} lines{pausedSuffix}";
         }
 
         // Auto-scroll to the latest entry unless stream is paused.
@@ -1457,13 +1140,9 @@ public partial class MainWindow : Window
     /// <summary>Synchronises the Watch/Stop button states and streaming indicator.</summary>
     private void RefreshLiveMonitorPanel()
     {
-        var watchBtn      = this.FindControl<Button>("WatchLogButton");
-        var stopBtn       = this.FindControl<Button>("StopWatchButton");
-        var pauseBtn      = this.FindControl<Button>("LogStreamPauseBtn");
-        var indicatorBorder = this.FindControl<Border>("LogStreamIndicatorBorder");
-        var indicatorText   = this.FindControl<TextBlock>("LogStreamIndicatorText");
-        // Legacy hidden control (still updated for safety).
-        var statusTb      = this.FindControl<TextBlock>("WatchStatusText");
+        var watchBtn = this.FindControl<Button>("WatchLogButton");
+        var stopBtn  = this.FindControl<Button>("StopWatchButton");
+        var pauseBtn = this.FindControl<Button>("LogStreamPauseBtn");
 
         bool hasWorkspace  = _vm.HasWorkspace;
         bool isWatching    = _vm.LiveMonitor.IsWatching;
@@ -1477,45 +1156,45 @@ public partial class MainWindow : Window
             pauseBtn.Content   = _logStreamPaused ? "▶ Resume" : "⏸ Pause";
         }
 
+        // Keep Import/Replay buttons enabled/disabled in sync.
+        if (_importLogBtn   != null) _importLogBtn.IsEnabled   = hasWorkspace && !isWatching;
+        if (_replayPlayBtn  != null) _replayPlayBtn.IsEnabled  = _vm.LogReplay.Entries.Count > 0 && !isWatching;
+        if (_replayPauseBtn != null) _replayPauseBtn.IsEnabled = _vm.LogReplay.IsPlaying;
+        if (_replayStopBtn  != null) _replayStopBtn.IsEnabled  = _vm.LogReplay.Entries.Count > 0;
+
         // Update streaming indicator.
-        if (indicatorText != null && indicatorBorder != null)
+        if (_logStreamIndicatorText != null && _logStreamIndicatorBorder != null)
         {
             if (_vm.LiveMonitor.HasError)
             {
-                indicatorText.Text       = $"⚠ Error";
-                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FF7070"));
-                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#2A0F0F"));
+                _logStreamIndicatorText.Text       = "⚠ Error";
+                _logStreamIndicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FF7070"));
+                _logStreamIndicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#2A0F0F"));
             }
             else if (isWatching)
             {
                 var pausedSuffix = _logStreamPaused ? " (paused)" : string.Empty;
-                indicatorText.Text       = $"● Streaming…  {_vm.LiveMonitor.Entries.Count:N0} lines{pausedSuffix}";
-                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#44CC44"));
-                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#152A15"));
+                _logStreamIndicatorText.Text       = $"● Streaming…  {_vm.LiveMonitor.Entries.Count:N0} lines{pausedSuffix}";
+                _logStreamIndicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#44CC44"));
+                _logStreamIndicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#152A15"));
             }
             else if (_logListShowingLive && _vm.LiveMonitor.Entries.Count > 0)
             {
-                indicatorText.Text       = $"○ Stopped  ({_vm.LiveMonitor.Entries.Count:N0} lines)";
-                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#778899"));
-                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F1E0F"));
+                _logStreamIndicatorText.Text       = $"○ Stopped  ({_vm.LiveMonitor.Entries.Count:N0} lines)";
+                _logStreamIndicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#778899"));
+                _logStreamIndicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F1E0F"));
             }
             else
             {
-                indicatorText.Text       = "○ Idle";
-                indicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
-                indicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F1E0F"));
+                _logStreamIndicatorText.Text       = "○ Idle";
+                _logStreamIndicatorText.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
+                _logStreamIndicatorBorder.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#0F1E0F"));
             }
         }
 
-        // Update legacy hidden WatchStatusText for any remaining code paths that read it.
-        if (statusTb != null)
-            statusTb.Text = isWatching ? $"● {_vm.LiveMonitor.WatchedFilePath}" : "Not watching";
-
         // Update top-bar running indicator.
-        var runIndicator = this.FindControl<Border>("RunningIndicatorBorder");
-        var topStopBtn   = this.FindControl<Button>("TopBarStopBtn");
-        if (runIndicator != null) runIndicator.IsVisible = isWatching;
-        if (topStopBtn   != null) topStopBtn.IsVisible   = isWatching;
+        if (_runningIndicatorBorder != null) _runningIndicatorBorder.IsVisible = isWatching;
+        if (_topBarStopBtn          != null) _topBarStopBtn.IsVisible          = isWatching;
 
         RefreshStatusBar();
     }
@@ -1536,26 +1215,24 @@ public partial class MainWindow : Window
     private void RefreshStatusBar()
     {
         // ── Scan-status dot + label ──────────────────────────────────────────
-        var scanDot   = this.FindControl<TextBlock>("StatusScanDot");
-        var scanLabel = this.FindControl<TextBlock>("StatusScanLabel");
-        if (scanDot != null && scanLabel != null)
+        if (_statusScanDotTb != null && _statusScanLabelTb != null)
         {
             switch (_vm.ScanStatus)
             {
                 case ScanStatusKind.Completed:
-                    scanDot.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#44CC44"));
-                    scanLabel.Text       = "Scan: Completed";
-                    scanLabel.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
+                    _statusScanDotTb.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#44CC44"));
+                    _statusScanLabelTb.Text       = "Scan: Completed";
+                    _statusScanLabelTb.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
                     break;
                 case ScanStatusKind.InProgress:
-                    scanDot.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFAA44"));
-                    scanLabel.Text       = "Scan: Scanning…";
-                    scanLabel.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFAA44"));
+                    _statusScanDotTb.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFAA44"));
+                    _statusScanLabelTb.Text       = "Scan: Scanning…";
+                    _statusScanLabelTb.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFAA44"));
                     break;
                 default:
-                    scanDot.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3A4A5A"));
-                    scanLabel.Text       = "Idle";
-                    scanLabel.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
+                    _statusScanDotTb.Foreground   = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3A4A5A"));
+                    _statusScanLabelTb.Text       = "Idle";
+                    _statusScanLabelTb.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677"));
                     break;
             }
         }
@@ -1563,13 +1240,13 @@ public partial class MainWindow : Window
         // ── Right metric pills ───────────────────────────────────────────────
         bool hasScanStats = _vm.FileCount > 0 || _vm.ClassCount > 0;
 
-        SetStatusPill("StatusBarFilesText",   hasScanStats, $"Files: {_vm.FileCount:N0}");
-        SetStatusPill("StatusBarSep1",        hasScanStats, " | ");
-        SetStatusPill("StatusBarClassesText", hasScanStats, $"Classes: {_vm.ClassCount:N0}");
-        SetStatusPill("StatusBarSep2",        hasScanStats, " | ");
-        SetStatusPill("StatusBarMethodsText", hasScanStats, $"Methods: {_vm.MethodCount:N0}");
-        SetStatusPill("StatusBarSep3",        hasScanStats, " | ");
-        SetStatusPill("StatusBarLogPtsText",  hasScanStats, $"Log Points: {_vm.LogPointCount:N0}");
+        SetStatusPill(_statusBarFilesTb,   hasScanStats, $"Files: {_vm.FileCount:N0}");
+        SetStatusPill(_statusBarSep1Tb,    hasScanStats, " | ");
+        SetStatusPill(_statusBarClassesTb, hasScanStats, $"Classes: {_vm.ClassCount:N0}");
+        SetStatusPill(_statusBarSep2Tb,    hasScanStats, " | ");
+        SetStatusPill(_statusBarMethodsTb, hasScanStats, $"Methods: {_vm.MethodCount:N0}");
+        SetStatusPill(_statusBarSep3Tb,    hasScanStats, " | ");
+        SetStatusPill(_statusBarLogPtsTb,  hasScanStats, $"Log Points: {_vm.LogPointCount:N0}");
 
         bool isWatching = _vm.LiveMonitor.IsWatching;
 
@@ -1579,26 +1256,25 @@ public partial class MainWindow : Window
             var runtimeStr = elapsed.TotalHours >= 1
                 ? $"{(int)elapsed.TotalHours:D2}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}"
                 : $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
-            SetStatusPill("StatusBarSep4",       true, " | ");
-            SetStatusPill("StatusBarRuntimeText", true, $"Runtime: {runtimeStr}");
+            SetStatusPill(_statusBarSep4Tb,    true, " | ");
+            SetStatusPill(_statusBarRuntimeTb,  true, $"Runtime: {runtimeStr}");
         }
         else
         {
-            SetStatusPill("StatusBarSep4",        false, string.Empty);
-            SetStatusPill("StatusBarRuntimeText", false, string.Empty);
+            SetStatusPill(_statusBarSep4Tb,    false, string.Empty);
+            SetStatusPill(_statusBarRuntimeTb,  false, string.Empty);
         }
 
         bool hasEvents = _vm.TotalEventCount > 0;
-        SetStatusPill("StatusBarSep5",       hasEvents, " | ");
-        SetStatusPill("StatusBarEventsText", hasEvents, $"Events: {_vm.TotalEventCount:N0}");
+        SetStatusPill(_statusBarSep5Tb,    hasEvents, " | ");
+        SetStatusPill(_statusBarEventsTb,  hasEvents, $"Events: {_vm.TotalEventCount:N0}");
     }
 
-    private void SetStatusPill(string controlName, bool visible, string text)
+    private static void SetStatusPill(TextBlock? textBlock, bool visible, string text)
     {
-        var tb = this.FindControl<TextBlock>(controlName);
-        if (tb == null) return;
-        tb.IsVisible = visible;
-        if (visible) tb.Text = text;
+        if (textBlock == null) return;
+        textBlock.IsVisible = visible;
+        if (visible) textBlock.Text = text;
     }
 
     // ── Roslyn Scan ───────────────────────────────────────────────────────────
@@ -2020,37 +1696,6 @@ public partial class MainWindow : Window
     private void OnExitClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Close();
 
-    private async void OnAboutClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var dialog = new Window
-        {
-            Title = "About codomon",
-            Width = 340,
-            Height = 180,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var closeBtn = new Button { Content = "Close", Padding = new Avalonia.Thickness(20, 4), IsDefault = true };
-        closeBtn.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(24, 20),
-            Spacing = 10,
-            Children =
-            {
-                new TextBlock { Text = $"codomon {BuildInfo.AppVersion}", FontSize = 16, FontWeight = Avalonia.Media.FontWeight.Bold, Foreground = Avalonia.Media.Brushes.White },
-                new TextBlock { Text = $"Build: {BuildInfo.BuildDate}", FontSize = 12, Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#88AABB")) },
-                new TextBlock { Text = "Architecture intelligence for software teams.", FontSize = 11, Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#556677")), TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-                new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, Children = { closeBtn } }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-    }
-
     private async void OnLocatorClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (!_vm.HasWorkspace)
@@ -2090,54 +1735,6 @@ public partial class MainWindow : Window
         // "Discard" or save succeeded — close for real.
         _vm.IsDirty = false;
         Close();
-    }
-
-    private async Task<bool?> ShowUnsavedChangesDialogAsync()
-    {
-        bool? result = null;
-
-        var dialog = new Window
-        {
-            Title = "Unsaved Changes",
-            Width = 400,
-            Height = 160,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#111820"))
-        };
-
-        var saveBtn = new Button { Content = "Save", Padding = new Avalonia.Thickness(20, 4) };
-        var discardBtn = new Button { Content = "Discard", Padding = new Avalonia.Thickness(20, 4) };
-        var cancelBtn = new Button { Content = "Cancel", Padding = new Avalonia.Thickness(20, 4) };
-
-        saveBtn.Click += (_, _) => { result = true; dialog.Close(); };
-        discardBtn.Click += (_, _) => { result = false; dialog.Close(); };
-        cancelBtn.Click += (_, _) => { result = null; dialog.Close(); };
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 16,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = "You have unsaved changes. Save before closing?",
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = Avalonia.Media.Brushes.White
-                },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    Children = { saveBtn, discardBtn, cancelBtn }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(this);
-        return result;
     }
 
     private async Task SaveAsAsync()
@@ -2599,9 +2196,8 @@ public partial class MainWindow : Window
         cfg.GraphAutoAlignSettings.ComponentGap = options.ComponentGap;
         UserConfigService.Save(cfg);
 
-        var statusText = this.FindControl<TextBlock>("StatusText");
-        if (statusText != null)
-            statusText.Text = "Graph auto-align applied and saved.";
+        if (_statusTextTb != null)
+            _statusTextTb.Text = "Graph auto-align applied and saved.";
     }
 
     private async void OnEditRulesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -2942,98 +2538,5 @@ public partial class MainWindow : Window
         {
             await ShowErrorAsync(ex.Message);
         }
-    }
-
-    private async Task ExecuteWithWorkspaceLoadingAsync(
-        Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
-    {
-        var operationId = Interlocked.Increment(ref _workspaceLoadingOperationId);
-        var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
-            Dispatcher.UIThread.Post(
-                () =>
-                {
-                    if (Volatile.Read(ref _workspaceLoadingOperationId) != operationId)
-                        return;
-
-                    SetWorkspaceLoadingState(true, update.ProgressPercent, update.Status);
-                },
-                DispatcherPriority.Background));
-
-        try
-        {
-            await Dispatcher.UIThread.InvokeAsync(
-                () =>
-                {
-                    if (Volatile.Read(ref _workspaceLoadingOperationId) != operationId)
-                        return;
-
-                    SetWorkspaceLoadingState(true, 0, "Preparing workspace...");
-                },
-                DispatcherPriority.Render);
-            await ExecuteSafeAsync(() => action(progress));
-        }
-        finally
-        {
-            Interlocked.CompareExchange(ref _workspaceLoadingOperationId, 0, operationId);
-            await Dispatcher.UIThread.InvokeAsync(
-                () =>
-                {
-                    if (Volatile.Read(ref _workspaceLoadingOperationId) != 0)
-                        return;
-
-                    SetWorkspaceLoadingState(false, 0, string.Empty);
-                },
-                DispatcherPriority.Render);
-        }
-    }
-
-    private void SetWorkspaceLoadingState(bool isVisible, double progressValue, string status)
-    {
-        if (_workspaceLoadingProgressBar != null)
-            _workspaceLoadingProgressBar.Value = Math.Clamp(progressValue, 0, 100);
-
-        if (_workspaceLoadingStatusText != null)
-            _workspaceLoadingStatusText.Text = status;
-
-        if (_workspaceLoadingOverlay != null)
-            _workspaceLoadingOverlay.IsVisible = isVisible;
-    }
-
-    private async Task ShowErrorAsync(string message)
-    {
-        var dialog = new Window
-        {
-            Title = "Error",
-            Width = 440,
-            Height = 160,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false
-        };
-
-        var okButton = new Button
-        {
-            Content = "OK",
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            Padding = new Avalonia.Thickness(24, 4)
-        };
-        okButton.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(16),
-            Spacing = 16,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = message,
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Foreground = Avalonia.Media.Brushes.White
-                },
-                okButton
-            }
-        };
-
-        await dialog.ShowDialog(this);
     }
 }

@@ -13,32 +13,47 @@
 
       <!-- File menu -->
       <MenuItem Header="_File" Padding="8,4">
-        <MenuItem Header="New Workspace"       Click="OnNewWorkspaceClick"/>
-        <MenuItem Header="Open Workspace…"     Click="OnOpenWorkspaceClick"/>
+        <MenuItem Header="New Workspace"       Click="OnNewWorkspaceClick"    HotKey="Ctrl+N"
+                  ToolTip.Tip="Create a new workspace (Ctrl+N)"/>
+        <MenuItem Header="Open Workspace…"     Click="OnOpenWorkspaceClick"   HotKey="Ctrl+O"
+                  ToolTip.Tip="Open an existing workspace folder (Ctrl+O)"/>
         <Separator/>
-        <MenuItem Header="Save"                Click="OnSaveWorkspaceClick"/>
-        <MenuItem Header="Save As…"            Click="OnSaveAsWorkspaceClick"/>
-        <MenuItem Header="Load Autosave…"      Click="OnLoadAutosaveClick"/>
+        <MenuItem Header="Save"                Click="OnSaveWorkspaceClick"   HotKey="Ctrl+S"
+                  ToolTip.Tip="Save the current workspace (Ctrl+S)"/>
+        <MenuItem Header="Save As…"            Click="OnSaveAsWorkspaceClick" HotKey="Ctrl+Shift+S"
+                  ToolTip.Tip="Save the workspace to a new folder (Ctrl+Shift+S)"/>
+        <MenuItem Header="Load Autosave…"      Click="OnLoadAutosaveClick"
+                  ToolTip.Tip="Restore a previously auto-saved workspace snapshot"/>
         <Separator/>
-        <MenuItem Header="New Profile"         Click="OnNewProfileClick"/>
-        <MenuItem Header="Rename Profile"      Click="OnRenameProfileClick"/>
-        <MenuItem Header="Duplicate Profile"   Click="OnDuplicateProfileClick"/>
-        <MenuItem Header="Delete Profile"      Click="OnDeleteProfileClick"/>
+        <MenuItem Header="New Profile"         Click="OnNewProfileClick"
+                  ToolTip.Tip="Create a new layout profile for the current workspace"/>
+        <MenuItem Header="Rename Profile"      Click="OnRenameProfileClick"
+                  ToolTip.Tip="Rename the active layout profile"/>
+        <MenuItem Header="Duplicate Profile"   Click="OnDuplicateProfileClick"
+                  ToolTip.Tip="Duplicate the active layout profile"/>
+        <MenuItem Header="Delete Profile"      Click="OnDeleteProfileClick"
+                  ToolTip.Tip="Delete the active layout profile"/>
         <Separator/>
         <MenuItem Header="E_xit"               Click="OnExitClick"/>
       </MenuItem>
 
       <!-- Tools menu -->
       <MenuItem Header="_Tools" Padding="8,4">
-        <MenuItem Header="Roslyn Scan…"              Click="OnScanClick"/>
-        <MenuItem Header="LLM Summaries…"            Click="OnSummariesClick"/>
-        <MenuItem Header="Architecture Hypothesis…"  Click="OnHypothesisClick"/>
+        <MenuItem Header="Roslyn Scan…"              Click="OnScanClick"
+                  ToolTip.Tip="Run a Roslyn static analysis scan on the source project"/>
+        <MenuItem Header="LLM Summaries…"            Click="OnSummariesClick"
+                  ToolTip.Tip="Generate LLM-powered summaries for scanned source files"/>
+        <MenuItem Header="Architecture Hypothesis…"  Click="OnHypothesisClick"
+                  ToolTip.Tip="Generate and review architecture hypotheses using LLM analysis"/>
         <Separator/>
-        <MenuItem Header="Locator…"                  Click="OnLocatorClick"/>
+        <MenuItem Header="Locator…"                  Click="OnLocatorClick"   HotKey="Ctrl+Shift+L"
+                  ToolTip.Tip="Open the Locator to search workspace entities (Ctrl+Shift+L)"/>
         <Separator/>
-        <MenuItem Header="Dev Console"               Click="OnDevConsoleClick"/>
+        <MenuItem Header="Dev Console"               Click="OnDevConsoleClick" HotKey="F12"
+                  ToolTip.Tip="Open the developer diagnostics console (F12)"/>
         <Separator/>
-        <MenuItem Header="_Preferences…"             Click="OnSettingsClick"/>
+        <MenuItem Header="_Preferences…"             Click="OnSettingsClick"   HotKey="Ctrl+OemComma"
+                  ToolTip.Tip="Edit user preferences (Ctrl+,)"/>
       </MenuItem>
 
       <!-- Help menu -->
@@ -89,11 +104,16 @@
         <!-- Center: five navigation tabs -->
         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
                     Spacing="2" VerticalAlignment="Center">
-          <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"/>
-          <Button x:Name="NavScanBtn"    Content="Analyze" Tag="Scan"    Click="OnNavTabClick" Padding="14,5"/>
-          <Button x:Name="NavMonitorBtn" Content="Monitor" Tag="Monitor" Click="OnNavTabClick" Padding="14,5"/>
-          <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"/>
-          <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"/>
+          <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Design tab — architecture component editor"/>
+          <Button x:Name="NavScanBtn"    Content="Analyze" Tag="Scan"    Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Analyze tab — run scan, summaries and architecture synthesis"/>
+          <Button x:Name="NavMonitorBtn" Content="Monitor" Tag="Monitor" Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Monitor tab — system map and live log stream"/>
+          <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Graph tab — AST relationship graph"/>
+          <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Docs tab — workspace documentation browser"/>
         </StackPanel>
 
         <!-- Right: running indicator + stop button + settings gear -->
@@ -176,10 +196,10 @@
                         Background="#2A3F5A"
                         ResizeDirection="Columns"/>
 
-          <!-- ── Left: Live Log Stream ── -->
+          <!-- ── Left: Log Stream (replay + live monitoring) ── -->
           <DockPanel Grid.Column="0">
 
-            <!-- Header: title + streaming indicator + watch/pause/stop -->
+            <!-- Header: title + streaming indicator + replay + live controls -->
             <Border DockPanel.Dock="Top" Background="#1A2435" Padding="6,4"
                     BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
               <Grid>
@@ -191,7 +211,7 @@
 
                 <!-- Title + streaming indicator -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                  <TextBlock Text="Live Log Stream" FontWeight="SemiBold"
+                  <TextBlock Text="Log Stream" FontWeight="SemiBold"
                              Foreground="#AABBCC" FontSize="12" VerticalAlignment="Center"/>
                   <Border x:Name="LogStreamIndicatorBorder" CornerRadius="8" Padding="6,2"
                           Background="#0F1E0F">
@@ -200,14 +220,39 @@
                   </Border>
                 </StackPanel>
 
-                <!-- Watch / Pause / Stop controls -->
+                <!-- Replay controls | Live monitoring controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+
+                  <!-- Replay: import a log file, then play / pause / stop -->
+                  <Button x:Name="ImportLogButton"   Content="📂 Import" Padding="6,2" FontSize="11"
+                          Click="OnImportLogClick"   IsEnabled="False"
+                          ToolTip.Tip="Import a log file for replay"/>
+                  <Button x:Name="ReplayPlayButton"  Content="▶ Play"    Padding="6,2" FontSize="11"
+                          Click="OnReplayPlayClick"  IsEnabled="False"
+                          ToolTip.Tip="Play the imported log replay"/>
+                  <ComboBox x:Name="ReplaySpeedComboBox" SelectionChanged="OnReplaySpeedChanged"
+                            ToolTip.Tip="Replay speed multiplier"
+                            MinWidth="56" FontSize="11" Padding="4,2" VerticalAlignment="Center"/>
+                  <Button x:Name="ReplayPauseButton" Content="⏸"         Padding="6,2" FontSize="11"
+                          Click="OnReplayPauseClick" IsEnabled="False"
+                          ToolTip.Tip="Pause / resume the log replay"/>
+                  <Button x:Name="ReplayStopButton"  Content="■"         Padding="6,2" FontSize="11"
+                          Click="OnReplayStopClick"  IsEnabled="False"
+                          ToolTip.Tip="Stop the log replay and reset position"/>
+
+                  <!-- Visual separator between replay and live sections -->
+                  <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
+
+                  <!-- Live monitoring: watch a live log file, pause auto-scroll, stop -->
                   <Button x:Name="WatchLogButton"     Content="📡 Watch"   Padding="6,2" FontSize="11"
-                          Click="OnWatchLogClick"    IsEnabled="False"/>
+                          Click="OnWatchLogClick"    IsEnabled="False"
+                          ToolTip.Tip="Start live monitoring of a log file"/>
                   <Button x:Name="LogStreamPauseBtn" Content="⏸ Pause"   Padding="6,2" FontSize="11"
-                          Click="OnLogStreamPauseClick" IsEnabled="False"/>
+                          Click="OnLogStreamPauseClick" IsEnabled="False"
+                          ToolTip.Tip="Pause / resume live stream auto-scroll"/>
                   <Button x:Name="StopWatchButton"   Content="■ Stop"     Padding="6,2" FontSize="11"
-                          Click="OnStopWatchClick"   IsEnabled="False"/>
+                          Click="OnStopWatchClick"   IsEnabled="False"
+                          ToolTip.Tip="Stop live log monitoring"/>
                 </StackPanel>
               </Grid>
             </Border>
@@ -275,17 +320,6 @@
               </DockPanel>
             </TabItem>
           </TabControl>
-
-          <!-- Hidden replay controls retained for code-behind compatibility -->
-          <StackPanel Grid.Column="0" IsVisible="False" Width="0" Height="0">
-            <Button x:Name="ImportLogButton"   Click="OnImportLogClick"/>
-            <Button x:Name="ReplayPlayButton"  Click="OnReplayPlayClick"  IsEnabled="False"/>
-            <Button x:Name="ReplayPauseButton" Click="OnReplayPauseClick" IsEnabled="False"/>
-            <Button x:Name="ReplayStopButton"  Click="OnReplayStopClick"  IsEnabled="False"/>
-            <ComboBox x:Name="ReplaySpeedComboBox" SelectionChanged="OnReplaySpeedChanged"/>
-            <TextBlock x:Name="ReplayStatusText"/>
-            <TextBlock x:Name="WatchStatusText"/>
-          </StackPanel>
 
         </Grid>
       </Border>
@@ -459,8 +493,14 @@
 
         <!-- ── Design tab placeholder ─── -->
         <Grid x:Name="DesignPanel" IsVisible="False" Background="#0F141E">
-          <TextBlock Text="Design" FontSize="24" Foreground="#4A6A8A"
-                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+            <TextBlock Text="✏" FontSize="40" HorizontalAlignment="Center" Foreground="#2A3F5A"/>
+            <TextBlock Text="Design" FontSize="22" FontWeight="Bold" Foreground="#4A6A8A"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="The visual design editor will appear here in a future release. Use the Architecture Hypothesis tool (Tools menu) to scaffold your architecture map from LLM analysis."
+                       FontSize="12" Foreground="#556677" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" TextAlignment="Center"/>
+          </StackPanel>
         </Grid>
 
         <!-- ── Analyze tab panel (devtools) ─── -->
@@ -522,8 +562,14 @@
 
         <!-- ── Docs tab placeholder ─── -->
         <Grid x:Name="DocsPanel" IsVisible="False" Background="#0F141E">
-          <TextBlock Text="Docs" FontSize="24" Foreground="#4A6A8A"
-                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+            <TextBlock Text="📄" FontSize="40" HorizontalAlignment="Center" Foreground="#2A3F5A"/>
+            <TextBlock Text="Docs" FontSize="22" FontWeight="Bold" Foreground="#4A6A8A"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Workspace documentation generated by LLM Summaries will appear here. Run a Roslyn scan followed by LLM Summaries to populate this view."
+                       FontSize="12" Foreground="#556677" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" TextAlignment="Center"/>
+          </StackPanel>
         </Grid>
 
         <!-- ── 1-column workspace layout ─── -->
