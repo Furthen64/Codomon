@@ -113,6 +113,10 @@
               <Button x:Name="HistoryLoadButton" Content="▶ Load Selected"
                       Click="OnLoadSelectedHistoryClick" Padding="10,4" IsEnabled="False"
                       Background="#1A3A5A" Foreground="White"/>
+              <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
+              <Button Content="Export Log" Click="OnExportLogClick" Padding="10,4"/>
+              <Button Content="Copy Diagnostics" Click="OnCopyDiagnosticsClick" Padding="10,4"/>
+              <Button Content="Open Raw Response" Click="OnOpenRawResponseClick" Padding="10,4"/>
             </StackPanel>
           </Border>
 
@@ -202,6 +206,15 @@
                               Margin="8,4,8,0">
                     <TextBlock x:Name="LiveOutputCharCountLabel"
                                Text="0 chars" Foreground="#556677" FontSize="10"/>
+                    <TextBlock x:Name="LiveOutputTokenCountLabel"
+                               Text="~0 tok" Foreground="#556677" FontSize="10"/>
+                    <CheckBox x:Name="LiveOutputAutoScrollToggle"
+                              Content="Auto-scroll"
+                              IsChecked="True"
+                              IsThreeState="False"
+                              FontSize="10"
+                              Foreground="#88AABB"
+                              IsCheckedChanged="OnLiveOutputAutoScrollChanged"/>
                     <Button x:Name="LiveOutputCopyButton" Content="Copy" Padding="6,2"
                             FontSize="10" Click="OnCopyLiveOutputClick"/>
                   </StackPanel>

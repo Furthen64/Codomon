@@ -626,6 +626,36 @@
           </DockPanel>
         </Grid>
 
+        <Grid x:Name="WorkspaceLoadingOverlay"
+              IsVisible="False"
+              ZIndex="20"
+              Background="#B20B1018">
+          <Border Width="420"
+                  Padding="22"
+                  CornerRadius="14"
+                  BorderThickness="1"
+                  BorderBrush="#2A3F5A"
+                  Background="#16202D"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+            <StackPanel Spacing="12">
+              <TextBlock Text="Opening workspace..."
+                         FontSize="20"
+                         FontWeight="SemiBold"
+                         Foreground="#E7EEF9"/>
+              <ProgressBar x:Name="WorkspaceLoadingProgressBar"
+                           Height="10"
+                           Minimum="0"
+                           Maximum="100"
+                           Value="0"/>
+              <TextBlock x:Name="WorkspaceLoadingStatusText"
+                         Text="Preparing workspace..."
+                         FontSize="13"
+                         Foreground="#9CC6FF"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+
         </Grid><!-- end content area Grid.Column="1" -->
 
       </Grid><!-- end main content row 0 -->
