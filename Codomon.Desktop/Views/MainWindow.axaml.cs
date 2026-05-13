@@ -2545,4 +2545,63 @@ public partial class MainWindow : Window
             await ShowErrorAsync(ex.Message);
         }
     }
+
+    private async Task ExecuteWithWorkspaceLoadingAsync(
+        Func<IProgress<WorkspaceSerializer.WorkspaceLoadProgress>, Task> action)
+    {
+        var operationId = Interlocked.Increment(ref _workspaceLoadingOperationId);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_workspaceLoadingOverlay != null)
+                _workspaceLoadingOverlay.IsVisible = true;
+
+            if (_workspaceLoadingProgressBar != null)
+                _workspaceLoadingProgressBar.Value = 0;
+
+            if (_workspaceLoadingStatusText != null)
+                _workspaceLoadingStatusText.Text = "Preparing workspace...";
+        });
+
+        var progress = new Progress<WorkspaceSerializer.WorkspaceLoadProgress>(update =>
+        {
+            _ = Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (operationId != _workspaceLoadingOperationId)
+                    return;
+
+                if (_workspaceLoadingProgressBar != null)
+                    _workspaceLoadingProgressBar.Value = update.ProgressPercent;
+
+                if (_workspaceLoadingStatusText != null && !string.IsNullOrWhiteSpace(update.Status))
+                    _workspaceLoadingStatusText.Text = update.Status;
+            });
+        });
+
+        try
+        {
+            await action(progress);
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorAsync(ex.Message);
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (operationId != _workspaceLoadingOperationId)
+                    return;
+
+                if (_workspaceLoadingOverlay != null)
+                    _workspaceLoadingOverlay.IsVisible = false;
+
+                if (_workspaceLoadingProgressBar != null)
+                    _workspaceLoadingProgressBar.Value = 0;
+
+                if (_workspaceLoadingStatusText != null)
+                    _workspaceLoadingStatusText.Text = "Preparing workspace...";
+            });
+        }
+    }
 }
