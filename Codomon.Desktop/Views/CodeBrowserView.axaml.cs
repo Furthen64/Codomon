@@ -110,7 +110,7 @@ public partial class CodeBrowserView : UserControl
 
             foreach (var codeNode in module.CodeNodes)
             {
-                var key = NormaliseRelativePath(codeNode.FilePath);
+                var key = NormalizeRelativePath(codeNode.FilePath);
                 if (string.IsNullOrWhiteSpace(key))
                     continue;
 
@@ -161,7 +161,7 @@ public partial class CodeBrowserView : UserControl
             {
                 Name = Path.GetFileName(directoryPath),
                 FullPath = directoryPath,
-                RelativePath = NormaliseRelativePath(Path.GetRelativePath(rootPath, directoryPath)),
+                RelativePath = NormalizeRelativePath(Path.GetRelativePath(rootPath, directoryPath)),
                 IsDirectory = true
             };
 
@@ -187,7 +187,7 @@ public partial class CodeBrowserView : UserControl
                 {
                     Name = Path.GetFileName(childFile),
                     FullPath = childFile,
-                    RelativePath = NormaliseRelativePath(Path.GetRelativePath(rootPath, childFile)),
+                    RelativePath = NormalizeRelativePath(Path.GetRelativePath(rootPath, childFile)),
                     IsDirectory = false
                 };
 
@@ -223,7 +223,7 @@ public partial class CodeBrowserView : UserControl
         return !string.IsNullOrWhiteSpace(name) && !name.StartsWith(".", StringComparison.Ordinal);
     }
 
-    private static string NormaliseRelativePath(string path)
+    private static string NormalizeRelativePath(string path)
         => (path ?? string.Empty).Replace('\\', '/');
 
     private TreeViewItem CreateTreeViewItem(CodeBrowserItem item, bool isRoot = false)
