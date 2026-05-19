@@ -24,8 +24,9 @@ public partial class CodeBrowserView : UserControl
         "node_modules"
     };
 
-    private const int PreviewCharacterLimit = 120_000;
-    private const int PreviewLineLimit = 2_000;
+    private static readonly string[] ByteSizeUnits = ["B", "KB", "MB", "GB"];
+    private const int MaxPreviewCharacters = 120_000;
+    private const int MaxPreviewLines = 2_000;
 
     private WorkspaceModel? _workspace;
     private CodeBrowserItem? _selectedItem;
@@ -405,7 +406,7 @@ public partial class CodeBrowserView : UserControl
             var lines = new List<string>();
             int totalCharacters = 0;
 
-            while (!reader.EndOfStream && lines.Count < PreviewLineLimit && totalCharacters < PreviewCharacterLimit)
+            while (!reader.EndOfStream && lines.Count < MaxPreviewLines && totalCharacters < MaxPreviewCharacters)
             {
                 var line = reader.ReadLine() ?? string.Empty;
                 lines.Add(line);
@@ -434,17 +435,16 @@ public partial class CodeBrowserView : UserControl
 
     private static string FormatByteSize(long bytes)
     {
-        string[] units = ["B", "KB", "MB", "GB"];
         double size = bytes;
         int unitIndex = 0;
 
-        while (size >= 1024 && unitIndex < units.Length - 1)
+        while (size >= 1024 && unitIndex < ByteSizeUnits.Length - 1)
         {
             size /= 1024;
             unitIndex++;
         }
 
-        return $"{size:0.#} {units[unitIndex]}";
+        return $"{size:0.#} {ByteSizeUnits[unitIndex]}";
     }
 
     private void OpenSelectedItem()
