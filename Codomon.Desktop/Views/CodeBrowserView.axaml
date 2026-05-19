@@ -93,6 +93,27 @@
             </StackPanel>
           </Border>
 
+          <!-- Shown when a workspace is open but no Roslyn scan has been applied yet -->
+          <Border x:Name="NoScanBanner"
+                  DockPanel.Dock="Top"
+                  IsVisible="False"
+                  Background="#0B1928"
+                  BorderBrush="#1B4060"
+                  BorderThickness="0,0,0,1"
+                  Padding="12,8">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <TextBlock Text="ℹ"
+                         FontSize="14"
+                         Foreground="#5BA3D0"
+                         VerticalAlignment="Center"/>
+              <TextBlock Text="No Roslyn scan data found. Go to Tools → Roslyn Scan… to analyse your codebase and unlock code-mapping features."
+                         FontSize="11"
+                         Foreground="#89BDDF"
+                         TextWrapping="Wrap"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+
           <TextBlock x:Name="PreviewPlaceholderText"
                      Margin="16,14"
                      Text="Select a file to preview its contents."
@@ -115,19 +136,20 @@
             </StackPanel>
           </ScrollViewer>
 
-          <TextBox x:Name="CodePreviewTextBox"
-                   IsVisible="False"
-                   Margin="12"
-                   IsReadOnly="True"
-                   AcceptsReturn="True"
-                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                   ScrollViewer.VerticalScrollBarVisibility="Auto"
-                   TextWrapping="NoWrap"
-                   FontFamily="Monospace"
-                   FontSize="12"
-                   Background="{StaticResource PanelBgDarkBrush}"
-                   Foreground="White"
-                   BorderBrush="{StaticResource BorderDefaultBrush}"/>
+          <!-- Syntax-highlighted code preview -->
+          <ScrollViewer x:Name="CodePreviewScrollViewer"
+                        IsVisible="False"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        Background="{StaticResource PanelBgDarkBrush}">
+            <SelectableTextBlock x:Name="CodePreviewBlock"
+                                 Margin="12"
+                                 FontFamily="Consolas, Courier New, monospace"
+                                 FontSize="12.5"
+                                 TextWrapping="NoWrap"
+                                 Foreground="#D4D4D4"
+                                 Background="Transparent"/>
+          </ScrollViewer>
         </DockPanel>
       </Border>
     </Grid>
