@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Models.SystemMap;
@@ -9,6 +10,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Codomon.Desktop.Views;
 
@@ -27,6 +29,32 @@ public partial class CodeBrowserView : UserControl
     private static readonly string[] ByteSizeUnits = ["B", "KB", "MB", "GB"];
     private const int MaxPreviewCharacters = 120_000;
     private const int MaxPreviewLines = 2_000;
+
+    // Lines beyond this threshold are rendered without syntax highlighting for performance
+    private const int SyntaxHighlightLineThreshold = 1_500;
+
+    // ── Syntax-highlighting colours (VS Code dark+ palette) ──────────────────
+    private static readonly IBrush ClrKeyword     = new SolidColorBrush(Color.Parse("#569CD6"));
+    private static readonly IBrush ClrString      = new SolidColorBrush(Color.Parse("#CE9178"));
+    private static readonly IBrush ClrComment     = new SolidColorBrush(Color.Parse("#6A9955"));
+    private static readonly IBrush ClrNumber      = new SolidColorBrush(Color.Parse("#B5CEA8"));
+    private static readonly IBrush ClrPreprocessor = new SolidColorBrush(Color.Parse("#C586C0"));
+    private static readonly IBrush ClrPlain       = new SolidColorBrush(Color.Parse("#D4D4D4"));
+
+    // Matches C# tokens in priority order.
+    // BlockComment uses an "unrolled loop" pattern to avoid catastrophic backtracking
+    // on files with unclosed /* comments. A 2-second timeout is also applied.
+    private static readonly Regex CSharpTokenRegex = new(
+        @"(?<BlockComment>/\*[^*]*(?:\*+(?!/)[^*]*)*\*/)" +
+        @"|(?<LineComment>//[^\n\r]*)" +
+        @"|(?<VerbatimString>@""(?:[^""]|"""")*"")" +
+        @"|(?<String>""(?:[^""\\]|\\.)*"")" +
+        @"|(?<Char>'(?:[^'\\]|\\.)*')" +
+        @"|(?<Number>\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFdDmMlLuUbB]{0,2}\b)" +
+        @"|(?<Preprocessor>^\s*#(?:if|else|elif|endif|define|undef|warning|error|pragma|region|endregion|line|nullable)\b)" +
+        @"|(?<Keyword>\b(?:abstract|as|base|bool|break|byte|case|catch|char|checked|class|const|continue|decimal|default|delegate|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|goto|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|var|virtual|void|volatile|while|async|await|yield|get|set|add|remove|value|partial|record|init|with|required|from|where|select|group|join|into|orderby|ascending|descending|let|on|equals|by|file|scoped|global)\b)",
+        RegexOptions.Compiled | RegexOptions.Multiline,
+        matchTimeout: TimeSpan.FromSeconds(2));
 
     private WorkspaceModel? _workspace;
     private CodeBrowserItem? _selectedItem;
@@ -63,11 +91,16 @@ public partial class CodeBrowserView : UserControl
         if (workspace == null || string.IsNullOrWhiteSpace(_sourceRoot) || !Directory.Exists(_sourceRoot))
         {
             this.FindControl<TextBlock>("CodeRootText")!.Text = "Open a workspace to browse its code.";
+            this.FindControl<Border>("NoScanBanner")!.IsVisible = false;
             ShowPlaceholder("Open a workspace to browse its codebase.");
             return;
         }
 
         this.FindControl<TextBlock>("CodeRootText")!.Text = _sourceRoot;
+
+        // Show banner when a workspace is open but no Roslyn scan data has been applied
+        var hasScanData = workspace.SystemMap.AllCodeNodes.Any();
+        this.FindControl<Border>("NoScanBanner")!.IsVisible = !hasScanData;
 
         var rootItem = BuildDirectoryItem(_sourceRoot, _sourceRoot, BuildFileTagMap(workspace));
         if (rootItem == null)
@@ -336,7 +369,7 @@ public partial class CodeBrowserView : UserControl
                 : $"Showing {item.Children.Count} direct child item(s).";
 
         this.FindControl<ScrollViewer>("DirectoryPreviewScrollViewer")!.IsVisible = true;
-        this.FindControl<TextBox>("CodePreviewTextBox")!.IsVisible = false;
+        this.FindControl<ScrollViewer>("CodePreviewScrollViewer")!.IsVisible = false;
         this.FindControl<TextBlock>("PreviewPlaceholderText")!.IsVisible = false;
     }
 
@@ -345,8 +378,10 @@ public partial class CodeBrowserView : UserControl
         UpdateHeader(item, BuildFileMetadata(item.FullPath));
 
         var previewText = TryReadPreview(item.FullPath);
-        this.FindControl<TextBox>("CodePreviewTextBox")!.Text = previewText;
-        this.FindControl<TextBox>("CodePreviewTextBox")!.IsVisible = true;
+        var block = this.FindControl<SelectableTextBlock>("CodePreviewBlock")!;
+        PopulateCodePreview(block, previewText, item.FullPath);
+
+        this.FindControl<ScrollViewer>("CodePreviewScrollViewer")!.IsVisible = true;
         this.FindControl<ScrollViewer>("DirectoryPreviewScrollViewer")!.IsVisible = false;
         this.FindControl<TextBlock>("PreviewPlaceholderText")!.IsVisible = false;
     }
@@ -358,7 +393,7 @@ public partial class CodeBrowserView : UserControl
         this.FindControl<WrapPanel>("SelectedItemTagsPanel")!.Children.Clear();
         this.FindControl<TextBlock>("PreviewPlaceholderText")!.Text = message;
         this.FindControl<TextBlock>("PreviewPlaceholderText")!.IsVisible = true;
-        this.FindControl<TextBox>("CodePreviewTextBox")!.IsVisible = false;
+        this.FindControl<ScrollViewer>("CodePreviewScrollViewer")!.IsVisible = false;
         this.FindControl<ScrollViewer>("DirectoryPreviewScrollViewer")!.IsVisible = false;
     }
 
@@ -445,6 +480,106 @@ public partial class CodeBrowserView : UserControl
         }
 
         return $"{size:0.#} {ByteSizeUnits[unitIndex]}";
+    }
+
+    // ── Code preview / syntax highlighting ───────────────────────────────────
+
+    private static void PopulateCodePreview(SelectableTextBlock block, string text, string filePath)
+    {
+        block.Inlines?.Clear();
+
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        var lines = text.Split('\n');
+
+        if (ext == ".cs" && lines.Length <= SyntaxHighlightLineThreshold)
+            BuildCSharpHighlightedInlines(block, text, lines);
+        else
+            BuildPlainInlines(block, lines);
+    }
+
+    private static void BuildPlainInlines(SelectableTextBlock block, string[] lines)
+    {
+        block.Inlines ??= new InlineCollection();
+        for (int i = 0; i < lines.Length; i++)
+        {
+            block.Inlines.Add(new Run { Text = lines[i].TrimEnd('\r'), Foreground = ClrPlain });
+            if (i < lines.Length - 1)
+                block.Inlines.Add(new LineBreak());
+        }
+    }
+
+    private static void BuildCSharpHighlightedInlines(SelectableTextBlock block, string text, string[] lines)
+    {
+        block.Inlines ??= new InlineCollection();
+
+        // We tokenize the full text at once so multi-line block comments work correctly,
+        // then track line breaks ourselves.
+        try
+        {
+            int pos = 0;
+            foreach (Match m in CSharpTokenRegex.Matches(text))
+            {
+                // Emit plain text (including any newlines) between the last match and this one
+                if (m.Index > pos)
+                    EmitSegment(block, text.AsSpan(pos, m.Index - pos));
+
+                var brush = m.Groups["BlockComment"].Success || m.Groups["LineComment"].Success
+                    ? ClrComment
+                    : m.Groups["VerbatimString"].Success || m.Groups["String"].Success || m.Groups["Char"].Success
+                        ? ClrString
+                        : m.Groups["Number"].Success
+                            ? ClrNumber
+                            : m.Groups["Preprocessor"].Success
+                                ? ClrPreprocessor
+                                : ClrKeyword; // Keyword group
+
+                EmitSegment(block, m.Value.AsSpan(), brush);
+                pos = m.Index + m.Length;
+            }
+
+            // Remainder after last match
+            if (pos < text.Length)
+                EmitSegment(block, text.AsSpan(pos));
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // Timeout: fall back to plain rendering
+            block.Inlines?.Clear();
+            BuildPlainInlines(block, lines);
+        }
+    }
+
+    /// <summary>
+    /// Emits a (possibly multi-line) text segment as a series of <see cref="Run"/> and
+    /// <see cref="LineBreak"/> inlines, honouring both \n and \r\n line endings.
+    /// </summary>
+    private static void EmitSegment(SelectableTextBlock block, ReadOnlySpan<char> span, IBrush? brush = null)
+    {
+        brush ??= ClrPlain;
+        int start = 0;
+        for (int i = 0; i < span.Length; i++)
+        {
+            if (span[i] != '\n') continue;
+
+            // Slice up to (but not including) \r if present
+            int end = i > 0 && span[i - 1] == '\r' ? i - 1 : i;
+            var lineText = span[start..end].ToString();
+            if (lineText.Length > 0)
+                block.Inlines!.Add(new Run { Text = lineText, Foreground = brush });
+            block.Inlines!.Add(new LineBreak());
+            start = i + 1;
+        }
+
+        // Trailing text after last newline
+        if (start < span.Length)
+        {
+            var tail = span[start..].ToString();
+            if (tail.Length > 0)
+                block.Inlines!.Add(new Run { Text = tail, Foreground = brush });
+        }
     }
 
     private void OpenSelectedItem()
