@@ -395,7 +395,7 @@ public partial class CodeBrowserView : UserControl
         try
         {
             using var stream = File.OpenRead(fullPath);
-            var buffer = new byte[Math.Min(8192, (int)Math.Min(stream.Length, 8192))];
+            var buffer = new byte[Math.Min(8192, (int)stream.Length)];
             var read = stream.Read(buffer, 0, buffer.Length);
             if (buffer.Take(read).Any(b => b == 0))
                 return "Binary or unsupported file preview.";
