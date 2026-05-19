@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Codomon.Desktop.Views.CodeBrowserView">
+  <DockPanel Background="{StaticResource PanelBgContentBrush}">
+    <Border DockPanel.Dock="Top"
+            Background="{StaticResource PanelBgCardBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="12,8">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="2">
+          <TextBlock Text="Code Browser"
+                     FontSize="18"
+                     FontWeight="Bold"
+                     Foreground="{StaticResource TextPrimaryBrush}"/>
+          <TextBlock x:Name="CodeRootText"
+                     Text="Open a workspace to browse its code."
+                     FontSize="11"
+                     Foreground="{StaticResource TextMutedBrush}"
+                     TextWrapping="Wrap"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+          <Button x:Name="RefreshBrowserButton"
+                  Content="Refresh"
+                  Padding="10,4"/>
+          <Button x:Name="OpenSelectedItemButton"
+                  Content="Open"
+                  Padding="10,4"
+                  IsEnabled="False"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="320"/>
+        <ColumnDefinition Width="5"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0"
+              Background="{StaticResource PanelBgDarkBrush}"
+              BorderBrush="{StaticResource BorderDefaultBrush}"
+              BorderThickness="0,0,1,0">
+        <DockPanel>
+          <Border DockPanel.Dock="Top"
+                  Background="{StaticResource PanelBgDarkestBrush}"
+                  BorderBrush="{StaticResource BorderDefaultBrush}"
+                  BorderThickness="0,0,0,1"
+                  Padding="10,7">
+            <TextBlock Text="Repository tree"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimaryBrush}"/>
+          </Border>
+          <TreeView x:Name="CodeTreeView"
+                    Margin="4"
+                    Background="Transparent"
+                    SelectionChanged="OnCodeTreeSelectionChanged"/>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1"
+                    HorizontalAlignment="Stretch"
+                    Background="{StaticResource BorderDefaultBrush}"
+                    ResizeDirection="Columns"/>
+
+      <Border Grid.Column="2"
+              Background="{StaticResource PanelBgContentBrush}">
+        <DockPanel>
+          <Border DockPanel.Dock="Top"
+                  Background="{StaticResource PanelBgDarkBrush}"
+                  BorderBrush="{StaticResource BorderDefaultBrush}"
+                  BorderThickness="0,0,0,1"
+                  Padding="12,10">
+            <StackPanel Spacing="6">
+              <TextBlock x:Name="SelectedItemPathText"
+                         Text="Select a file or folder from the tree."
+                         FontSize="15"
+                         FontWeight="SemiBold"
+                         Foreground="White"
+                         TextWrapping="Wrap"/>
+              <TextBlock x:Name="SelectedItemMetaText"
+                         Text=""
+                         FontSize="11"
+                         Foreground="{StaticResource TextMutedBrush}"
+                         TextWrapping="Wrap"/>
+              <WrapPanel x:Name="SelectedItemTagsPanel"
+                         Orientation="Horizontal"/>
+            </StackPanel>
+          </Border>
+
+          <TextBlock x:Name="PreviewPlaceholderText"
+                     Margin="16,14"
+                     Text="Select a file to preview its contents."
+                     FontSize="12"
+                     Foreground="{StaticResource TextFaintBrush}"
+                     TextWrapping="Wrap"/>
+
+          <ScrollViewer x:Name="DirectoryPreviewScrollViewer"
+                        IsVisible="False"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="16,14"
+                        Spacing="10">
+              <TextBlock x:Name="DirectorySummaryText"
+                         Text=""
+                         FontSize="12"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         TextWrapping="Wrap"/>
+              <ItemsControl x:Name="DirectoryChildrenItemsControl"/>
+            </StackPanel>
+          </ScrollViewer>
+
+          <TextBox x:Name="CodePreviewTextBox"
+                   IsVisible="False"
+                   Margin="12"
+                   IsReadOnly="True"
+                   AcceptsReturn="True"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   TextWrapping="NoWrap"
+                   FontFamily="Monospace"
+                   FontSize="12"
+                   Background="{StaticResource PanelBgDarkBrush}"
+                   Foreground="White"
+                   BorderBrush="{StaticResource BorderDefaultBrush}"/>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

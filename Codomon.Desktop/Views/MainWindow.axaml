@@ -107,7 +107,7 @@
           </Button>
         </StackPanel>
 
-        <!-- Center: five navigation tabs -->
+        <!-- Center: six navigation tabs -->
         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
                     Spacing="2" VerticalAlignment="Center">
           <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"
@@ -118,6 +118,8 @@
                   ToolTip.Tip="Monitor tab — system map and live log stream"/>
           <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Graph tab — AST relationship graph"/>
+          <Button x:Name="NavCodeBtn"    Content="Code"    Tag="Code"    Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Code tab — browse the repository tree and preview files"/>
           <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Docs tab — workspace documentation browser"/>
         </StackPanel>
@@ -564,6 +566,13 @@
               </Grid>
             </StackPanel>
           </DockPanel>
+        </Grid>
+
+        <!-- ── Code tab ─── -->
+        <Grid x:Name="CodePanel" IsVisible="False" Background="#0F141E">
+          <ContentControl x:Name="CodeBrowserHost"
+                          HorizontalContentAlignment="Stretch"
+                          VerticalContentAlignment="Stretch"/>
         </Grid>
 
         <!-- ── Docs tab placeholder ─── -->
