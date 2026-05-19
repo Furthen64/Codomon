@@ -176,6 +176,7 @@ public partial class MainWindow : Window
         Title = $"codomon {BuildInfo.AppVersion}  (build {BuildInfo.BuildDate})";
 
         SetupCanvas();
+        SetupCodeBrowserView();
         SetupTreeView();
         SetupTimeline();
         InitializeGraphAutoAlignPanel();
@@ -256,6 +257,7 @@ public partial class MainWindow : Window
         {
             _logListShowingLive = false;
             SetupCanvas();
+            SetupCodeBrowserView();
             SetupTreeView();
             RefreshProfileComboBox();
             RefreshRoslynConnectionsPanel();
@@ -348,6 +350,7 @@ public partial class MainWindow : Window
         var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
         var designPanel    = this.FindControl<Grid>("DesignPanel");
         var scanPanel      = this.FindControl<Grid>("ScanPanel");
+        var codePanel      = this.FindControl<Grid>("CodePanel");
         var docsPanel      = this.FindControl<Grid>("DocsPanel");
 
         bool has = _vm.HasWorkspace;
@@ -355,9 +358,10 @@ public partial class MainWindow : Window
         // Sidebar is always visible once a workspace is loaded, regardless of active nav tab.
         if (sidebarPanel   != null) sidebarPanel.IsVisible   = has;
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
-        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Docs";
+        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Code" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
         if (scanPanel      != null) scanPanel.IsVisible      = _activeNavTab == "Scan";
+        if (codePanel      != null) codePanel.IsVisible      = has && _activeNavTab == "Code";
         if (docsPanel      != null) docsPanel.IsVisible      = has && _activeNavTab == "Docs";
 
         // Synchronise the CenterTabControl index when on Monitor or Graph nav tab.
@@ -381,6 +385,7 @@ public partial class MainWindow : Window
             ("NavScanBtn",    "Scan"),
             ("NavMonitorBtn", "Monitor"),
             ("NavGraphBtn",   "Graph"),
+            ("NavCodeBtn",    "Code"),
             ("NavDocsBtn",    "Docs"),
         };
 
@@ -1326,6 +1331,7 @@ public partial class MainWindow : Window
                 AppLogger.Debug("[Roslyn] Applying scan results to System Map via SystemDetector.");
                 await _vm.ApplyRoslynScanAsync(result.ScanResult);
                 AppLogger.Debug("[Roslyn] System Map updated. Graph refreshed from System Map.");
+                RefreshCodeBrowserView();
                 SetupTreeView();
                 RefreshSidebar();
             }
@@ -1398,6 +1404,7 @@ public partial class MainWindow : Window
         _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
         AppLogger.Debug("[Hypothesis] System Map view model refresh completed. Applying graph canvas refresh.");
         _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
+        RefreshCodeBrowserView();
         AppLogger.Debug("[Hypothesis] Graph canvas refresh completed.");
 
         // Mark workspace dirty for accepted or cleared changes.
@@ -1429,6 +1436,7 @@ public partial class MainWindow : Window
         }
 
         AppLogger.Debug($"[Hypothesis] Apply-to-canvas flow finished. IsDirty={_vm.IsDirty}; Final System Map: {DescribeSystemMap(_vm.Workspace.SystemMap)}");
+        RefreshCodeBrowserView();
         SetupTreeView();
         RefreshSidebar();
         RefreshAnalyzePanel();
@@ -1820,6 +1828,22 @@ public partial class MainWindow : Window
         AppLogger.Debug("System Map view initialized");
     }
 
+    private void SetupCodeBrowserView()
+    {
+        var host = this.FindControl<ContentControl>("CodeBrowserHost");
+        if (host == null) return;
+
+        var view = host.Content as CodeBrowserView ?? new CodeBrowserView();
+        host.Content = view;
+        view.LoadWorkspace(_vm.HasWorkspace ? _vm.Workspace : null);
+    }
+
+    private void RefreshCodeBrowserView()
+    {
+        if (this.FindControl<ContentControl>("CodeBrowserHost")?.Content is CodeBrowserView view)
+            view.LoadWorkspace(_vm.HasWorkspace ? _vm.Workspace : null);
+    }
+
     private void OnSystemMapLayoutPositionChanged(string itemId, bool isExternal, double x, double y)
     {
         if (!_vm.HasWorkspace) return;
@@ -1937,6 +1961,7 @@ public partial class MainWindow : Window
 
         _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
         _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
+        RefreshCodeBrowserView();
         _vm.IsDirty = true;
 
         AppLogger.Debug("[SystemMap] Canvas cleared and views refreshed.");
@@ -1970,6 +1995,7 @@ public partial class MainWindow : Window
 
         _vm.SystemMap.LoadFrom(map, _vm.Workspace.ActiveProfile?.LayoutPositions);
         _vm.Graph.RefreshFromSystemMap(map);
+        RefreshCodeBrowserView();
         _vm.IsDirty = true;
     }
 
@@ -2338,11 +2364,7 @@ public partial class MainWindow : Window
         => SetActiveNavTab("Scan");
 
     private void OnAnalysisSourceFilesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        SetActiveNavTab("Monitor");
-        if (_vm.HasWorkspace)
-            _vm.SystemMap.SetActiveView(ViewModels.SystemMapViewKind.CodeDetailView);
-    }
+        => SetActiveNavTab("Code");
 
     private void OnAnalysisMarkdownDocsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetActiveNavTab("Docs");
@@ -2376,6 +2398,7 @@ public partial class MainWindow : Window
         _vm.Workspace.SystemMap.Systems.Add(newSystem);
         _vm.SystemMap.LoadFrom(_vm.Workspace.SystemMap, _vm.Workspace.ActiveProfile?.LayoutPositions);
         _vm.Graph.RefreshFromSystemMap(_vm.Workspace.SystemMap);
+        RefreshCodeBrowserView();
         _vm.IsDirty = true;
         SetupTreeView();
         AppLogger.Info($"Architecture component added: {name.Trim()}");
