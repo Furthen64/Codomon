@@ -21,6 +21,7 @@ public partial class LlmSummaryDialog : Window
     private bool _pendingShiftClick;
     private bool _isApplyingRangeSelection;
     private bool _hideSummarized;
+    private int _syncedProgressMessageCount;
 
     private DispatcherTimer? _spinnerTimer;
     private int _spinnerFrame;
@@ -473,7 +474,26 @@ public partial class LlmSummaryDialog : Window
         var progressTextBox = this.FindControl<TextBox>("ProgressTextBox");
         if (progressTextBox == null) return;
 
-        progressTextBox.Text = string.Join(Environment.NewLine, _vm.ProgressMessages);
+        if (_vm.ProgressMessages.Count < _syncedProgressMessageCount)
+        {
+            _syncedProgressMessageCount = 0;
+            progressTextBox.Text = string.Empty;
+        }
+
+        if (_vm.ProgressMessages.Count > _syncedProgressMessageCount)
+        {
+            var newMessages = _vm.ProgressMessages
+                .Skip(_syncedProgressMessageCount)
+                .ToList();
+
+            if (string.IsNullOrEmpty(progressTextBox.Text))
+                progressTextBox.Text = string.Join(Environment.NewLine, newMessages);
+            else
+                progressTextBox.Text += Environment.NewLine + string.Join(Environment.NewLine, newMessages);
+
+            _syncedProgressMessageCount = _vm.ProgressMessages.Count;
+        }
+
         progressTextBox.CaretIndex = progressTextBox.Text?.Length ?? 0;
     }
 
