@@ -29,7 +29,7 @@ public class LogEntryModel
     {
         get
         {
-            if (!IsParsed) return RawLine;
+            if (!IsParsed) return RawLine ?? string.Empty;
             var ts = Timestamp?.ToString("HH:mm:ss.fff") ?? "??:??:??";
             var src = string.IsNullOrEmpty(Source) ? string.Empty : $"{Source}: ";
             var lvl = string.IsNullOrEmpty(Level) ? "?" : Level;

@@ -39,7 +39,7 @@ public static class LogParser
     public static LogEntryModel Parse(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
-            return new LogEntryModel { RawLine = line, IsParsed = false };
+            return new LogEntryModel { RawLine = string.Empty, IsParsed = false };
 
         Match m;
 
@@ -114,7 +114,7 @@ public static class LogParser
     public static LogEntryModel ParseDelimited(string line, ImportOptions options)
     {
         if (string.IsNullOrWhiteSpace(line))
-            return new LogEntryModel { RawLine = line, IsParsed = false };
+            return new LogEntryModel { RawLine = string.Empty, IsParsed = false };
 
         string[] parts;
         if (options.DelimiterIsRegex && !string.IsNullOrEmpty(options.Delimiter))
