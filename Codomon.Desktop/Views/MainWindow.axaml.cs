@@ -248,6 +248,7 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.HasWorkspace))
         {
+            RefreshDocsBrowserView();
             UpdateMainContentVisibility();
             UpdateWindowTitle();
             UpdateWorkspaceNameDisplay();
@@ -1904,7 +1905,9 @@ public partial class MainWindow : Window
             return;
 
         // DocsBrowserView only needs the workspace folder path to read summary files from disk.
-        view.LoadWorkspace(string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath) ? null : _vm.WorkspaceFolderPath);
+        view.LoadWorkspace(_vm.HasWorkspace && !string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath)
+            ? _vm.WorkspaceFolderPath
+            : null);
     }
 
     private void OnSystemMapLayoutPositionChanged(string itemId, bool isExternal, double x, double y)
