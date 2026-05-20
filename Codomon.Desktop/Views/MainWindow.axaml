@@ -17,6 +17,9 @@
                   ToolTip.Tip="Create a new workspace (Ctrl+N)"/>
         <MenuItem Header="Open Workspace…"     Click="OnOpenWorkspaceClick"   HotKey="Ctrl+O"
                   ToolTip.Tip="Open an existing workspace folder (Ctrl+O)"/>
+        <MenuItem Header="Close Workspace"     Click="OnCloseWorkspaceClick"
+                  IsEnabled="{Binding HasWorkspace}"
+                  ToolTip.Tip="Close the current workspace and return to the start view"/>
         <Separator/>
         <MenuItem Header="Save"                Click="OnSaveWorkspaceClick"   HotKey="Ctrl+S"
                   ToolTip.Tip="Save the current workspace (Ctrl+S)"/>
@@ -90,6 +93,9 @@
               <MenuFlyout Placement="BottomEdgeAlignedLeft">
                 <MenuItem Header="New Workspace"     Click="OnNewWorkspaceClick"/>
                 <MenuItem Header="Open Workspace…"   Click="OnOpenWorkspaceClick"/>
+                <MenuItem Header="Close Workspace"   Click="OnCloseWorkspaceClick"
+                          IsEnabled="{Binding HasWorkspace}"/>
+                <Separator/>
                 <MenuItem Header="Save"              Click="OnSaveWorkspaceClick"/>
                 <MenuItem Header="Save As…"          Click="OnSaveAsWorkspaceClick"/>
                 <MenuItem Header="Load Autosave…"    Click="OnLoadAutosaveClick"/>
@@ -108,7 +114,7 @@
         </StackPanel>
 
         <!-- Center: six navigation tabs -->
-        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+        <StackPanel x:Name="NavTabsPanel" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
                     Spacing="2" VerticalAlignment="Center">
           <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Design tab — architecture component editor"/>

@@ -430,6 +430,29 @@ public class MainViewModel : INotifyPropertyChanged
         await TryCreateAutosaveAsync();
     }
 
+    public void CloseWorkspace()
+    {
+        StopLiveMonitoring();
+        _autosaveTimer?.Stop();
+        _autosaveTimer?.Dispose();
+        _autosaveTimer = null;
+
+        Workspace = new WorkspaceModel();
+        WorkspaceFolderPath = string.Empty;
+        HasWorkspace = false;
+        IsDirty = false;
+
+        FileCount = 0;
+        ClassCount = 0;
+        MethodCount = 0;
+        LogPointCount = 0;
+        TotalEventCount = 0;
+        ScanStatus = ScanStatusKind.Idle;
+
+        ClearSelection();
+        StatusMessage = "Ready";
+    }
+
     /// <summary>
     /// Loads the autosave at <paramref name="autosavePath"/> after verifying its integrity,
     /// then reloads the workspace from disk.

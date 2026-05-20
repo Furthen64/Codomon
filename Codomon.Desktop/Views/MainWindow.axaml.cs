@@ -348,6 +348,7 @@ public partial class MainWindow : Window
         var sidebarPanel   = this.FindControl<Border>("SidebarPanel");
         var workspaceGrid  = this.FindControl<Grid>("WorkspaceGrid");
         var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
+        var navTabsPanel   = this.FindControl<StackPanel>("NavTabsPanel");
         var designPanel    = this.FindControl<Grid>("DesignPanel");
         var scanPanel      = this.FindControl<Grid>("ScanPanel");
         var codePanel      = this.FindControl<Grid>("CodePanel");
@@ -357,6 +358,7 @@ public partial class MainWindow : Window
 
         // Sidebar is always visible once a workspace is loaded, regardless of active nav tab.
         if (sidebarPanel   != null) sidebarPanel.IsVisible   = has;
+        if (navTabsPanel   != null) navTabsPanel.IsVisible   = has;
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
         if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Code" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
@@ -480,6 +482,41 @@ public partial class MainWindow : Window
     private async void OnSaveAsWorkspaceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await SaveAsAsync();
+    }
+
+    private async void OnCloseWorkspaceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace) return;
+
+        if (_vm.IsDirty)
+        {
+            var save = await ShowUnsavedChangesDialogAsync();
+            if (save == null) return;
+
+            if (save == true)
+            {
+                if (string.IsNullOrEmpty(_vm.WorkspaceFolderPath))
+                {
+                    await SaveAsAsync();
+                    if (_vm.IsDirty) return;
+                }
+                else
+                {
+                    await ExecuteSafeAsync(_vm.SaveWorkspaceAsync);
+                    if (_vm.IsDirty) return;
+                }
+            }
+        }
+
+        _vm.CloseWorkspace();
+        SetActiveNavTab("Monitor");
+        UpdateWindowTitle();
+        PopulateRecentWorkspaces();
+        RefreshSidebar();
+        RefreshLogReplayPanel();
+        RefreshLiveMonitorPanel();
+        RefreshAnalyzePanel();
+        AppLogger.Info("Workspace closed.");
     }
 
     private async void OnLoadAutosaveClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
