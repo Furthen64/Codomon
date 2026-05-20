@@ -20,6 +20,7 @@ public partial class LlmSummaryDialog : Window
     private const double MinDialogHeight = 520;
     private const double DefaultGenerateLeftPaneWidth = 300;
     private const double MinGenerateLeftPaneWidth = 180;
+    private const string GenerateSplitGridName = "GenerateSplitGrid";
 
     private readonly LlmSummaryViewModel _vm;
     private readonly List<int> _visibleFileIndices = new();
@@ -657,7 +658,7 @@ public partial class LlmSummaryDialog : Window
             ? height
             : DefaultWindowHeight;
 
-        var splitGrid = this.FindControl<Grid>("GenerateSplitGrid");
+        var splitGrid = this.FindControl<Grid>(GenerateSplitGridName);
         if (splitGrid?.ColumnDefinitions.Count > 0)
         {
             var leftPaneWidth = config.LlmSummaryGenerateLeftPaneWidth;
@@ -682,7 +683,7 @@ public partial class LlmSummaryDialog : Window
             if (double.IsFinite(height) && height >= MinDialogHeight)
                 config.LlmSummaryWindowHeight = height;
 
-            var splitGrid = this.FindControl<Grid>("GenerateSplitGrid");
+            var splitGrid = this.FindControl<Grid>(GenerateSplitGridName);
             if (splitGrid?.ColumnDefinitions.Count > 0)
             {
                 var leftPaneWidth = splitGrid.ColumnDefinitions[0].ActualWidth;
