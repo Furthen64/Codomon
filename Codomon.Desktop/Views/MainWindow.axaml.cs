@@ -268,6 +268,7 @@ public partial class MainWindow : Window
         }
         else if (e.PropertyName == nameof(MainViewModel.WorkspaceFolderPath))
         {
+            RefreshDocsBrowserView();
             UpdateWorkspaceNameDisplay();
             RefreshAnalyzePanel();
         }
@@ -1888,15 +1889,22 @@ public partial class MainWindow : Window
 
         var view = host.Content as DocsBrowserView ?? new DocsBrowserView();
         host.Content = view;
-        // DocsBrowserView only needs the workspace folder path to read summary files from disk
-        // (unlike CodeBrowserView which needs the full WorkspaceModel for system-map data).
-        view.LoadWorkspace(_vm.HasWorkspace ? _vm.WorkspaceFolderPath : null);
+        RefreshDocsBrowserView();
     }
 
     private void RefreshCodeBrowserView()
     {
         if (this.FindControl<ContentControl>("CodeBrowserHost")?.Content is CodeBrowserView view)
             view.LoadWorkspace(_vm.HasWorkspace ? _vm.Workspace : null);
+    }
+
+    private void RefreshDocsBrowserView()
+    {
+        if (this.FindControl<ContentControl>("DocsBrowserHost")?.Content is not DocsBrowserView view)
+            return;
+
+        // DocsBrowserView only needs the workspace folder path to read summary files from disk.
+        view.LoadWorkspace(string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath) ? null : _vm.WorkspaceFolderPath);
     }
 
     private void OnSystemMapLayoutPositionChanged(string itemId, bool isExternal, double x, double y)
