@@ -17,8 +17,7 @@
                   ToolTip.Tip="Create a new workspace (Ctrl+N)"/>
         <MenuItem Header="Open Workspace…"     Click="OnOpenWorkspaceClick"   HotKey="Ctrl+O"
                   ToolTip.Tip="Open an existing workspace folder (Ctrl+O)"/>
-        <MenuItem Header="Close Workspace"     Click="OnCloseWorkspaceClick"
-                  IsEnabled="{Binding HasWorkspace}"
+        <MenuItem x:Name="FileCloseWorkspaceMenuItem" Header="Close Workspace"     Click="OnCloseWorkspaceClick"
                   ToolTip.Tip="Close the current workspace and return to the start view"/>
         <Separator/>
         <MenuItem Header="Save"                Click="OnSaveWorkspaceClick"   HotKey="Ctrl+S"
@@ -93,8 +92,7 @@
               <MenuFlyout Placement="BottomEdgeAlignedLeft">
                 <MenuItem Header="New Workspace"     Click="OnNewWorkspaceClick"/>
                 <MenuItem Header="Open Workspace…"   Click="OnOpenWorkspaceClick"/>
-                <MenuItem Header="Close Workspace"   Click="OnCloseWorkspaceClick"
-                          IsEnabled="{Binding HasWorkspace}"/>
+                <MenuItem x:Name="WorkspaceCloseMenuItem" Header="Close Workspace"   Click="OnCloseWorkspaceClick"/>
                 <Separator/>
                 <MenuItem Header="Save"              Click="OnSaveWorkspaceClick"/>
                 <MenuItem Header="Save As…"          Click="OnSaveAsWorkspaceClick"/>

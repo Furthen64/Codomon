@@ -349,6 +349,8 @@ public partial class MainWindow : Window
         var workspaceGrid  = this.FindControl<Grid>("WorkspaceGrid");
         var welcomeOverlay = this.FindControl<Grid>("WelcomeOverlay");
         var navTabsPanel   = this.FindControl<StackPanel>("NavTabsPanel");
+        var fileCloseWorkspaceMenuItem = this.FindControl<MenuItem>("FileCloseWorkspaceMenuItem");
+        var workspaceCloseMenuItem = this.FindControl<MenuItem>("WorkspaceCloseMenuItem");
         var designPanel    = this.FindControl<Grid>("DesignPanel");
         var scanPanel      = this.FindControl<Grid>("ScanPanel");
         var codePanel      = this.FindControl<Grid>("CodePanel");
@@ -359,6 +361,8 @@ public partial class MainWindow : Window
         // Sidebar is always visible once a workspace is loaded, regardless of active nav tab.
         if (sidebarPanel   != null) sidebarPanel.IsVisible   = has;
         if (navTabsPanel   != null) navTabsPanel.IsVisible   = has;
+        if (fileCloseWorkspaceMenuItem != null) fileCloseWorkspaceMenuItem.IsEnabled = has;
+        if (workspaceCloseMenuItem != null) workspaceCloseMenuItem.IsEnabled = has;
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
         if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Code" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
