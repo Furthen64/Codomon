@@ -470,17 +470,11 @@ public partial class LlmSummaryDialog : Window
 
     private void ScrollProgressToBottom()
     {
-        var listBox = this.FindControl<ListBox>("ProgressListBox");
-        if (listBox == null) return;
+        var progressTextBox = this.FindControl<TextBox>("ProgressTextBox");
+        if (progressTextBox == null) return;
 
-        // Sync the progress list items from ViewModel.
-        listBox.ItemsSource = null;
-        listBox.ItemsSource = _vm.ProgressMessages;
-
-        if (listBox.ItemCount == 0) return;
-
-        var last = listBox.Items[listBox.ItemCount - 1];
-        if (last != null) listBox.ScrollIntoView(last);
+        progressTextBox.Text = string.Join(Environment.NewLine, _vm.ProgressMessages);
+        progressTextBox.CaretIndex = progressTextBox.Text?.Length ?? 0;
     }
 
     // ── Browse tab ────────────────────────────────────────────────────────────

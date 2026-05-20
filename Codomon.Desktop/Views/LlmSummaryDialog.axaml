@@ -96,6 +96,7 @@
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="300" MinWidth="180"/>
+              <ColumnDefinition Width="6"/>
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -118,17 +119,28 @@
               </DockPanel>
             </Border>
 
+            <GridSplitter Grid.Column="1"
+                          Width="6"
+                          Background="#2A3F5A"
+                          ResizeDirection="Columns"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"/>
+
             <!-- Progress log -->
-            <DockPanel Grid.Column="1">
+            <DockPanel Grid.Column="2">
               <Border DockPanel.Dock="Top" Padding="8,6" Background="#1A2435">
                 <TextBlock Text="Progress" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
               </Border>
               <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" Margin="8">
-                <ListBox x:Name="ProgressListBox"
+                <TextBox x:Name="ProgressTextBox"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
                          Background="Transparent"
                          FontFamily="Monospace"
                          FontSize="11"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                         TextWrapping="NoWrap"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
               </Border>
             </DockPanel>
 
