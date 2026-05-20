@@ -162,6 +162,8 @@ public static class LlmSummaryService
         AppLogger.Debug($"[LLM] Prompt ready: template={promptTemplate.Length} chars, sourceCode={sourceCode.Length} chars, totalPrompt={prompt.Length} chars");
 
         // Call the LLM.
+        AppLogger.Debug($"[LLM] dump prompt: {Environment.NewLine}--- PROMPT START ---{Environment.NewLine}{prompt}{Environment.NewLine}--- PROMPT END ---");
+
         var summary = await CallLlmAsync(apiEndpoint, modelName, prompt, maxOutputTokens, cancellationToken);
 
         AppLogger.Debug($"[LLM] GenerateSummary complete: {relPath}  summary={summary.Length} chars");
