@@ -144,7 +144,7 @@ public partial class DocsBrowserView : UserControl
         var scroll = this.FindControl<ScrollViewer>("SummaryContentScroll");
 
         if (title != null) title.Text = entry.SourceRelativePath;
-        if (meta != null) meta.Text = $"Generated {entry.GeneratedAt:yyyy-MM-dd HH:mm} UTC  ·  {entry.SummaryFilePath}";
+        if (meta != null) meta.Text = $"Generated {entry.GeneratedAt:yyyy-MM-dd HH:mm}  ·  {entry.SummaryFilePath}";
 
         if (block == null || scroll == null) return;
 
