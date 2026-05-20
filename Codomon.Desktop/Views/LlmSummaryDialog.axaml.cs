@@ -21,6 +21,7 @@ public partial class LlmSummaryDialog : Window
     private bool _pendingShiftClick;
     private bool _isApplyingRangeSelection;
     private bool _hideSummarized;
+    private int _syncedProgressMessageCount;
 
     private DispatcherTimer? _spinnerTimer;
     private int _spinnerFrame;
@@ -470,17 +471,37 @@ public partial class LlmSummaryDialog : Window
 
     private void ScrollProgressToBottom()
     {
-        var listBox = this.FindControl<ListBox>("ProgressListBox");
-        if (listBox == null) return;
+        var progressTextBox = this.FindControl<TextBox>("ProgressTextBox");
+        if (progressTextBox == null) return;
 
-        // Sync the progress list items from ViewModel.
-        listBox.ItemsSource = null;
-        listBox.ItemsSource = _vm.ProgressMessages;
+        if (_vm.ProgressMessages.Count < _syncedProgressMessageCount)
+        {
+            _syncedProgressMessageCount = 0;
+            progressTextBox.Text = string.Empty;
+        }
 
-        if (listBox.ItemCount == 0) return;
+        if (_vm.ProgressMessages.Count > _syncedProgressMessageCount)
+        {
+            var newMessages = _vm.ProgressMessages
+                .Skip(_syncedProgressMessageCount)
+                .ToList();
 
-        var last = listBox.Items[listBox.ItemCount - 1];
-        if (last != null) listBox.ScrollIntoView(last);
+            if (string.IsNullOrEmpty(progressTextBox.Text))
+            {
+                progressTextBox.Text = string.Join(Environment.NewLine, newMessages);
+            }
+            else
+            {
+                var builder = new System.Text.StringBuilder(progressTextBox.Text);
+                builder.AppendLine();
+                builder.AppendJoin(Environment.NewLine, newMessages);
+                progressTextBox.Text = builder.ToString();
+            }
+
+            _syncedProgressMessageCount = _vm.ProgressMessages.Count;
+        }
+
+        progressTextBox.CaretIndex = progressTextBox.Text?.Length ?? 0;
     }
 
     // ── Browse tab ────────────────────────────────────────────────────────────
