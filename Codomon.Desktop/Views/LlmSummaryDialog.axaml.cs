@@ -675,13 +675,16 @@ public partial class LlmSummaryDialog : Window
         {
             var config = UserConfigService.Load();
 
-            var width = Bounds.Width;
-            if (double.IsFinite(width) && width >= MinDialogWidth)
-                config.LlmSummaryWindowWidth = width;
+            if (WindowState == WindowState.Normal)
+            {
+                var width = Bounds.Width;
+                if (double.IsFinite(width) && width >= MinDialogWidth)
+                    config.LlmSummaryWindowWidth = width;
 
-            var height = Bounds.Height;
-            if (double.IsFinite(height) && height >= MinDialogHeight)
-                config.LlmSummaryWindowHeight = height;
+                var height = Bounds.Height;
+                if (double.IsFinite(height) && height >= MinDialogHeight)
+                    config.LlmSummaryWindowHeight = height;
+            }
 
             var splitGrid = this.FindControl<Grid>(GenerateSplitGridName);
             if (splitGrid?.ColumnDefinitions.Count > 0)
@@ -693,9 +696,10 @@ public partial class LlmSummaryDialog : Window
 
             UserConfigService.Save(config);
         }
-        catch
+        catch (Exception ex)
         {
             // Non-critical - ignore persistence errors for dialog layout.
+            Models.AppLogger.Debug($"Failed to persist LLM Summaries dialog layout: {ex.Message}");
         }
     }
 }
