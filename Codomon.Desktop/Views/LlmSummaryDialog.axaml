@@ -93,7 +93,7 @@
           </Border>
 
           <!-- Split: file list (left) | progress (right) -->
-          <Grid>
+          <Grid x:Name="GenerateSplitGrid">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="300" MinWidth="180"/>
               <ColumnDefinition Width="6"/>

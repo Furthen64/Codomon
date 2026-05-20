@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
 
@@ -13,6 +14,14 @@ namespace Codomon.Desktop.Views;
 /// </summary>
 public partial class LlmSummaryDialog : Window
 {
+    private const double DefaultWindowWidth = 960;
+    private const double DefaultWindowHeight = 720;
+    private const double MinDialogWidth = 700;
+    private const double MinDialogHeight = 520;
+    private const double DefaultGenerateLeftPaneWidth = 300;
+    private const double MinGenerateLeftPaneWidth = 180;
+    private const string GenerateSplitGridName = "GenerateSplitGrid";
+
     private readonly LlmSummaryViewModel _vm;
     private readonly List<int> _visibleFileIndices = new();
     private string _fileFilter = string.Empty;
@@ -37,6 +46,7 @@ public partial class LlmSummaryDialog : Window
     {
         InitializeComponent();
         _vm = vm;
+        ApplySavedLayout();
 
         _vm.PropertyChanged += (_, e) =>
         {
@@ -55,6 +65,7 @@ public partial class LlmSummaryDialog : Window
             Dispatcher.UIThread.Post(RebuildSummariesList);
 
         Opened += async (_, _) => await OnDialogOpenedAsync();
+        Closing += (_, _) => SaveLayout();
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
@@ -632,4 +643,63 @@ public partial class LlmSummaryDialog : Window
 
     private void OnCloseClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Close();
+
+    private void ApplySavedLayout()
+    {
+        var config = UserConfigService.Load();
+
+        var width = config.LlmSummaryWindowWidth;
+        Width = double.IsFinite(width) && width >= MinDialogWidth
+            ? width
+            : DefaultWindowWidth;
+
+        var height = config.LlmSummaryWindowHeight;
+        Height = double.IsFinite(height) && height >= MinDialogHeight
+            ? height
+            : DefaultWindowHeight;
+
+        var splitGrid = this.FindControl<Grid>(GenerateSplitGridName);
+        if (splitGrid?.ColumnDefinitions.Count > 0)
+        {
+            var leftPaneWidth = config.LlmSummaryGenerateLeftPaneWidth;
+            if (!double.IsFinite(leftPaneWidth) || leftPaneWidth < MinGenerateLeftPaneWidth)
+                leftPaneWidth = DefaultGenerateLeftPaneWidth;
+
+            splitGrid.ColumnDefinitions[0].Width = new GridLength(leftPaneWidth, GridUnitType.Pixel);
+        }
+    }
+
+    private void SaveLayout()
+    {
+        try
+        {
+            var config = UserConfigService.Load();
+
+            if (WindowState == WindowState.Normal)
+            {
+                var width = Bounds.Width;
+                if (double.IsFinite(width) && width >= MinDialogWidth)
+                    config.LlmSummaryWindowWidth = width;
+
+                var height = Bounds.Height;
+                if (double.IsFinite(height) && height >= MinDialogHeight)
+                    config.LlmSummaryWindowHeight = height;
+            }
+
+            var splitGrid = this.FindControl<Grid>(GenerateSplitGridName);
+            if (splitGrid?.ColumnDefinitions.Count > 0)
+            {
+                var leftPaneWidth = splitGrid.ColumnDefinitions[0].ActualWidth;
+                if (double.IsFinite(leftPaneWidth) && leftPaneWidth >= MinGenerateLeftPaneWidth)
+                    config.LlmSummaryGenerateLeftPaneWidth = leftPaneWidth;
+            }
+
+            UserConfigService.Save(config);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical - ignore persistence errors for dialog layout.
+            Models.AppLogger.Debug($"Failed to persist LLM Summaries dialog layout: {ex.Message}");
+        }
+    }
 }

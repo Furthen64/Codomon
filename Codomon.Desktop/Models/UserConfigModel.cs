@@ -44,6 +44,17 @@ public class UserConfigModel
     /// <summary>Whether the main window should start maximized.</summary>
     public bool StartMaximized { get; set; } = false;
 
+    // ── LLM Summaries dialog layout ───────────────────────────────────────────
+
+    /// <summary>Last-used width for the LLM Summaries window.</summary>
+    public double LlmSummaryWindowWidth { get; set; } = 960;
+
+    /// <summary>Last-used height for the LLM Summaries window.</summary>
+    public double LlmSummaryWindowHeight { get; set; } = 720;
+
+    /// <summary>Last-used left pane width in the LLM Summaries Generate tab split view.</summary>
+    public double LlmSummaryGenerateLeftPaneWidth { get; set; } = 300;
+
     // ── Log import defaults ───────────────────────────────────────────────────
 
     /// <summary>Key of the delimiter option pre-selected in the import wizard (e.g. "tab").</summary>
