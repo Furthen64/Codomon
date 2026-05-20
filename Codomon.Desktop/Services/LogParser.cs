@@ -38,8 +38,6 @@ public static class LogParser
 
     public static LogEntryModel Parse(string line)
     {
-        line ??= string.Empty;
-
         if (string.IsNullOrWhiteSpace(line))
             return new LogEntryModel { RawLine = string.Empty, IsParsed = false };
 
@@ -115,8 +113,6 @@ public static class LogParser
     /// </summary>
     public static LogEntryModel ParseDelimited(string line, ImportOptions options)
     {
-        line ??= string.Empty;
-
         if (string.IsNullOrWhiteSpace(line))
             return new LogEntryModel { RawLine = string.Empty, IsParsed = false };
 
