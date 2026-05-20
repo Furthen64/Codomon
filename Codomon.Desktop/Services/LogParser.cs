@@ -41,7 +41,7 @@ public static class LogParser
         line ??= string.Empty;
 
         if (string.IsNullOrWhiteSpace(line))
-            return new LogEntryModel { RawLine = line, IsParsed = false };
+            return new LogEntryModel { RawLine = string.Empty, IsParsed = false };
 
         Match m;
 
@@ -118,7 +118,7 @@ public static class LogParser
         line ??= string.Empty;
 
         if (string.IsNullOrWhiteSpace(line))
-            return new LogEntryModel { RawLine = line, IsParsed = false };
+            return new LogEntryModel { RawLine = string.Empty, IsParsed = false };
 
         string[] parts;
         if (options.DelimiterIsRegex && !string.IsNullOrEmpty(options.Delimiter))
