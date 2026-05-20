@@ -487,9 +487,16 @@ public partial class LlmSummaryDialog : Window
                 .ToList();
 
             if (string.IsNullOrEmpty(progressTextBox.Text))
+            {
                 progressTextBox.Text = string.Join(Environment.NewLine, newMessages);
+            }
             else
-                progressTextBox.Text += Environment.NewLine + string.Join(Environment.NewLine, newMessages);
+            {
+                var builder = new System.Text.StringBuilder(progressTextBox.Text);
+                builder.AppendLine();
+                builder.AppendJoin(Environment.NewLine, newMessages);
+                progressTextBox.Text = builder.ToString();
+            }
 
             _syncedProgressMessageCount = _vm.ProgressMessages.Count;
         }
