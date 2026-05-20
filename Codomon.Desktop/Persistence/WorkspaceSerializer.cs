@@ -100,6 +100,8 @@ public static class WorkspaceSerializer
         ```
         """;
 
+    public static string GetDefaultSummaryPrompt() => DefaultSummaryPrompt;
+
     private static readonly string[] RequiredFiles =
     {
         WorkspaceFile, SystemsFile, ModulesFile, ConnectionsFile
@@ -288,7 +290,7 @@ public static class WorkspaceSerializer
                 ? workspaceDto.ActiveProfileId
                 : profiles[0].Id;
 
-        var activeProfile = profiles.First(p => p.Id == activeProfileId);
+        var activeProfile = profiles.FirstOrDefault(p => p.Id == activeProfileId) ?? profiles[0];
 
         progress?.Report(new WorkspaceLoadProgress(85, "Rebuilding workspace..."));
 

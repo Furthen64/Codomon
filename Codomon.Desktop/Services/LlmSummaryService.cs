@@ -1,4 +1,5 @@
 using Codomon.Desktop.Models;
+using Codomon.Desktop.Persistence;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
@@ -182,15 +183,22 @@ public static class LlmSummaryService
     /// </summary>
     public static async Task<string> LoadPromptTemplateAsync(string workspaceFolderPath)
     {
+        Directory.CreateDirectory(workspaceFolderPath);
+
         var path = Path.Combine(workspaceFolderPath, PromptFileName);
-        return File.Exists(path)
-            ? await File.ReadAllTextAsync(path)
-            : string.Empty;
+        if (File.Exists(path))
+            return await File.ReadAllTextAsync(path);
+
+        var defaultPrompt = WorkspaceSerializer.GetDefaultSummaryPrompt();
+        await File.WriteAllTextAsync(path, defaultPrompt);
+        return defaultPrompt;
     }
 
     /// <summary>Saves <paramref name="content"/> to the workspace <c>summary_prompt.md</c>.</summary>
     public static async Task SavePromptTemplateAsync(string workspaceFolderPath, string content)
     {
+        Directory.CreateDirectory(workspaceFolderPath);
+
         var path = Path.Combine(workspaceFolderPath, PromptFileName);
         await File.WriteAllTextAsync(path, content);
     }
