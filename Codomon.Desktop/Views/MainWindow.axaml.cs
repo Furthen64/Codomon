@@ -177,6 +177,7 @@ public partial class MainWindow : Window
 
         SetupCanvas();
         SetupCodeBrowserView();
+        SetupDocsBrowserView();
         SetupTreeView();
         SetupTimeline();
         InitializeGraphAutoAlignPanel();
@@ -258,6 +259,7 @@ public partial class MainWindow : Window
             _logListShowingLive = false;
             SetupCanvas();
             SetupCodeBrowserView();
+            SetupDocsBrowserView();
             SetupTreeView();
             RefreshProfileComboBox();
             RefreshRoslynConnectionsPanel();
@@ -1877,6 +1879,18 @@ public partial class MainWindow : Window
         var view = host.Content as CodeBrowserView ?? new CodeBrowserView();
         host.Content = view;
         view.LoadWorkspace(_vm.HasWorkspace ? _vm.Workspace : null);
+    }
+
+    private void SetupDocsBrowserView()
+    {
+        var host = this.FindControl<ContentControl>("DocsBrowserHost");
+        if (host == null) return;
+
+        var view = host.Content as DocsBrowserView ?? new DocsBrowserView();
+        host.Content = view;
+        // DocsBrowserView only needs the workspace folder path to read summary files from disk
+        // (unlike CodeBrowserView which needs the full WorkspaceModel for system-map data).
+        view.LoadWorkspace(_vm.HasWorkspace ? _vm.WorkspaceFolderPath : null);
     }
 
     private void RefreshCodeBrowserView()

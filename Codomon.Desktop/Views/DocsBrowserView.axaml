@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Codomon.Desktop.Views.DocsBrowserView">
+  <DockPanel Background="{StaticResource PanelBgContentBrush}">
+
+    <!-- Header bar -->
+    <Border DockPanel.Dock="Top"
+            Background="{StaticResource PanelBgCardBrush}"
+            BorderBrush="{StaticResource BorderDefaultBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="12,8">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="2">
+          <TextBlock Text="Docs"
+                     FontSize="18"
+                     FontWeight="Bold"
+                     Foreground="{StaticResource TextPrimaryBrush}"/>
+          <TextBlock x:Name="DocsSubtitleText"
+                     Text="LLM-generated documentation for this workspace."
+                     FontSize="11"
+                     Foreground="{StaticResource TextMutedBrush}"
+                     TextWrapping="Wrap"/>
+        </StackPanel>
+        <Button x:Name="RefreshDocsButton"
+                Grid.Column="1"
+                Content="Refresh"
+                Padding="10,4"
+                VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+
+    <!-- No-summaries banner -->
+    <Border x:Name="NoSummariesBanner"
+            DockPanel.Dock="Top"
+            IsVisible="False"
+            Background="#0B1928"
+            BorderBrush="#1B4060"
+            BorderThickness="0,0,0,1"
+            Padding="12,8">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <TextBlock Text="ℹ"
+                   FontSize="14"
+                   Foreground="#5BA3D0"
+                   VerticalAlignment="Center"/>
+        <TextBlock Text="No LLM summaries found. Open Tools → LLM Summaries… to generate documentation for your C# source files."
+                   FontSize="11"
+                   Foreground="#89BDDF"
+                   TextWrapping="Wrap"
+                   VerticalAlignment="Center"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Split: summary list (left) | content viewer (right) -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="300" MinWidth="160"/>
+        <ColumnDefinition Width="5"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- Left: summary list -->
+      <Border Grid.Column="0"
+              Background="{StaticResource PanelBgDarkBrush}"
+              BorderBrush="{StaticResource BorderDefaultBrush}"
+              BorderThickness="0,0,1,0">
+        <DockPanel>
+          <Border DockPanel.Dock="Top"
+                  Background="{StaticResource PanelBgDarkestBrush}"
+                  BorderBrush="{StaticResource BorderDefaultBrush}"
+                  BorderThickness="0,0,0,1"
+                  Padding="10,7">
+            <StackPanel Spacing="4">
+              <TextBlock x:Name="SummaryCountText"
+                         Text="Summaries"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource TextPrimaryBrush}"/>
+              <TextBox x:Name="SummaryFilterBox"
+                       Watermark="Filter…"
+                       FontSize="11"
+                       TextChanged="OnFilterChanged"/>
+            </StackPanel>
+          </Border>
+          <ListBox x:Name="SummaryListBox"
+                   Background="Transparent"
+                   SelectionChanged="OnSummarySelectionChanged"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1"
+                    HorizontalAlignment="Stretch"
+                    Background="{StaticResource BorderDefaultBrush}"
+                    ResizeDirection="Columns"/>
+
+      <!-- Right: content viewer -->
+      <Border Grid.Column="2"
+              Background="{StaticResource PanelBgContentBrush}">
+        <DockPanel>
+          <Border DockPanel.Dock="Top"
+                  Background="{StaticResource PanelBgDarkBrush}"
+                  BorderBrush="{StaticResource BorderDefaultBrush}"
+                  BorderThickness="0,0,0,1"
+                  Padding="12,10">
+            <StackPanel Spacing="4">
+              <TextBlock x:Name="SelectedSummaryTitle"
+                         Text="Select a file summary from the list."
+                         FontSize="15"
+                         FontWeight="SemiBold"
+                         Foreground="White"
+                         TextWrapping="Wrap"/>
+              <TextBlock x:Name="SelectedSummaryMeta"
+                         Text=""
+                         FontSize="11"
+                         Foreground="{StaticResource TextMutedBrush}"/>
+            </StackPanel>
+          </Border>
+
+          <ScrollViewer x:Name="SummaryContentScroll"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto"
+                        IsVisible="False">
+            <SelectableTextBlock x:Name="SummaryContentBlock"
+                                 Margin="16,12"
+                                 FontSize="12.5"
+                                 TextWrapping="Wrap"
+                                 Foreground="{StaticResource TextSecondaryBrush}"
+                                 Background="Transparent"/>
+          </ScrollViewer>
+
+        </DockPanel>
+      </Border>
+    </Grid>
+
+  </DockPanel>
+</UserControl>
