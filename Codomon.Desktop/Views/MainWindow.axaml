@@ -109,6 +109,34 @@
               <TextBlock Text="▾" VerticalAlignment="Center" Opacity="0.6" FontSize="10"/>
             </StackPanel>
           </Button>
+          <Border x:Name="WorkspaceSavedBadge"
+                  IsVisible="False"
+                  Background="{StaticResource PanelBgCardBrush}"
+                  BorderBrush="{StaticResource AccentGreenBrush}"
+                  BorderThickness="1"
+                  CornerRadius="8"
+                  Padding="6,2"
+                  VerticalAlignment="Center">
+            <TextBlock Text="Saved"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentGreenBrush}"
+                       VerticalAlignment="Center"/>
+          </Border>
+          <Border x:Name="WorkspaceUnsavedBadge"
+                  IsVisible="False"
+                  Background="{StaticResource PanelBgCardBrush}"
+                  BorderBrush="{StaticResource AccentAmberBrush}"
+                  BorderThickness="1"
+                  CornerRadius="8"
+                  Padding="6,2"
+                  VerticalAlignment="Center">
+            <TextBlock Text="Unsaved"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentAmberBrush}"
+                       VerticalAlignment="Center"/>
+          </Border>
         </StackPanel>
 
         <!-- Center: navigation tabs -->
