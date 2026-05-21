@@ -192,6 +192,7 @@ public partial class MainWindow : Window
 
         // Apply initial nav tab state.
         UpdateNavTabStyles();
+        UpdateMainContentVisibility();
         UpdateWorkspaceNameDisplay();
         SetupAnalyzePanel();
         RefreshAnalyzePanel();
