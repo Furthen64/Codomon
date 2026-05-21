@@ -74,6 +74,15 @@ Refer to the individual method implementations below for details and call-sites.
 
 public partial class MainWindow : Window
 {
+    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeUnsavedBackground =
+        new(Avalonia.Media.Color.Parse("#2A2315"));
+    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeUnsavedForeground =
+        new(Avalonia.Media.Color.Parse("#FFAA44"));
+    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeSavedBackground =
+        new(Avalonia.Media.Color.Parse("#152A15"));
+    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeSavedForeground =
+        new(Avalonia.Media.Color.Parse("#44CC44"));
+
     private readonly MainViewModel _vm;
     private MainCanvasControl? _canvas;
 
@@ -453,18 +462,14 @@ public partial class MainWindow : Window
 
         if (_vm.IsDirty)
         {
-            _workspaceSaveStateBadge.Background = new Avalonia.Media.SolidColorBrush(
-                Avalonia.Media.Color.Parse("#2A2315"));
-            _workspaceSaveStateText.Foreground = new Avalonia.Media.SolidColorBrush(
-                Avalonia.Media.Color.Parse("#FFAA44"));
+            _workspaceSaveStateBadge.Background = WorkspaceSaveBadgeUnsavedBackground;
+            _workspaceSaveStateText.Foreground = WorkspaceSaveBadgeUnsavedForeground;
             _workspaceSaveStateText.Text = "Unsaved";
             return;
         }
 
-        _workspaceSaveStateBadge.Background = new Avalonia.Media.SolidColorBrush(
-            Avalonia.Media.Color.Parse("#152A15"));
-        _workspaceSaveStateText.Foreground = new Avalonia.Media.SolidColorBrush(
-            Avalonia.Media.Color.Parse("#44CC44"));
+        _workspaceSaveStateBadge.Background = WorkspaceSaveBadgeSavedBackground;
+        _workspaceSaveStateText.Foreground = WorkspaceSaveBadgeSavedForeground;
         _workspaceSaveStateText.Text = "Saved";
     }
 
@@ -477,20 +482,23 @@ public partial class MainWindow : Window
 
         e.Handled = true;
 
-        if ((e.KeyModifiers & KeyModifiers.Shift) != 0)
+        await ExecuteSafeAsync(async () =>
         {
-            await SaveAsAsync();
-            return;
-        }
+            if ((e.KeyModifiers & KeyModifiers.Shift) != 0)
+            {
+                await SaveAsAsync();
+                return;
+            }
 
-        if (string.IsNullOrEmpty(_vm.WorkspaceFolderPath))
-        {
-            await SaveAsAsync();
-            return;
-        }
+            if (string.IsNullOrEmpty(_vm.WorkspaceFolderPath))
+            {
+                await SaveAsAsync();
+                return;
+            }
 
-        await ExecuteSafeAsync(_vm.SaveWorkspaceAsync);
-        AppLogger.Info($"Workspace saved: {_vm.WorkspaceFolderPath}");
+            await _vm.SaveWorkspaceAsync();
+            AppLogger.Info($"Workspace saved: {_vm.WorkspaceFolderPath}");
+        });
     }
 
     private async void OnNewWorkspaceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
