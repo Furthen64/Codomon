@@ -74,15 +74,6 @@ Refer to the individual method implementations below for details and call-sites.
 
 public partial class MainWindow : Window
 {
-    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeUnsavedBackground =
-        new(Avalonia.Media.Color.Parse("#2A2315"));
-    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeUnsavedForeground =
-        new(Avalonia.Media.Color.Parse("#FFAA44"));
-    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeSavedBackground =
-        new(Avalonia.Media.Color.Parse("#152A15"));
-    private static readonly Avalonia.Media.SolidColorBrush WorkspaceSaveBadgeSavedForeground =
-        new(Avalonia.Media.Color.Parse("#44CC44"));
-
     private readonly MainViewModel _vm;
     private MainCanvasControl? _canvas;
 
@@ -150,8 +141,8 @@ public partial class MainWindow : Window
     private Button?    _replayPlayBtn;
     private Button?    _replayPauseBtn;
     private Button?    _replayStopBtn;
-    private Border?    _workspaceSaveStateBadge;
-    private TextBlock? _workspaceSaveStateText;
+    private Border?    _workspaceSavedBadge;
+    private Border?    _workspaceUnsavedBadge;
 
     public MainWindow()
     {
@@ -180,8 +171,8 @@ public partial class MainWindow : Window
         _replayPlayBtn            = this.FindControl<Button>("ReplayPlayButton");
         _replayPauseBtn           = this.FindControl<Button>("ReplayPauseButton");
         _replayStopBtn            = this.FindControl<Button>("ReplayStopButton");
-        _workspaceSaveStateBadge  = this.FindControl<Border>("WorkspaceSaveStateBadge");
-        _workspaceSaveStateText   = this.FindControl<TextBlock>("WorkspaceSaveStateText");
+        _workspaceSavedBadge      = this.FindControl<Border>("WorkspaceSavedBadge");
+        _workspaceUnsavedBadge    = this.FindControl<Border>("WorkspaceUnsavedBadge");
 
         _vm = new MainViewModel();
         DataContext = _vm;
@@ -449,35 +440,26 @@ public partial class MainWindow : Window
 
     private void UpdateWorkspaceSaveStateDisplay()
     {
-        if (_workspaceSaveStateBadge == null || _workspaceSaveStateText == null)
+        if (_workspaceSavedBadge == null || _workspaceUnsavedBadge == null)
             return;
 
         if (!_vm.HasWorkspace)
         {
-            _workspaceSaveStateBadge.IsVisible = false;
+            _workspaceSavedBadge.IsVisible = false;
+            _workspaceUnsavedBadge.IsVisible = false;
             return;
         }
 
-        _workspaceSaveStateBadge.IsVisible = true;
-
-        if (_vm.IsDirty)
-        {
-            _workspaceSaveStateBadge.Background = WorkspaceSaveBadgeUnsavedBackground;
-            _workspaceSaveStateText.Foreground = WorkspaceSaveBadgeUnsavedForeground;
-            _workspaceSaveStateText.Text = "Unsaved";
-            return;
-        }
-
-        _workspaceSaveStateBadge.Background = WorkspaceSaveBadgeSavedBackground;
-        _workspaceSaveStateText.Foreground = WorkspaceSaveBadgeSavedForeground;
-        _workspaceSaveStateText.Text = "Saved";
+        _workspaceSavedBadge.IsVisible = !_vm.IsDirty;
+        _workspaceUnsavedBadge.IsVisible = _vm.IsDirty;
     }
 
     // ── Toolbar handlers ────────────────────────────────────────────────────
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
-        if ((e.KeyModifiers & KeyModifiers.Control) == 0 || e.Key != Key.S)
+        var primaryModifier = e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta);
+        if (primaryModifier == 0 || e.Key != Key.S)
             return;
 
         e.Handled = true;
