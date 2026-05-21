@@ -111,9 +111,11 @@
           </Button>
         </StackPanel>
 
-        <!-- Center: six navigation tabs -->
+        <!-- Center: navigation tabs -->
         <StackPanel x:Name="NavTabsPanel" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
                     Spacing="2" VerticalAlignment="Center">
+          <Button x:Name="NavOverviewBtn" Content="Overview" Tag="Overview" Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Overview tab — project progress and next actions"/>
           <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Design tab — architecture component editor"/>
           <Button x:Name="NavScanBtn"    Content="Analyze" Tag="Scan"    Click="OnNavTabClick" Padding="14,5"
@@ -502,6 +504,49 @@
 
         <!-- ── Content area (all tab panels sit here) ── -->
         <Grid Grid.Column="1">
+
+        <!-- ── Overview tab panel ─── -->
+        <Grid x:Name="OverviewPanel" IsVisible="False" Background="#0F141E">
+          <DockPanel Margin="40,32">
+            <TextBlock DockPanel.Dock="Top" Text="Overview" FontSize="22" FontWeight="Bold"
+                       Foreground="#AABBCC" Margin="0,0,0,6"/>
+            <TextBlock DockPanel.Dock="Top"
+                       Text="Start here to review what has been done and what still needs doing."
+                       FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,18"/>
+
+            <StackPanel Spacing="14">
+              <Border Background="#121A26" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Done so far" FontSize="13" FontWeight="SemiBold" Foreground="#AABBCC"/>
+                  <TextBlock x:Name="OverviewDoneStatusText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+
+              <Border Background="#121A26" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="What needs doing next" FontSize="13" FontWeight="SemiBold" Foreground="#AABBCC"/>
+                  <TextBlock x:Name="OverviewNextScanText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="OverviewNextSummariesText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="OverviewNextArchitectureText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+
+              <Border Background="#121A26" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="Logs" FontSize="13" FontWeight="SemiBold" Foreground="#AABBCC"/>
+                  <TextBlock x:Name="OverviewLogsLocationText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Run Scan" Click="OnScanClick" Padding="14,6"/>
+                <Button Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6"/>
+                <Button Content="Architecture" Click="OnHypothesisClick" Padding="14,6"/>
+                <Button Content="Replay Logs" Click="OnImportLogClick" Padding="14,6"/>
+              </StackPanel>
+            </StackPanel>
+          </DockPanel>
+        </Grid>
 
         <!-- ── Design tab placeholder ─── -->
         <Grid x:Name="DesignPanel" IsVisible="False" Background="#0F141E">
