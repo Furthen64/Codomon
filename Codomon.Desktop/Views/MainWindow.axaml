@@ -109,6 +109,19 @@
               <TextBlock Text="▾" VerticalAlignment="Center" Opacity="0.6" FontSize="10"/>
             </StackPanel>
           </Button>
+          <Border x:Name="WorkspaceSaveStateBadge"
+                  IsVisible="False"
+                  Background="{StaticResource PanelBgCardBrush}"
+                  CornerRadius="8"
+                  Padding="6,2"
+                  VerticalAlignment="Center">
+            <TextBlock x:Name="WorkspaceSaveStateText"
+                       Text="Saved"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextFaintBrush}"
+                       VerticalAlignment="Center"/>
+          </Border>
         </StackPanel>
 
         <!-- Center: six navigation tabs -->

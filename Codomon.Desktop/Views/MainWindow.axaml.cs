@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Codomon.Desktop.Controls;
@@ -140,6 +141,8 @@ public partial class MainWindow : Window
     private Button?    _replayPlayBtn;
     private Button?    _replayPauseBtn;
     private Button?    _replayStopBtn;
+    private Border?    _workspaceSaveStateBadge;
+    private TextBlock? _workspaceSaveStateText;
 
     public MainWindow()
     {
@@ -168,6 +171,8 @@ public partial class MainWindow : Window
         _replayPlayBtn            = this.FindControl<Button>("ReplayPlayButton");
         _replayPauseBtn           = this.FindControl<Button>("ReplayPauseButton");
         _replayStopBtn            = this.FindControl<Button>("ReplayStopButton");
+        _workspaceSaveStateBadge  = this.FindControl<Border>("WorkspaceSaveStateBadge");
+        _workspaceSaveStateText   = this.FindControl<TextBlock>("WorkspaceSaveStateText");
 
         _vm = new MainViewModel();
         DataContext = _vm;
@@ -203,8 +208,8 @@ public partial class MainWindow : Window
         // Intercept window close to warn about unsaved changes.
         Closing += OnWindowClosing;
         Opened += OnWindowOpened;
-
         Closed += OnWindowClosed;
+        KeyDown += OnWindowKeyDown;
 
         AppLogger.Info("App started");
     }
@@ -299,6 +304,7 @@ public partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.IsDirty))
         {
             UpdateWindowTitle();
+            UpdateWorkspaceSaveStateDisplay();
         }
         else if (e.PropertyName is nameof(MainViewModel.FileCount)
                                 or nameof(MainViewModel.ClassCount)
@@ -428,10 +434,64 @@ public partial class MainWindow : Window
         if (nameText != null)
             nameText.Text = _vm.HasWorkspace ? _vm.Workspace.WorkspaceName : "No Workspace";
 
+        UpdateWorkspaceSaveStateDisplay();
         RefreshSidebar();
     }
 
+    private void UpdateWorkspaceSaveStateDisplay()
+    {
+        if (_workspaceSaveStateBadge == null || _workspaceSaveStateText == null)
+            return;
+
+        if (!_vm.HasWorkspace)
+        {
+            _workspaceSaveStateBadge.IsVisible = false;
+            return;
+        }
+
+        _workspaceSaveStateBadge.IsVisible = true;
+
+        if (_vm.IsDirty)
+        {
+            _workspaceSaveStateBadge.Background = new Avalonia.Media.SolidColorBrush(
+                Avalonia.Media.Color.Parse("#2A2315"));
+            _workspaceSaveStateText.Foreground = new Avalonia.Media.SolidColorBrush(
+                Avalonia.Media.Color.Parse("#FFAA44"));
+            _workspaceSaveStateText.Text = "Unsaved";
+            return;
+        }
+
+        _workspaceSaveStateBadge.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.Parse("#152A15"));
+        _workspaceSaveStateText.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.Parse("#44CC44"));
+        _workspaceSaveStateText.Text = "Saved";
+    }
+
     // ── Toolbar handlers ────────────────────────────────────────────────────
+
+    private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0 || e.Key != Key.S)
+            return;
+
+        e.Handled = true;
+
+        if ((e.KeyModifiers & KeyModifiers.Shift) != 0)
+        {
+            await SaveAsAsync();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_vm.WorkspaceFolderPath))
+        {
+            await SaveAsAsync();
+            return;
+        }
+
+        await ExecuteSafeAsync(_vm.SaveWorkspaceAsync);
+        AppLogger.Info($"Workspace saved: {_vm.WorkspaceFolderPath}");
+    }
 
     private async void OnNewWorkspaceClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
