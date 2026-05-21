@@ -113,7 +113,7 @@ public partial class MainWindow : Window
     private bool _devConsoleAutoOpenedThisSession;
 
     // Tracks the currently active navigation tab.
-    private string _activeNavTab = "Monitor";
+    private string _activeNavTab = "Overview";
 
     // ── Cached control references ────────────────────────────────────────────
     // Initialized once in the constructor to avoid repeated string-based FindControl
@@ -196,6 +196,7 @@ public partial class MainWindow : Window
         UpdateWorkspaceNameDisplay();
         SetupAnalyzePanel();
         RefreshAnalyzePanel();
+        RefreshOverviewPanel();
         _workspaceLoadingOverlay = this.FindControl<Grid>("WorkspaceLoadingOverlay");
         _workspaceLoadingProgressBar = this.FindControl<ProgressBar>("WorkspaceLoadingProgressBar");
         _workspaceLoadingStatusText = this.FindControl<TextBlock>("WorkspaceLoadingStatusText");
@@ -242,6 +243,7 @@ public partial class MainWindow : Window
 
         TryAutoStartDevConsole();
         RefreshAnalyzePanel();
+        RefreshOverviewPanel();
     }
 
 
@@ -255,6 +257,7 @@ public partial class MainWindow : Window
             UpdateWorkspaceNameDisplay();
             RefreshLiveMonitorPanel();
             RefreshAnalyzePanel();
+            RefreshOverviewPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.Workspace))
         {
@@ -267,12 +270,14 @@ public partial class MainWindow : Window
             RefreshRoslynConnectionsPanel();
             UpdateWorkspaceNameDisplay();  // calls RefreshSidebar() internally
             RefreshAnalyzePanel();
+            RefreshOverviewPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.WorkspaceFolderPath))
         {
             RefreshDocsBrowserView();
             UpdateWorkspaceNameDisplay();
             RefreshAnalyzePanel();
+            RefreshOverviewPanel();
         }
         else if (e.PropertyName == nameof(MainViewModel.Timeline))
         {
@@ -327,13 +332,13 @@ public partial class MainWindow : Window
     private void OnNavTabClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is not Button btn) return;
-        var tab = btn.Tag?.ToString() ?? "Monitor";
+        var tab = btn.Tag?.ToString() ?? "Overview";
         SetActiveNavTab(tab);
     }
 
     private void OnLogoClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        SetActiveNavTab("Monitor");
+        SetActiveNavTab("Overview");
         _vm.SystemMap.SetActiveView(SystemMapViewKind.SystemOverview);
     }
 
@@ -356,6 +361,7 @@ public partial class MainWindow : Window
         var navTabsPanel   = this.FindControl<StackPanel>("NavTabsPanel");
         var fileCloseWorkspaceMenuItem = this.FindControl<MenuItem>("FileCloseWorkspaceMenuItem");
         var workspaceCloseMenuItem = this.FindControl<MenuItem>("WorkspaceCloseMenuItem");
+        var overviewPanel  = this.FindControl<Grid>("OverviewPanel");
         var designPanel    = this.FindControl<Grid>("DesignPanel");
         var scanPanel      = this.FindControl<Grid>("ScanPanel");
         var codePanel      = this.FindControl<Grid>("CodePanel");
@@ -368,8 +374,9 @@ public partial class MainWindow : Window
         if (navTabsPanel   != null) navTabsPanel.IsVisible   = has;
         if (fileCloseWorkspaceMenuItem != null) fileCloseWorkspaceMenuItem.IsEnabled = has;
         if (workspaceCloseMenuItem != null) workspaceCloseMenuItem.IsEnabled = has;
+        if (overviewPanel  != null) overviewPanel.IsVisible  = has && _activeNavTab == "Overview";
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
-        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Monitor" or "Graph" or "Design" or "Code" or "Docs";
+        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Overview" or "Monitor" or "Graph" or "Design" or "Code" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
         if (scanPanel      != null) scanPanel.IsVisible      = _activeNavTab == "Scan";
         if (codePanel      != null) codePanel.IsVisible      = has && _activeNavTab == "Code";
@@ -387,11 +394,12 @@ public partial class MainWindow : Window
     private const string NavTabActiveBackground = "#2A4A6A";
     private const string NavTabInactiveForeground = "#88AABB";
 
-    /// <summary>Applies active/inactive visual styling to the five nav tab buttons.</summary>
+    /// <summary>Applies active/inactive visual styling to nav tab buttons.</summary>
     private void UpdateNavTabStyles()
     {
         var navTabs = new[]
         {
+            ("NavOverviewBtn","Overview"),
             ("NavDesignBtn",  "Design"),
             ("NavScanBtn",    "Scan"),
             ("NavMonitorBtn", "Monitor"),
@@ -447,6 +455,7 @@ public partial class MainWindow : Window
                 result.SourceProjectPath,
                 result.ProfileName,
                 result.SystemNames);
+            SetActiveNavTab("Overview");
             UpdateWindowTitle();
             AppLogger.Info($"New workspace created: {result.WorkspaceName}");
         });
@@ -470,6 +479,7 @@ public partial class MainWindow : Window
         await ExecuteWithWorkspaceLoadingAsync(async progress =>
         {
             await _vm.OpenWorkspaceAsync(folderPath, progress);
+            SetActiveNavTab("Overview");
             UpdateWindowTitle();
             AppLogger.Info($"Workspace opened: {folderPath}");
         });
@@ -518,7 +528,7 @@ public partial class MainWindow : Window
         }
 
         _vm.CloseWorkspace();
-        SetActiveNavTab("Monitor");
+        SetActiveNavTab("Overview");
         UpdateWindowTitle();
         PopulateRecentWorkspaces();
         RefreshSidebar();
@@ -781,6 +791,7 @@ public partial class MainWindow : Window
         await ExecuteWithWorkspaceLoadingAsync(async progress =>
         {
             await _vm.OpenWorkspaceAsync(entry.FolderPath, progress);
+            SetActiveNavTab("Overview");
             UpdateWindowTitle();
             AppLogger.Info($"Workspace opened from recent list: {entry.FolderPath}");
         });
@@ -1517,6 +1528,7 @@ public partial class MainWindow : Window
             if (architectureBtn != null) architectureBtn.IsEnabled = false;
             if (architectureAvailability != null) architectureAvailability.Text = "Requires LLM summaries.";
             if (architectureStatus != null) architectureStatus.Text = "Generate summaries to enable architecture synthesis.";
+            RefreshOverviewPanel();
             return;
         }
 
@@ -1572,6 +1584,75 @@ public partial class MainWindow : Window
                 ? "No architecture synthesis runs yet."
                 : $"Runs: {hypotheses.Count} · Last: {FormatTime(latestHypothesisAt)}";
         }
+
+        RefreshOverviewPanel();
+    }
+
+    private void RefreshOverviewPanel()
+    {
+        var doneStatus = this.FindControl<TextBlock>("OverviewDoneStatusText");
+        var nextScan = this.FindControl<TextBlock>("OverviewNextScanText");
+        var nextSummaries = this.FindControl<TextBlock>("OverviewNextSummariesText");
+        var nextArchitecture = this.FindControl<TextBlock>("OverviewNextArchitectureText");
+        var logsLocation = this.FindControl<TextBlock>("OverviewLogsLocationText");
+
+        if (doneStatus == null || nextScan == null || nextSummaries == null || nextArchitecture == null || logsLocation == null)
+            return;
+
+        if (!_vm.HasWorkspace || string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath))
+        {
+            doneStatus.Text = "Open or create a workspace to see project progress.";
+            nextScan.Text = "• Run Scan to discover source structure.";
+            nextSummaries.Text = "• Generate LLM summaries after a scan completes.";
+            nextArchitecture.Text = "• Run Architecture synthesis after summaries are available.";
+            logsLocation.Text = "Imported logs are stored under logs/imported in each workspace.";
+            return;
+        }
+
+        var savedScans = RoslynScanService.ListSavedScans(_vm.WorkspaceFolderPath);
+        var summaries = LlmSummaryService.ListSummaries(_vm.WorkspaceFolderPath);
+        var hypotheses = ArchitectureHypothesisService.ListHypotheses(_vm.WorkspaceFolderPath);
+        var latestScanAt = savedScans.Count > 0 ? savedScans[0].ScanTime : (DateTime?)null;
+        var latestSummaryAt = summaries.Count > 0 ? summaries.Max(s => s.GeneratedAt) : (DateTime?)null;
+        var latestHypothesisAt = hypotheses.Count > 0 ? hypotheses.Max(h => h.CreatedAt) : (DateTime?)null;
+
+        var importedLogsPath = Path.Combine(_vm.WorkspaceFolderPath, "logs", "imported");
+        int importedLogFileCount;
+        try
+        {
+            importedLogFileCount = Directory.Exists(importedLogsPath)
+                ? Directory.EnumerateFiles(importedLogsPath, "*", SearchOption.TopDirectoryOnly).Count()
+                : 0;
+        }
+        catch
+        {
+            importedLogFileCount = 0;
+        }
+
+        doneStatus.Text =
+            $"Workspace: {_vm.Workspace.WorkspaceName} · Scans: {savedScans.Count} (last {FormatTime(latestScanAt)}) · " +
+            $"Summaries: {summaries.Count} (last {FormatTime(latestSummaryAt)}) · " +
+            $"Architecture runs: {hypotheses.Count} (last {FormatTime(latestHypothesisAt)})";
+
+        nextScan.Text = savedScans.Count == 0
+            ? "• Next: run Scan to create the first analysis snapshot."
+            : "• Scan is available — re-run when source changes.";
+
+        nextSummaries.Text = savedScans.Count == 0
+            ? "• LLM summaries are blocked until a scan exists."
+            : summaries.Count == 0
+                ? "• Next: generate LLM summaries from the latest scan."
+                : "• LLM summaries exist — regenerate to refresh coverage.";
+
+        nextArchitecture.Text = summaries.Count == 0
+            ? "• Architecture synthesis is blocked until summaries are generated."
+            : hypotheses.Count == 0
+                ? "• Next: run Architecture synthesis to build architecture hypotheses."
+                : "• Architecture synthesis has runs — re-run after major changes.";
+
+        logsLocation.Text =
+            $"Imported logs folder: {importedLogsPath} · Imported files: {importedLogFileCount:N0} · " +
+            $"Loaded entries: {_vm.LogReplay.Entries.Count:N0} · Watched files: {_vm.Workspace.WatchedLogPaths.Count:N0}";
     }
 
     private void TryAutoStartDevConsole()
@@ -2408,6 +2489,8 @@ public partial class MainWindow : Window
         var initial = string.IsNullOrEmpty(osUser) ? "?" : osUser[0].ToString().ToUpperInvariant();
         if (profileInitial     != null) profileInitial.Text     = initial;
         if (profileDisplayName != null) profileDisplayName.Text = osUser;
+
+        RefreshOverviewPanel();
     }
 
     private static int CountMarkdownDocs(string workspaceFolderPath)
