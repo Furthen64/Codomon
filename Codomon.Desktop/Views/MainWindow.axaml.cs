@@ -1607,7 +1607,7 @@ public partial class MainWindow : Window
             nextScan.Text = "• Run Scan to discover source structure.";
             nextSummaries.Text = "• Generate LLM summaries after a scan completes.";
             nextArchitecture.Text = "• Run Architecture synthesis after summaries are available.";
-            logsLocation.Text = "Imported logs are stored under logs/imported in each workspace.";
+            logsLocation.Text = $"Imported logs are stored under {WorkspaceLogsFolderName}/{WorkspaceImportedLogsFolderName} in each workspace.";
             return;
         }
 
@@ -1631,7 +1631,11 @@ public partial class MainWindow : Window
             importedLogFileCount = 0;
         }
 
-        doneStatus.Text = $"Workspace: {_vm.Workspace.WorkspaceName} · Scans: {savedScans.Count} (last {FormatTime(latestScanAt)}) · Summaries: {summaries.Count} (last {FormatTime(latestSummaryAt)}) · Architecture runs: {hypotheses.Count} (last {FormatTime(latestHypothesisAt)})";
+        doneStatus.Text =
+            $"Workspace: {_vm.Workspace.WorkspaceName}{Environment.NewLine}" +
+            $"Scans: {savedScans.Count} (last {FormatTime(latestScanAt)}){Environment.NewLine}" +
+            $"Summaries: {summaries.Count} (last {FormatTime(latestSummaryAt)}){Environment.NewLine}" +
+            $"Architecture runs: {hypotheses.Count} (last {FormatTime(latestHypothesisAt)})";
 
         nextScan.Text = savedScans.Count == 0
             ? "• Next: run Scan to create the first analysis snapshot."
@@ -1649,7 +1653,10 @@ public partial class MainWindow : Window
                 ? "• Next: run Architecture synthesis to build architecture hypotheses."
                 : "• Architecture synthesis has runs — re-run after major changes.";
 
-        logsLocation.Text = $"Imported logs folder: {importedLogsPath} · Imported files: {importedLogFileCount:N0} · Loaded entries: {_vm.LogReplay.Entries.Count:N0} · Watched files: {_vm.Workspace.WatchedLogPaths.Count:N0}";
+        logsLocation.Text =
+            $"Imported logs folder: {importedLogsPath}{Environment.NewLine}" +
+            $"Imported files: {importedLogFileCount:N0}{Environment.NewLine}" +
+            $"Loaded entries: {_vm.LogReplay.Entries.Count:N0} · Watched files: {_vm.Workspace.WatchedLogPaths.Count:N0}";
     }
 
     private void TryAutoStartDevConsole()
