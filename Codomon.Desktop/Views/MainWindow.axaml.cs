@@ -393,6 +393,8 @@ public partial class MainWindow : Window
 
     private const string NavTabActiveBackground = "#2A4A6A";
     private const string NavTabInactiveForeground = "#88AABB";
+    private const string WorkspaceLogsFolderName = "logs";
+    private const string WorkspaceImportedLogsFolderName = "imported";
 
     /// <summary>Applies active/inactive visual styling to nav tab buttons.</summary>
     private void UpdateNavTabStyles()
@@ -1616,7 +1618,7 @@ public partial class MainWindow : Window
         var latestSummaryAt = summaries.Count > 0 ? summaries.Max(s => s.GeneratedAt) : (DateTime?)null;
         var latestHypothesisAt = hypotheses.Count > 0 ? hypotheses.Max(h => h.CreatedAt) : (DateTime?)null;
 
-        var importedLogsPath = Path.Combine(_vm.WorkspaceFolderPath, "logs", "imported");
+        var importedLogsPath = Path.Combine(_vm.WorkspaceFolderPath, WorkspaceLogsFolderName, WorkspaceImportedLogsFolderName);
         int importedLogFileCount;
         try
         {
@@ -1629,10 +1631,7 @@ public partial class MainWindow : Window
             importedLogFileCount = 0;
         }
 
-        doneStatus.Text =
-            $"Workspace: {_vm.Workspace.WorkspaceName} · Scans: {savedScans.Count} (last {FormatTime(latestScanAt)}) · " +
-            $"Summaries: {summaries.Count} (last {FormatTime(latestSummaryAt)}) · " +
-            $"Architecture runs: {hypotheses.Count} (last {FormatTime(latestHypothesisAt)})";
+        doneStatus.Text = $"Workspace: {_vm.Workspace.WorkspaceName} · Scans: {savedScans.Count} (last {FormatTime(latestScanAt)}) · Summaries: {summaries.Count} (last {FormatTime(latestSummaryAt)}) · Architecture runs: {hypotheses.Count} (last {FormatTime(latestHypothesisAt)})";
 
         nextScan.Text = savedScans.Count == 0
             ? "• Next: run Scan to create the first analysis snapshot."
@@ -1650,9 +1649,7 @@ public partial class MainWindow : Window
                 ? "• Next: run Architecture synthesis to build architecture hypotheses."
                 : "• Architecture synthesis has runs — re-run after major changes.";
 
-        logsLocation.Text =
-            $"Imported logs folder: {importedLogsPath} · Imported files: {importedLogFileCount:N0} · " +
-            $"Loaded entries: {_vm.LogReplay.Entries.Count:N0} · Watched files: {_vm.Workspace.WatchedLogPaths.Count:N0}";
+        logsLocation.Text = $"Imported logs folder: {importedLogsPath} · Imported files: {importedLogFileCount:N0} · Loaded entries: {_vm.LogReplay.Entries.Count:N0} · Watched files: {_vm.Workspace.WatchedLogPaths.Count:N0}";
     }
 
     private void TryAutoStartDevConsole()
