@@ -546,7 +546,7 @@
                            TextWrapping="Wrap"/>
               </StackPanel>
 
-              <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+              <Grid ColumnDefinitions="*,24,*">
                 <Border Background="{StaticResource PanelBgCardBrush}"
                         BorderBrush="{StaticResource BorderDefaultBrush}"
                         BorderThickness="1"
@@ -558,9 +558,9 @@
                                FontWeight="SemiBold"
                                Foreground="{StaticResource TextPrimaryBrush}"/>
 
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="Auto,12,*">
                       <TextBlock x:Name="OverviewSourceScanIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
-                      <StackPanel Grid.Column="1" Spacing="4">
+                      <StackPanel Grid.Column="2" Spacing="4">
                         <TextBlock x:Name="OverviewSourceScanTitleText" Text="Source scan"
                                    FontSize="18" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
@@ -571,9 +571,9 @@
                       </StackPanel>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="Auto,12,*">
                       <TextBlock x:Name="OverviewSummariesIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
-                      <StackPanel Grid.Column="1" Spacing="4">
+                      <StackPanel Grid.Column="2" Spacing="4">
                         <TextBlock x:Name="OverviewSummariesTitleText" Text="File summaries"
                                    FontSize="18" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
@@ -584,9 +584,9 @@
                       </StackPanel>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="Auto,12,*">
                       <TextBlock x:Name="OverviewArchitectureIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
-                      <StackPanel Grid.Column="1" Spacing="4">
+                      <StackPanel Grid.Column="2" Spacing="4">
                         <TextBlock x:Name="OverviewArchitectureTitleText" Text="Architecture synthesis"
                                    FontSize="18" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
@@ -597,9 +597,9 @@
                       </StackPanel>
                     </Grid>
 
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="Auto,12,*">
                       <TextBlock x:Name="OverviewGraphIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
-                      <StackPanel Grid.Column="1" Spacing="4">
+                      <StackPanel Grid.Column="2" Spacing="4">
                         <TextBlock x:Name="OverviewGraphTitleText" Text="Code graph exploration"
                                    FontSize="18" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
@@ -629,7 +629,7 @@
                   </StackPanel>
                 </Border>
 
-                <Border Grid.Column="1"
+                <Border Grid.Column="2"
                         Background="{StaticResource PanelBgBaseBrush}"
                         BorderBrush="{StaticResource AccentBlueBrush}"
                         BorderThickness="1"
