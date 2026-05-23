@@ -534,46 +534,184 @@
         <Grid Grid.Column="1">
 
         <!-- ── Overview tab panel ─── -->
-        <Grid x:Name="OverviewPanel" IsVisible="False" Background="#0F141E">
-          <DockPanel Margin="40,32">
-            <TextBlock DockPanel.Dock="Top" Text="Overview" FontSize="22" FontWeight="Bold"
-                       Foreground="#AABBCC" Margin="0,0,0,6"/>
-            <TextBlock DockPanel.Dock="Top"
-                       Text="Start here to review what has been done and what still needs doing."
-                       FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,18"/>
-
-            <StackPanel Spacing="14">
-              <Border Background="#121A26" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="6" Padding="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Done so far" FontSize="13" FontWeight="SemiBold" Foreground="#AABBCC"/>
-                  <TextBlock x:Name="OverviewDoneStatusText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
-                </StackPanel>
-              </Border>
-
-              <Border Background="#121A26" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="6" Padding="12">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="What needs doing next" FontSize="13" FontWeight="SemiBold" Foreground="#AABBCC"/>
-                  <TextBlock x:Name="OverviewNextScanText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
-                  <TextBlock x:Name="OverviewNextSummariesText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
-                  <TextBlock x:Name="OverviewNextArchitectureText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
-                </StackPanel>
-              </Border>
-
-              <Border Background="#121A26" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="6" Padding="12">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="Logs" FontSize="13" FontWeight="SemiBold" Foreground="#AABBCC"/>
-                  <TextBlock x:Name="OverviewLogsLocationText" Text="" FontSize="11" Foreground="#88AABB" TextWrapping="Wrap"/>
-                </StackPanel>
-              </Border>
-
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <Button Content="Run Scan" Click="OnScanClick" Padding="14,6"/>
-                <Button Content="LLM Summaries" Click="OnSummariesClick" Padding="14,6"/>
-                <Button Content="Architecture" Click="OnHypothesisClick" Padding="14,6"/>
-                <Button Content="Replay Logs" Click="OnImportLogClick" Padding="14,6"/>
+        <Grid x:Name="OverviewPanel" IsVisible="False" Background="{StaticResource PanelBgContentBrush}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="44,36,44,44" Spacing="24">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Overview" FontSize="28" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                <TextBlock x:Name="OverviewWorkspaceMetaText"
+                           FontSize="15"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"/>
               </StackPanel>
+
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+                <Border Background="{StaticResource PanelBgCardBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="24">
+                  <StackPanel Spacing="22">
+                    <TextBlock Text="What’s been done"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                      <TextBlock x:Name="OverviewSourceScanIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
+                      <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock x:Name="OverviewSourceScanTitleText" Text="Source scan"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="OverviewSourceScanDetailText"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                      <TextBlock x:Name="OverviewSummariesIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
+                      <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock x:Name="OverviewSummariesTitleText" Text="File summaries"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="OverviewSummariesDetailText"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                      <TextBlock x:Name="OverviewArchitectureIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
+                      <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock x:Name="OverviewArchitectureTitleText" Text="Architecture synthesis"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="OverviewArchitectureDetailText"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                      <TextBlock x:Name="OverviewGraphIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
+                      <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock x:Name="OverviewGraphTitleText" Text="Code graph exploration"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="OverviewGraphDetailText"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Grid>
+
+                    <Border Background="{StaticResource PanelBgDarkBrush}"
+                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="16,14">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="Auxiliary features"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextMutedBrush}"/>
+                        <TextBlock x:Name="OverviewLogsStatusText"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Background="{StaticResource PanelBgBaseBrush}"
+                        BorderBrush="{StaticResource AccentBlueBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="24">
+                  <StackPanel Spacing="24">
+                    <TextBlock Text="Next best move"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+
+                    <StackPanel Spacing="12">
+                      <TextBlock x:Name="OverviewRecommendationTitleText"
+                                 FontSize="26"
+                                 FontWeight="Bold"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 TextWrapping="Wrap"/>
+                      <TextBlock x:Name="OverviewRecommendationBodyText"
+                                 FontSize="15"
+                                 Foreground="{StaticResource TextSecondaryBrush}"
+                                 TextWrapping="Wrap"/>
+                      <Button x:Name="OverviewPrimaryActionButton"
+                              Click="OnOverviewPrimaryActionClick"
+                              HorizontalAlignment="Left"
+                              Padding="18,10"
+                              FontSize="15"
+                              FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <Border Background="{StaticResource PanelBgDarkBrush}"
+                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="16,14">
+                      <StackPanel Spacing="14">
+                        <TextBlock Text="Other available actions"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextMutedBrush}"/>
+                        <WrapPanel ItemWidth="170" Orientation="Horizontal">
+                          <Button Content="Run source scan again" Click="OnScanClick"
+                                  Margin="0,0,10,10" Padding="12,8"
+                                  Background="{StaticResource PanelBgCardBrush}"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}"
+                                  Foreground="{StaticResource TextSecondaryBrush}"/>
+                          <Button Content="View summaries" Click="OnOverviewViewSummariesClick"
+                                  Margin="0,0,10,10" Padding="12,8"
+                                  Background="{StaticResource PanelBgCardBrush}"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}"
+                                  Foreground="{StaticResource TextSecondaryBrush}"/>
+                          <Button Content="Open graph" Click="OnOverviewOpenGraphClick"
+                                  Margin="0,0,10,10" Padding="12,8"
+                                  Background="{StaticResource PanelBgCardBrush}"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}"
+                                  Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </WrapPanel>
+
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Auxiliary features"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{StaticResource TextFaintBrush}"/>
+                          <WrapPanel ItemWidth="170" Orientation="Horizontal">
+                            <Button Content="Import logs" Click="OnImportLogClick"
+                                    Margin="0,0,10,10" Padding="12,8"
+                                    Background="{StaticResource PanelBgCardBrush}"
+                                    BorderBrush="{StaticResource BorderSubtleBrush}"
+                                    Foreground="{StaticResource TextMutedBrush}"/>
+                            <Button Content="Replay logs" Click="OnOverviewOpenMonitorClick"
+                                    Margin="0,0,10,10" Padding="12,8"
+                                    Background="{StaticResource PanelBgCardBrush}"
+                                    BorderBrush="{StaticResource BorderSubtleBrush}"
+                                    Foreground="{StaticResource TextMutedBrush}"/>
+                          </WrapPanel>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </Border>
+              </Grid>
             </StackPanel>
-          </DockPanel>
+          </ScrollViewer>
         </Grid>
 
         <!-- ── Design tab placeholder ─── -->

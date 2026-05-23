@@ -401,6 +401,45 @@ public partial class MainWindow : Window
     private const string NavTabInactiveForeground = "#88AABB";
     private const string WorkspaceLogsFolderName = "logs";
     private const string WorkspaceImportedLogsFolderName = "imported";
+    private const string OverviewActionScan = "scan";
+    private const string OverviewActionSummaries = "summaries";
+    private const string OverviewActionArchitecture = "architecture";
+    private const string OverviewActionGraph = "graph";
+
+    private static readonly string[] SourceSnapshotExtensions =
+    {
+        ".cs", ".csproj", ".sln", ".props", ".targets", ".md", ".markdown"
+    };
+
+    private static readonly string[] SourceSnapshotIgnoredDirectories =
+    {
+        ".git", ".vs", ".idea", "bin", "obj", "node_modules"
+    };
+
+    private enum OverviewStatusKind
+    {
+        Done,
+        Warning,
+        Pending,
+        Blocked,
+        Running,
+        Failed
+    }
+
+    private sealed class OverviewStepState
+    {
+        public required OverviewStatusKind Kind { get; init; }
+        public required string Title { get; init; }
+        public required string Detail { get; init; }
+    }
+
+    private sealed class OverviewRecommendation
+    {
+        public required string Title { get; init; }
+        public required string Description { get; init; }
+        public required string ButtonText { get; init; }
+        public required string ActionKey { get; init; }
+    }
 
     /// <summary>Applies active/inactive visual styling to nav tab buttons.</summary>
     private void UpdateNavTabStyles()
@@ -1642,22 +1681,68 @@ public partial class MainWindow : Window
 
     private void RefreshOverviewPanel()
     {
-        var doneStatus = this.FindControl<TextBlock>("OverviewDoneStatusText");
-        var nextScan = this.FindControl<TextBlock>("OverviewNextScanText");
-        var nextSummaries = this.FindControl<TextBlock>("OverviewNextSummariesText");
-        var nextArchitecture = this.FindControl<TextBlock>("OverviewNextArchitectureText");
-        var logsLocation = this.FindControl<TextBlock>("OverviewLogsLocationText");
+        var workspaceMeta = this.FindControl<TextBlock>("OverviewWorkspaceMetaText");
+        var sourceScanIcon = this.FindControl<TextBlock>("OverviewSourceScanIconText");
+        var sourceScanTitle = this.FindControl<TextBlock>("OverviewSourceScanTitleText");
+        var sourceScanDetail = this.FindControl<TextBlock>("OverviewSourceScanDetailText");
+        var summariesIcon = this.FindControl<TextBlock>("OverviewSummariesIconText");
+        var summariesTitle = this.FindControl<TextBlock>("OverviewSummariesTitleText");
+        var summariesDetail = this.FindControl<TextBlock>("OverviewSummariesDetailText");
+        var architectureIcon = this.FindControl<TextBlock>("OverviewArchitectureIconText");
+        var architectureTitle = this.FindControl<TextBlock>("OverviewArchitectureTitleText");
+        var architectureDetail = this.FindControl<TextBlock>("OverviewArchitectureDetailText");
+        var graphIcon = this.FindControl<TextBlock>("OverviewGraphIconText");
+        var graphTitle = this.FindControl<TextBlock>("OverviewGraphTitleText");
+        var graphDetail = this.FindControl<TextBlock>("OverviewGraphDetailText");
+        var logsStatus = this.FindControl<TextBlock>("OverviewLogsStatusText");
+        var recommendationTitle = this.FindControl<TextBlock>("OverviewRecommendationTitleText");
+        var recommendationBody = this.FindControl<TextBlock>("OverviewRecommendationBodyText");
+        var primaryActionButton = this.FindControl<Button>("OverviewPrimaryActionButton");
 
-        if (doneStatus == null || nextScan == null || nextSummaries == null || nextArchitecture == null || logsLocation == null)
+        if (workspaceMeta == null ||
+            sourceScanIcon == null || sourceScanTitle == null || sourceScanDetail == null ||
+            summariesIcon == null || summariesTitle == null || summariesDetail == null ||
+            architectureIcon == null || architectureTitle == null || architectureDetail == null ||
+            graphIcon == null || graphTitle == null || graphDetail == null ||
+            logsStatus == null ||
+            recommendationTitle == null || recommendationBody == null || primaryActionButton == null)
             return;
 
         if (!_vm.HasWorkspace || string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath))
         {
-            doneStatus.Text = "Open or create a workspace to see project progress.";
-            nextScan.Text = "• Run Scan to discover source structure.";
-            nextSummaries.Text = "• Generate LLM summaries after a scan completes.";
-            nextArchitecture.Text = "• Run Architecture synthesis after summaries are available.";
-            logsLocation.Text = $"Imported logs are stored under {WorkspaceLogsFolderName}/{WorkspaceImportedLogsFolderName} in each workspace.";
+            workspaceMeta.Text = "Open or create a workspace to start Codomon’s learning pipeline.";
+
+            ApplyOverviewStep(sourceScanIcon, sourceScanTitle, sourceScanDetail, new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "Source scan",
+                Detail = "Ready when a workspace is open."
+            });
+            ApplyOverviewStep(summariesIcon, summariesTitle, summariesDetail, new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "File summaries",
+                Detail = "Ready after a source scan exists."
+            });
+            ApplyOverviewStep(architectureIcon, architectureTitle, architectureDetail, new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "Architecture synthesis",
+                Detail = "Ready after file summaries exist."
+            });
+            ApplyOverviewStep(graphIcon, graphTitle, graphDetail, new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "Code graph exploration",
+                Detail = "Ready after architecture synthesis is current."
+            });
+
+            logsStatus.Text = $"Runtime logs stay auxiliary. Imported logs are stored under {WorkspaceLogsFolderName}/{WorkspaceImportedLogsFolderName} in each workspace.";
+            recommendationTitle.Text = "Open a workspace";
+            recommendationBody.Text = "Codomon can recommend the next best move after a workspace is loaded.";
+            primaryActionButton.Content = "Workspace required";
+            primaryActionButton.Tag = null;
+            primaryActionButton.IsEnabled = false;
             return;
         }
 
@@ -1681,32 +1766,75 @@ public partial class MainWindow : Window
             importedLogFileCount = 0;
         }
 
-        doneStatus.Text =
-            $"Workspace: {_vm.Workspace.WorkspaceName}{Environment.NewLine}" +
-            $"Scans: {savedScans.Count} (last {FormatTime(latestScanAt)}){Environment.NewLine}" +
-            $"Summaries: {summaries.Count} (last {FormatTime(latestSummaryAt)}){Environment.NewLine}" +
-            $"Architecture runs: {hypotheses.Count} (last {FormatTime(latestHypothesisAt)})";
+        var sourceSnapshot = GetSourceSnapshotStats(_vm.Workspace.SourceProjectPath);
+        var sourceFileCount = GetLatestScanAnalyzedFileCount(_vm.WorkspaceFolderPath);
+        var summariesCoverageComplete = sourceFileCount <= 0 || summaries.Count >= sourceFileCount;
+        var summariesCoverageText = sourceFileCount > 0
+            ? summariesCoverageComplete
+                ? "complete"
+                : $"{summaries.Count:N0}/{sourceFileCount:N0}"
+            : summaries.Count > 0
+                ? $"{summaries.Count:N0} generated"
+                : "not started";
 
-        nextScan.Text = savedScans.Count == 0
-            ? "• Next: run Scan to create the first analysis snapshot."
-            : "• Scan is available — re-run when source changes.";
+        var scanIsStale = latestScanAt.HasValue &&
+                          sourceSnapshot.LatestChangeAt.HasValue &&
+                          sourceSnapshot.LatestChangeAt.Value > latestScanAt.Value.AddSeconds(1);
+        var summariesAreStale = savedScans.Count > 0 &&
+                                (summaries.Count == 0 ||
+                                 (latestScanAt.HasValue && latestSummaryAt.HasValue && latestSummaryAt.Value < latestScanAt.Value));
+        var architectureIsStale = latestHypothesisAt.HasValue &&
+                                  ((latestScanAt.HasValue && latestHypothesisAt.Value < latestScanAt.Value) ||
+                                   (latestSummaryAt.HasValue && latestHypothesisAt.Value < latestSummaryAt.Value));
+        var graphIsReady = latestHypothesisAt.HasValue && !architectureIsStale;
 
-        nextSummaries.Text = savedScans.Count == 0
-            ? "• LLM summaries are blocked until a scan exists."
-            : summaries.Count == 0
-                ? "• Next: generate LLM summaries from the latest scan."
-                : "• LLM summaries exist — regenerate to refresh coverage.";
+        workspaceMeta.Text = $"{_vm.Workspace.WorkspaceName} · {(_vm.IsDirty ? "Unsaved" : "Saved")}";
 
-        nextArchitecture.Text = summaries.Count == 0
-            ? "• Architecture synthesis is blocked until summaries are generated."
-            : hypotheses.Count == 0
-                ? "• Next: run Architecture synthesis to build architecture hypotheses."
-                : "• Architecture synthesis has runs — re-run after major changes.";
+        ApplyOverviewStep(sourceScanIcon, sourceScanTitle, sourceScanDetail, BuildSourceScanState(
+            savedScans.Count,
+            scanIsStale,
+            sourceFileCount,
+            sourceSnapshot.MarkdownDocCount,
+            latestScanAt));
 
-        logsLocation.Text =
-            $"Imported logs folder: {importedLogsPath}{Environment.NewLine}" +
-            $"Imported files: {importedLogFileCount:N0}{Environment.NewLine}" +
+        ApplyOverviewStep(summariesIcon, summariesTitle, summariesDetail, BuildSummariesState(
+            savedScans.Count,
+            summaries.Count,
+            summariesAreStale,
+            summariesCoverageComplete,
+            summariesCoverageText,
+            latestSummaryAt));
+
+        ApplyOverviewStep(architectureIcon, architectureTitle, architectureDetail, BuildArchitectureState(
+            summaries.Count,
+            hypotheses.Count,
+            architectureIsStale,
+            latestHypothesisAt,
+            latestScanAt,
+            latestSummaryAt));
+
+        ApplyOverviewStep(graphIcon, graphTitle, graphDetail, BuildGraphState(
+            hypotheses.Count,
+            graphIsReady,
+            architectureIsStale));
+
+        logsStatus.Text =
+            $"Optional · {importedLogFileCount:N0} imported log file(s){Environment.NewLine}" +
             $"Loaded entries: {_vm.LogReplay.Entries.Count:N0} · Watched files: {_vm.Workspace.WatchedLogPaths.Count:N0}";
+
+        var recommendation = BuildOverviewRecommendation(
+            savedScans.Count,
+            scanIsStale,
+            summaries.Count,
+            summariesAreStale || (sourceFileCount > 0 && !summariesCoverageComplete),
+            hypotheses.Count,
+            architectureIsStale);
+
+        recommendationTitle.Text = recommendation.Title;
+        recommendationBody.Text = recommendation.Description;
+        primaryActionButton.Content = recommendation.ButtonText;
+        primaryActionButton.Tag = recommendation.ActionKey;
+        primaryActionButton.IsEnabled = true;
     }
 
     private void TryAutoStartDevConsole()
@@ -1720,6 +1848,411 @@ public partial class MainWindow : Window
 
     private static string FormatTime(DateTime? value)
         => value.HasValue ? value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "—";
+
+    private static OverviewStepState BuildSourceScanState(
+        int savedScanCount,
+        bool scanIsStale,
+        int sourceFileCount,
+        int markdownDocCount,
+        DateTime? latestScanAt)
+    {
+        if (savedScanCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "Source scan",
+                Detail = "No source scan has been saved yet."
+            };
+        }
+
+        var detail =
+            $"{sourceFileCount:N0} source files found · {markdownDocCount:N0} markdown docs found{Environment.NewLine}" +
+            $"Last run: {FormatTime(latestScanAt)}";
+
+        return new OverviewStepState
+        {
+            Kind = scanIsStale ? OverviewStatusKind.Warning : OverviewStatusKind.Done,
+            Title = "Source scan",
+            Detail = scanIsStale
+                ? $"{detail}{Environment.NewLine}Newer source changes may need a fresh scan."
+                : detail
+        };
+    }
+
+    private static OverviewStepState BuildSummariesState(
+        int savedScanCount,
+        int summaryCount,
+        bool summariesAreStale,
+        bool coverageComplete,
+        string coverageText,
+        DateTime? latestSummaryAt)
+    {
+        if (savedScanCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "File summaries",
+                Detail = "Ready after a current source scan."
+            };
+        }
+
+        if (summaryCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "File summaries",
+                Detail = "No summaries generated yet."
+            };
+        }
+
+        var detail =
+            $"{summaryCount:N0} summaries generated · Coverage: {coverageText}{Environment.NewLine}" +
+            $"Last run: {FormatTime(latestSummaryAt)}";
+
+        if (summariesAreStale)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Warning,
+                Title = "File summaries",
+                Detail = $"{detail}{Environment.NewLine}The current source scan is newer than these summaries."
+            };
+        }
+
+        if (!coverageComplete)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Warning,
+                Title = "File summaries",
+                Detail = $"{detail}{Environment.NewLine}Coverage is incomplete for the latest scan."
+            };
+        }
+
+        return new OverviewStepState
+        {
+            Kind = OverviewStatusKind.Done,
+            Title = "File summaries",
+            Detail = detail
+        };
+    }
+
+    private static OverviewStepState BuildArchitectureState(
+        int summaryCount,
+        int hypothesisCount,
+        bool architectureIsStale,
+        DateTime? latestHypothesisAt,
+        DateTime? latestScanAt,
+        DateTime? latestSummaryAt)
+    {
+        if (summaryCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "Architecture synthesis",
+                Detail = "Ready after file summaries are current."
+            };
+        }
+
+        if (hypothesisCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "Architecture synthesis",
+                Detail = "No architecture synthesis has been saved yet."
+            };
+        }
+
+        var detail =
+            $"Last run: {FormatTime(latestHypothesisAt)}";
+
+        if (architectureIsStale)
+        {
+            var staleReason = latestScanAt.HasValue && latestHypothesisAt.HasValue && latestHypothesisAt.Value < latestScanAt.Value
+                ? "The source scan is newer than the architecture map."
+                : latestSummaryAt.HasValue && latestHypothesisAt.HasValue && latestHypothesisAt.Value < latestSummaryAt.Value
+                    ? "File summaries are newer than the architecture map."
+                    : "The architecture map may need a refresh.";
+
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Warning,
+                Title = "Architecture synthesis",
+                Detail = $"Existing architecture map may be stale{Environment.NewLine}{detail}{Environment.NewLine}{staleReason}"
+            };
+        }
+
+        return new OverviewStepState
+        {
+            Kind = OverviewStatusKind.Done,
+            Title = "Architecture synthesis",
+            Detail = $"Architecture map is current{Environment.NewLine}{detail}"
+        };
+    }
+
+    private static OverviewStepState BuildGraphState(
+        int hypothesisCount,
+        bool graphIsReady,
+        bool architectureIsStale)
+    {
+        if (hypothesisCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "Code graph exploration",
+                Detail = "Ready after architecture synthesis is current."
+            };
+        }
+
+        if (!graphIsReady || architectureIsStale)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "Code graph exploration",
+                Detail = "Ready after architecture synthesis is current."
+            };
+        }
+
+        return new OverviewStepState
+        {
+            Kind = OverviewStatusKind.Done,
+            Title = "Code graph exploration",
+            Detail = "Ready to explore from the Graph tab."
+        };
+    }
+
+    private static OverviewRecommendation BuildOverviewRecommendation(
+        int savedScanCount,
+        bool scanIsStale,
+        int summaryCount,
+        bool summariesNeedAttention,
+        int hypothesisCount,
+        bool architectureIsStale)
+    {
+        if (savedScanCount == 0)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Run source scan",
+                Description = "Codomon needs a source scan before it can summarize the codebase or synthesize architecture.",
+                ButtonText = "Run source scan",
+                ActionKey = OverviewActionScan
+            };
+        }
+
+        if (scanIsStale)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Run source scan again",
+                Description = "Newer source changes were detected after the last scan. Refresh the scan first so every downstream step uses current code.",
+                ButtonText = "Run source scan again",
+                ActionKey = OverviewActionScan
+            };
+        }
+
+        if (summaryCount == 0)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Generate LLM summaries",
+                Description = "The source scan is ready, but Codomon still needs file summaries before it can build a useful architecture map.",
+                ButtonText = "Generate LLM summaries",
+                ActionKey = OverviewActionSummaries
+            };
+        }
+
+        if (summariesNeedAttention)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Refresh file summaries",
+                Description = "The summaries are incomplete or older than the current scan. Refresh them so architecture synthesis has up-to-date context.",
+                ButtonText = "Refresh file summaries",
+                ActionKey = OverviewActionSummaries
+            };
+        }
+
+        if (hypothesisCount == 0)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Synthesize architecture",
+                Description = "Source scan and file summaries are ready. Run architecture synthesis to build the layer map and unlock a more useful graph view.",
+                ButtonText = "Synthesize architecture",
+                ActionKey = OverviewActionArchitecture
+            };
+        }
+
+        if (architectureIsStale)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Re-run architecture synthesis",
+                Description = "The source scan and file summaries are complete, but the architecture map may be stale. Re-running synthesis will refresh the layer map and make the graph view more useful.",
+                ButtonText = "Re-run architecture synthesis",
+                ActionKey = OverviewActionArchitecture
+            };
+        }
+
+        return new OverviewRecommendation
+        {
+            Title = "Explore architecture graph",
+            Description = "Codomon has current scan, summary, and architecture data. Open the graph to inspect the architecture map and navigate the codebase.",
+            ButtonText = "Open graph",
+            ActionKey = OverviewActionGraph
+        };
+    }
+
+    private static void ApplyOverviewStep(
+        TextBlock iconBlock,
+        TextBlock titleBlock,
+        TextBlock detailBlock,
+        OverviewStepState state)
+    {
+        var (icon, colorHex) = GetOverviewStatusAppearance(state.Kind);
+        iconBlock.Text = icon;
+        iconBlock.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(colorHex));
+        titleBlock.Text = state.Title;
+        detailBlock.Text = state.Detail;
+    }
+
+    private static (string Icon, string ColorHex) GetOverviewStatusAppearance(OverviewStatusKind kind)
+        => kind switch
+        {
+            OverviewStatusKind.Done => ("✓", "#44CC44"),
+            OverviewStatusKind.Warning => ("⚠", "#FFAA44"),
+            OverviewStatusKind.Running => ("⏳", "#4A90D9"),
+            OverviewStatusKind.Failed => ("✕", "#FF7070"),
+            OverviewStatusKind.Blocked => ("○", "#556677"),
+            _ => ("○", "#778899")
+        };
+
+    private static (int MarkdownDocCount, DateTime? LatestChangeAt) GetSourceSnapshotStats(string sourceProjectPath)
+    {
+        var searchRoot = GetSourceSearchRoot(sourceProjectPath);
+        if (string.IsNullOrWhiteSpace(searchRoot) || !Directory.Exists(searchRoot))
+            return (0, null);
+
+        var markdownDocCount = 0;
+        DateTime? latestChangeAt = null;
+
+        try
+        {
+            foreach (var filePath in EnumerateRelevantSourceFiles(searchRoot))
+            {
+                var extension = Path.GetExtension(filePath);
+                if (extension.Equals(".md", StringComparison.OrdinalIgnoreCase) ||
+                    extension.Equals(".markdown", StringComparison.OrdinalIgnoreCase))
+                {
+                    markdownDocCount++;
+                }
+
+                var lastWrite = File.GetLastWriteTimeUtc(filePath);
+                if (!latestChangeAt.HasValue || lastWrite > latestChangeAt.Value)
+                    latestChangeAt = lastWrite;
+            }
+        }
+        catch
+        {
+            return (markdownDocCount, latestChangeAt);
+        }
+
+        return (markdownDocCount, latestChangeAt);
+    }
+
+    private static string GetSourceSearchRoot(string sourceProjectPath)
+    {
+        if (string.IsNullOrWhiteSpace(sourceProjectPath))
+            return string.Empty;
+
+        return Directory.Exists(sourceProjectPath)
+            ? sourceProjectPath
+            : Path.GetDirectoryName(sourceProjectPath) ?? string.Empty;
+    }
+
+    private static IEnumerable<string> EnumerateRelevantSourceFiles(string searchRoot)
+    {
+        var pending = new Stack<string>();
+        pending.Push(searchRoot);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+
+            IEnumerable<string> subDirectories;
+            try
+            {
+                subDirectories = Directory.EnumerateDirectories(current);
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (var subDirectory in subDirectories)
+            {
+                var directoryName = Path.GetFileName(subDirectory);
+                if (SourceSnapshotIgnoredDirectories.Contains(directoryName, StringComparer.OrdinalIgnoreCase))
+                    continue;
+
+                pending.Push(subDirectory);
+            }
+
+            IEnumerable<string> files;
+            try
+            {
+                files = Directory.EnumerateFiles(current);
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (var file in files)
+            {
+                var extension = Path.GetExtension(file);
+                if (SourceSnapshotExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                    yield return file;
+            }
+        }
+    }
+
+    private void OnOverviewPrimaryActionClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var actionKey = (sender as Button)?.Tag?.ToString();
+        switch (actionKey)
+        {
+            case OverviewActionScan:
+                OnScanClick(sender, e);
+                break;
+            case OverviewActionSummaries:
+                OnSummariesClick(sender, e);
+                break;
+            case OverviewActionArchitecture:
+                OnHypothesisClick(sender, e);
+                break;
+            case OverviewActionGraph:
+                OnOverviewOpenGraphClick(sender, e);
+                break;
+        }
+    }
+
+    private void OnOverviewViewSummariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Docs");
+
+    private void OnOverviewOpenGraphClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Graph");
+
+    private void OnOverviewOpenMonitorClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetActiveNavTab("Monitor");
 
     private static int GetLatestScanAnalyzedFileCount(string workspaceFolderPath)
     {
