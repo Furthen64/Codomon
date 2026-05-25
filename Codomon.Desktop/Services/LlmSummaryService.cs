@@ -147,7 +147,8 @@ public static class LlmSummaryService
         string batchFolder,
         string sourceFilePath,
         string searchRoot,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<string>? streamingTokenProgress = null)
     {
         var relPath = Path.GetRelativePath(searchRoot, sourceFilePath);
         AppLogger.Debug($"[LLM] GenerateSummary start: {relPath}  model={modelName}");
@@ -165,7 +166,13 @@ public static class LlmSummaryService
         // Call the LLM.
         AppLogger.Debug($"[LLM] dump prompt: {Environment.NewLine}--- PROMPT START ---{Environment.NewLine}{prompt}{Environment.NewLine}--- PROMPT END ---");
 
-        var summary = await CallLlmAsync(apiEndpoint, modelName, prompt, maxOutputTokens, cancellationToken);
+        var summary = await CallLlmAsync(
+            apiEndpoint,
+            modelName,
+            prompt,
+            maxOutputTokens,
+            cancellationToken,
+            streamingTokenProgress);
 
         AppLogger.Debug($"[LLM] GenerateSummary complete: {relPath}  summary={summary.Length} chars");
 
@@ -405,7 +412,8 @@ public static class LlmSummaryService
         string modelName,
         string prompt,
         int maxOutputTokens,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<string>? streamingTokenProgress = null)
     {
         var url = BuildChatCompletionsUrl(apiEndpoint);
         AppLogger.Debug($"[LLM] CallLlm → POST {url}  model={modelName}  promptLength={prompt.Length}");
@@ -430,26 +438,11 @@ public static class LlmSummaryService
                     MaxTokens = maxTokensPerRequest
                 };
 
-                using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
-                AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}  attempt={requestCount}");
+                var (content, finishReason) = streamingTokenProgress != null
+                    ? await CallLlmStreamingAsync(url, payload, streamingTokenProgress, cancellationToken)
+                    : await CallLlmNonStreamingAsync(url, payload, cancellationToken);
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                    var snippet = body.Length > 500 ? body[..500] + "…" : body;
-                    AppLogger.Error($"[LLM] CallLlm error body: {snippet}");
-                    throw new InvalidOperationException(
-                        $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
-                }
-
-                var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
-                    ?? throw new InvalidOperationException("LLM API returned an empty response.");
-
-                var firstChoice = result.Choices?.FirstOrDefault();
-                var finishReason = firstChoice?.FinishReason ?? "(null)";
-                var content = firstChoice?.Message?.Content;
-
-                AppLogger.Debug($"[LLM] CallLlm response: choices={result.Choices?.Length ?? 0}  finish_reason={finishReason}  contentLength={content?.Length ?? 0}  attempt={requestCount}");
+                AppLogger.Debug($"[LLM] CallLlm response: finish_reason={finishReason}  contentLength={content?.Length ?? 0}  attempt={requestCount}");
 
                 if (string.IsNullOrWhiteSpace(content))
                 {
@@ -485,6 +478,119 @@ public static class LlmSummaryService
             AppLogger.Warn($"[LLM] CallLlm cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}. HttpClient timeout={Http.Timeout}");
             throw;
         }
+    }
+
+    private static async Task<(string Content, string FinishReason)> CallLlmNonStreamingAsync(
+        string url,
+        ChatRequest payload,
+        CancellationToken cancellationToken)
+    {
+        using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
+        AppLogger.Debug($"[LLM] CallLlm ← {(int)response.StatusCode} {response.ReasonPhrase}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var snippet = body.Length > 500 ? body[..500] + "…" : body;
+            AppLogger.Error($"[LLM] CallLlm error body: {snippet}");
+            throw new InvalidOperationException(
+                $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("LLM API returned an empty response.");
+
+        var firstChoice = result.Choices?.FirstOrDefault();
+        var finishReason = firstChoice?.FinishReason ?? "(null)";
+        var content = firstChoice?.Message?.Content ?? string.Empty;
+        return (content, finishReason);
+    }
+
+    private static async Task<(string Content, string FinishReason)> CallLlmStreamingAsync(
+        string url,
+        ChatRequest payload,
+        IProgress<string> tokenProgress,
+        CancellationToken cancellationToken)
+    {
+        var streamPayload = new ChatStreamRequest
+        {
+            Model = payload.Model,
+            Messages = payload.Messages,
+            MaxTokens = payload.MaxTokens,
+            Stream = true
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(streamPayload, options: JsonOptions)
+        };
+
+        using var response = await Http.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        AppLogger.Debug($"[LLM] CallLlm(stream) ← {(int)response.StatusCode} {response.ReasonPhrase}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var snippet = body.Length > 500 ? body[..500] + "…" : body;
+            AppLogger.Error($"[LLM] CallLlm(stream) error body: {snippet}");
+            throw new InvalidOperationException(
+                $"LLM API returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+        }
+
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+        if (!string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, cancellationToken)
+                ?? throw new InvalidOperationException("LLM API returned an empty response.");
+
+            var firstChoice = result.Choices?.FirstOrDefault();
+            var finish = firstChoice?.FinishReason ?? "(null)";
+            var content = firstChoice?.Message?.Content ?? string.Empty;
+            return (content, finish);
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream);
+        var sb = new StringBuilder();
+        string? finishReason = null;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var line = await reader.ReadLineAsync();
+            if (line == null) break;
+            if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+
+            var data = line.Length > 5 && line[5] == ' '
+                ? line[6..]
+                : line[5..];
+            if (string.IsNullOrWhiteSpace(data)) continue;
+            if (data == "[DONE]") break;
+
+            ChatStreamChunk? chunk;
+            try { chunk = JsonSerializer.Deserialize<ChatStreamChunk>(data, JsonOptions); }
+            catch (JsonException jex)
+            {
+                AppLogger.Debug($"[LLM] CallLlm(stream): skipped malformed SSE frame: {jex.Message}");
+                continue;
+            }
+
+            var choice = chunk?.Choices?.FirstOrDefault();
+            var token = choice?.Delta?.Content;
+            if (!string.IsNullOrEmpty(token))
+            {
+                sb.Append(token);
+                tokenProgress.Report(token);
+            }
+
+            if (!string.IsNullOrWhiteSpace(choice?.FinishReason))
+                finishReason = choice!.FinishReason;
+        }
+
+        return (sb.ToString(), finishReason ?? "stop");
     }
 
     private static async Task<string> WriteSummaryFileAsync(
@@ -683,6 +789,21 @@ public static class LlmSummaryService
         public int? MaxTokens { get; set; }
     }
 
+    private sealed class ChatStreamRequest
+    {
+        [JsonPropertyName("model")]
+        public string Model { get; set; } = string.Empty;
+
+        [JsonPropertyName("messages")]
+        public ChatMessage[] Messages { get; set; } = Array.Empty<ChatMessage>();
+
+        [JsonPropertyName("max_tokens")]
+        public int? MaxTokens { get; set; }
+
+        [JsonPropertyName("stream")]
+        public bool Stream { get; set; } = true;
+    }
+
     private sealed class ChatMessage
     {
         [JsonPropertyName("role")]
@@ -705,6 +826,27 @@ public static class LlmSummaryService
 
         [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
+    }
+
+    private sealed class ChatStreamChunk
+    {
+        [JsonPropertyName("choices")]
+        public ChatStreamChoice[]? Choices { get; set; }
+    }
+
+    private sealed class ChatStreamChoice
+    {
+        [JsonPropertyName("delta")]
+        public ChatStreamDelta? Delta { get; set; }
+
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
+    }
+
+    private sealed class ChatStreamDelta
+    {
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
     }
 
     private sealed class ModelsResponse
