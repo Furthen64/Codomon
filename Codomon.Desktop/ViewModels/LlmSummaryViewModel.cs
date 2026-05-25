@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Codomon.Desktop.ViewModels;
 
@@ -275,7 +276,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
     /// Generates summaries for all currently selected files in the background.
     /// Stops on the first failure; failures are added to <see cref="ProgressMessages"/>.
     /// </summary>
-    public async Task GenerateSummariesAsync()
+    public async Task GenerateSummariesAsync(bool verboseOutputEnabled = false)
     {
         if (IsGenerating) return;
 
@@ -376,10 +377,46 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                     AppLogger.Debug($"[LLM] Processing [{done + 1}/{selected.Count}]: {file.RelativePath}");
                     ReportProgress($"[{done + 1}/{selected.Count}] {file.RelativePath}");
                     var fileTimer = Stopwatch.StartNew();
+                    var verboseBuffer = new StringBuilder();
+                    var verboseBufferLock = new object();
+                    var verboseHeaderWritten = false;
+
+                    void EmitVerboseLine(string line)
+                    {
+                        if (!verboseHeaderWritten)
+                        {
+                            ReportProgress("  … Live stream:");
+                            verboseHeaderWritten = true;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(line))
+                            ReportProgress($"    {line}");
+                    }
+
+                    IProgress<string>? streamingTokenProgress = null;
+                    if (verboseOutputEnabled)
+                    {
+                        streamingTokenProgress = new Progress<string>(chunk =>
+                        {
+                            if (string.IsNullOrEmpty(chunk)) return;
+                            lock (verboseBufferLock)
+                            {
+                                verboseBuffer.Append(chunk.Replace("\r", string.Empty));
+                                DrainVerboseOutputBuffer(verboseBuffer, flushRemainder: false, EmitVerboseLine);
+                            }
+                        });
+                    }
+
                     await LlmSummaryService.GenerateAndSaveSummaryAsync(
                         ApiEndpoint, ModelName, maxOutputTokens,
                         _workspaceFolderPath, batchFolder,
-                        file.FullPath, searchRoot, ct);
+                        file.FullPath, searchRoot, ct, streamingTokenProgress);
+                    if (verboseOutputEnabled)
+                    {
+                        lock (verboseBufferLock)
+                            DrainVerboseOutputBuffer(verboseBuffer, flushRemainder: true, EmitVerboseLine);
+                    }
+
                     fileTimer.Stop();
                     return (file, fileTimer.Elapsed);
                 }).ToList();
@@ -470,6 +507,39 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
 
     private void ReportProgress(string message)
         => Avalonia.Threading.Dispatcher.UIThread.Post(() => ProgressMessages.Add(message));
+
+    private static void DrainVerboseOutputBuffer(
+        StringBuilder buffer,
+        bool flushRemainder,
+        Action<string> emitLine)
+    {
+        while (true)
+        {
+            var newlineIndex = -1;
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                if (buffer[i] == '\n')
+                {
+                    newlineIndex = i;
+                    break;
+                }
+            }
+
+            if (newlineIndex < 0)
+                break;
+
+            var line = buffer.ToString(0, newlineIndex).TrimEnd('\r');
+            buffer.Remove(0, newlineIndex + 1);
+            emitLine(line);
+        }
+
+        if (flushRemainder && buffer.Length > 0)
+        {
+            var line = buffer.ToString().TrimEnd('\r');
+            buffer.Clear();
+            emitLine(line);
+        }
+    }
 
     private static async Task<int> EstimateSelectedTokenCountAsync(
         IReadOnlyList<CsFileItem> selected,

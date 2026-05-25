@@ -170,13 +170,19 @@ public partial class LlmSummaryDialog : Window
             return;
         }
 
-        await _vm.GenerateSummariesAsync();
+        await _vm.GenerateSummariesAsync(IsVerboseOutputEnabled());
         SyncStatusText();
         RebuildFileList();
     }
 
     private void OnCancelGenerateClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => _vm.CancelGeneration();
+
+    private void OnVerboseOutputChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is CheckBox cb)
+            PersistVerboseOutputSetting(cb.IsChecked == true);
+    }
 
     private void SyncGenerateButtons()
     {
@@ -667,6 +673,10 @@ public partial class LlmSummaryDialog : Window
 
             splitGrid.ColumnDefinitions[0].Width = new GridLength(leftPaneWidth, GridUnitType.Pixel);
         }
+
+        var verboseOutputCheckBox = this.FindControl<CheckBox>("VerboseOutputCheckBox");
+        if (verboseOutputCheckBox != null)
+            verboseOutputCheckBox.IsChecked = config.LlmSummaryVerboseOutputEnabled;
     }
 
     private void SaveLayout()
@@ -694,12 +704,34 @@ public partial class LlmSummaryDialog : Window
                     config.LlmSummaryGenerateLeftPaneWidth = leftPaneWidth;
             }
 
+            config.LlmSummaryVerboseOutputEnabled = IsVerboseOutputEnabled();
+
             UserConfigService.Save(config);
         }
         catch (Exception ex)
         {
             // Non-critical - ignore persistence errors for dialog layout.
             Models.AppLogger.Debug($"Failed to persist LLM Summaries dialog layout: {ex.Message}");
+        }
+    }
+
+    private bool IsVerboseOutputEnabled()
+        => this.FindControl<CheckBox>("VerboseOutputCheckBox")?.IsChecked == true;
+
+    private static void PersistVerboseOutputSetting(bool enabled)
+    {
+        try
+        {
+            var config = UserConfigService.Load();
+            if (config.LlmSummaryVerboseOutputEnabled == enabled)
+                return;
+
+            config.LlmSummaryVerboseOutputEnabled = enabled;
+            UserConfigService.Save(config);
+        }
+        catch (Exception ex)
+        {
+            Models.AppLogger.Debug($"Failed to persist verbose output setting: {ex.Message}");
         }
     }
 }

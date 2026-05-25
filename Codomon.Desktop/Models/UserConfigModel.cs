@@ -55,6 +55,9 @@ public class UserConfigModel
     /// <summary>Last-used left pane width in the LLM Summaries Generate tab split view.</summary>
     public double LlmSummaryGenerateLeftPaneWidth { get; set; } = 300;
 
+    /// <summary>Whether LLM Summaries should show streamed model output in the progress log.</summary>
+    public bool LlmSummaryVerboseOutputEnabled { get; set; } = false;
+
     // ── Log import defaults ───────────────────────────────────────────────────
 
     /// <summary>Key of the delimiter option pre-selected in the import wizard (e.g. "tab").</summary>

@@ -79,6 +79,12 @@
                         Foreground="#AABBCC"
                         VerticalAlignment="Center"
                         Margin="8,0,0,0"/>
+              <CheckBox x:Name="VerboseOutputCheckBox"
+                        Content="Verbose output"
+                        IsChecked="False"
+                        IsCheckedChanged="OnVerboseOutputChanged"
+                        Foreground="#AABBCC"
+                        VerticalAlignment="Center"/>
               <Border Width="1" Margin="4,0" Background="#2A3F5A"/>
               <Button x:Name="GenerateButton" Content="▶ Generate for Selected"
                       Click="OnGenerateClick" Padding="10,4"
