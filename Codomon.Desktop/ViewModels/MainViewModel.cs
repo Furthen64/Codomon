@@ -384,6 +384,7 @@ public class MainViewModel : INotifyPropertyChanged
             folderPath, workspaceName, sourceProjectPath, profileName, initialSystemNames);
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
+        ResetWorkspaceRuntimeState();
         HasWorkspace = true;
         IsDirty = false;
         ClearSelection();
@@ -400,6 +401,7 @@ public class MainViewModel : INotifyPropertyChanged
         var workspace = await WorkspaceSerializer.LoadAsync(folderPath, progress);
         Workspace = workspace;
         WorkspaceFolderPath = folderPath;
+        ResetWorkspaceRuntimeState();
         HasWorkspace = true;
         IsDirty = false;
         ClearSelection();
@@ -439,18 +441,22 @@ public class MainViewModel : INotifyPropertyChanged
 
         Workspace = new WorkspaceModel();
         WorkspaceFolderPath = string.Empty;
+        ResetWorkspaceRuntimeState();
         HasWorkspace = false;
         IsDirty = false;
 
+        ClearSelection();
+        StatusMessage = "Ready";
+    }
+
+    private void ResetWorkspaceRuntimeState()
+    {
         FileCount = 0;
         ClassCount = 0;
         MethodCount = 0;
         LogPointCount = 0;
         TotalEventCount = 0;
         ScanStatus = ScanStatusKind.Idle;
-
-        ClearSelection();
-        StatusMessage = "Ready";
     }
 
     /// <summary>
