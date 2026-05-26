@@ -27,7 +27,7 @@ if ! command -v dotnet &>/dev/null; then
       echo "  # Install the SDK package"
       echo "  sudo apt-get update"
       if [ "${UBUNTU_MAJOR:-0}" -ge 26 ]; then
-        echo "  apt-cache policy dotnet-sdk-8.0"
+        echo "  apt-cache policy $SDK_PACKAGE"
       fi
       echo "  sudo apt-get install -y $SDK_PACKAGE"
       echo ""
