@@ -22,6 +22,7 @@ if ! command -v dotnet &>/dev/null; then
       echo ""
       if [ "${UBUNTU_MAJOR:-0}" -ge 26 ]; then
         echo "  # Ubuntu 26+ may require the .NET backports PPA for dotnet-sdk-8.0"
+        echo "  # Heads-up: this command shows a long repository description and then asks you to press ENTER"
         echo "  sudo add-apt-repository ppa:dotnet/backports"
       fi
       echo "  # Install the SDK package"
