@@ -109,7 +109,7 @@ os_id="${ID:-}"
 os_like="${ID_LIKE:-}"
 ubuntu_version="${VERSION_ID:-}"
 
-if [ "$os_id" != "ubuntu" ] && [[ "$os_like" != *ubuntu* ]]; then
+if [[ "$os_id" != "ubuntu" && "$os_like" != *ubuntu* ]]; then
   echo "ERROR: Unsupported platform '$os_id'. Install .NET 8 SDK manually from https://dotnet.microsoft.com/download and re-run this script."
   exit 1
 fi
