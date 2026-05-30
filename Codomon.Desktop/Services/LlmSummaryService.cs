@@ -20,6 +20,7 @@ public static class LlmSummaryService
     private const double DefaultEstimatedTokensPerSecond = 1200.0;
     private const int MaxTotalSummaryRequests = 6;
     private const string ContinuationPrompt = "Continue exactly where you left off. Do not repeat previous text. Return only the remaining summary content.";
+    private static readonly TimeSpan ConnectivityProbeTimeout = TimeSpan.FromSeconds(10);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -45,19 +46,21 @@ public static class LlmSummaryService
     {
         var url = BuildModelsUrl(apiEndpoint);
         AppLogger.Debug($"[LLM] FetchModels → GET {url}");
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ConnectivityProbeTimeout);
         try
         {
-            using var response = await Http.GetAsync(url, cancellationToken);
+            using var response = await Http.GetAsync(url, timeoutCts.Token);
             AppLogger.Debug($"[LLM] FetchModels ← {(int)response.StatusCode} {response.ReasonPhrase}");
             if (!response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                var body = await response.Content.ReadAsStringAsync(timeoutCts.Token);
                 var snippet = body.Length > 300 ? body[..300] + "…" : body;
                 AppLogger.Warn($"[LLM] FetchModels non-success body: {snippet}");
                 return new List<string>();
             }
 
-            var result = await response.Content.ReadFromJsonAsync<ModelsResponse>(JsonOptions, cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<ModelsResponse>(JsonOptions, timeoutCts.Token);
             var models = result?.Data?
                 .Select(m => m.Id)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -74,6 +77,11 @@ public static class LlmSummaryService
         }
         catch (OperationCanceledException oce)
         {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                AppLogger.Warn($"[LLM] FetchModels timed out after {ConnectivityProbeTimeout.TotalSeconds:0}s.");
+                return new List<string>();
+            }
             AppLogger.Warn($"[LLM] FetchModels cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
             throw;
         }
@@ -95,6 +103,8 @@ public static class LlmSummaryService
     {
         var url = BuildChatCompletionsUrl(apiEndpoint);
         AppLogger.Debug($"[LLM] TestConnection → POST {url}  model={modelName}");
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ConnectivityProbeTimeout);
         try
         {
             var payload = new ChatRequest
@@ -104,7 +114,7 @@ public static class LlmSummaryService
                 MaxTokens = 5
             };
 
-            using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, cancellationToken);
+            using var response = await Http.PostAsJsonAsync(url, payload, JsonOptions, timeoutCts.Token);
             AppLogger.Debug($"[LLM] TestConnection ← {(int)response.StatusCode} {response.ReasonPhrase}");
             if (response.IsSuccessStatusCode)
             {
@@ -113,7 +123,7 @@ public static class LlmSummaryService
                 return (true, msg);
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(timeoutCts.Token);
             var snippet = body.Length > 200 ? body[..200] + "…" : body;
             var errMsg = $"Server returned {(int)response.StatusCode} {response.ReasonPhrase}: {snippet}";
             AppLogger.Warn($"[LLM] TestConnection failed: {errMsg}");
@@ -121,6 +131,12 @@ public static class LlmSummaryService
         }
         catch (OperationCanceledException oce)
         {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                var timeoutMsg = $"Connection test timed out after {ConnectivityProbeTimeout.TotalSeconds:0}s.";
+                AppLogger.Warn($"[LLM] TestConnection timeout: {timeoutMsg}");
+                return (false, timeoutMsg);
+            }
             AppLogger.Warn($"[LLM] TestConnection cancelled. IsCancellationRequested={oce.CancellationToken.IsCancellationRequested}. Inner: {oce.InnerException?.GetType().Name}: {oce.InnerException?.Message}");
             throw;
         }
