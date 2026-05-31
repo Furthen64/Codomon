@@ -148,8 +148,8 @@
                          Background="Transparent"
                          FontFamily="Monospace"
                          FontSize="11"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         TextWrapping="Wrap"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"/>
               </Border>
             </DockPanel>
