@@ -65,8 +65,6 @@ public sealed class BatchLogEntry : INotifyPropertyChanged
 /// </summary>
 public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
 {
-    private const string DefaultWorkspaceEndpoint = "http://localhost:8080/v1";
-
     private readonly WorkspaceModel _workspace;
     private readonly string _workspaceFolderPath;
     private readonly string _apiEndpoint;
@@ -105,24 +103,10 @@ public class ArchitectureHypothesisViewModel : INotifyPropertyChanged
         _workspace = workspace;
         _workspaceFolderPath = workspaceFolderPath;
 
-        // Fall back to user-level defaults when workspace LLM settings are not configured yet.
-        var userConfig = UserConfigService.Load();
-        var hasExplicitWorkspaceEndpoint = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ApiEndpoint)
-            && (!string.Equals(workspace.LlmSettings.ApiEndpoint, DefaultWorkspaceEndpoint, StringComparison.OrdinalIgnoreCase)
-                || !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName));
-
-        _apiEndpoint = hasExplicitWorkspaceEndpoint
-            ? workspace.LlmSettings.ApiEndpoint
-            : userConfig.DefaultLlmSettings.ApiEndpoint;
-        _modelName = !string.IsNullOrWhiteSpace(workspace.LlmSettings.ModelName)
-            ? workspace.LlmSettings.ModelName
-            : userConfig.DefaultLlmSettings.ModelName;
-
-        // If the workspace is still using the built-in threshold default, prefer the user-level default.
-        var defaultThreshold = new LlmSettingsModel().HypothesisTokenThreshold;
-        _hypothesisTokenThreshold = workspace.LlmSettings.HypothesisTokenThreshold != defaultThreshold
-            ? workspace.LlmSettings.HypothesisTokenThreshold
-            : userConfig.DefaultLlmSettings.HypothesisTokenThreshold;
+        var effectiveSettings = LlmSettingsResolver.ResolveEffectiveSettings(workspace);
+        _apiEndpoint = effectiveSettings.ApiEndpoint;
+        _modelName = effectiveSettings.ModelName;
+        _hypothesisTokenThreshold = effectiveSettings.HypothesisTokenThreshold;
     }
 
     // ── State ─────────────────────────────────────────────────────────────────

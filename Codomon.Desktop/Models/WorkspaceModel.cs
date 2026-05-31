@@ -24,7 +24,7 @@ public class WorkspaceModel
     /// <summary>Log file paths configured for live monitoring in this workspace.</summary>
     public List<string> WatchedLogPaths { get; set; } = new();
 
-    /// <summary>LLM API configuration for summary generation.</summary>
+    /// <summary>Workspace-level LLM tuning and legacy persisted settings.</summary>
     public LlmSettingsModel LlmSettings { get; set; } = new();
 
     /// <summary>
