@@ -169,21 +169,8 @@ public partial class LocatorWindow : Window
 
     private (string ApiEndpoint, string ModelName) ResolveEffectiveLlmSettings()
     {
-        // Prefer workspace-level settings; fall back to user defaults.
-        const string DefaultEndpoint = "http://localhost:8080/v1";
-        var userConfig = UserConfigService.Load();
-
-        var wsEndpoint = _workspace.LlmSettings.ApiEndpoint;
-        var wsModel    = _workspace.LlmSettings.ModelName;
-
-        bool hasExplicitEndpoint = !string.IsNullOrWhiteSpace(wsEndpoint)
-            && (!string.Equals(wsEndpoint, DefaultEndpoint, StringComparison.OrdinalIgnoreCase)
-                || !string.IsNullOrWhiteSpace(wsModel));
-
-        var endpoint = hasExplicitEndpoint ? wsEndpoint : userConfig.DefaultLlmSettings.ApiEndpoint;
-        var model    = !string.IsNullOrEmpty(wsModel)    ? wsModel  : userConfig.DefaultLlmSettings.ModelName;
-
-        return (endpoint, model);
+        var settings = LlmSettingsResolver.ResolveEffectiveSettings(_workspace);
+        return (settings.ApiEndpoint, settings.ModelName);
     }
 
     private void SetStatus(string message)

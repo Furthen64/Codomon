@@ -15,8 +15,6 @@ namespace Codomon.Desktop.ViewModels;
 /// </summary>
 public class LlmSummaryViewModel : INotifyPropertyChanged
 {
-    private const string DefaultWorkspaceEndpoint = "http://localhost:8080/v1";
-
     private readonly WorkspaceModel _workspace;
     private readonly string _workspaceFolderPath;
 
@@ -88,21 +86,13 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
     public ObservableCollection<string> AvailableModels { get; } = new();
 
     /// <summary>
-    /// Reloads endpoint/model values from workspace settings, falling back to user defaults.
+    /// Reloads endpoint/model values from user settings.
     /// </summary>
     public void RefreshEffectiveSettingsFromConfig()
     {
-        var userConfig = UserConfigService.Load();
-        var hasExplicitWorkspaceEndpoint = !string.IsNullOrWhiteSpace(_workspace.LlmSettings.ApiEndpoint)
-            && (!string.Equals(_workspace.LlmSettings.ApiEndpoint, DefaultWorkspaceEndpoint, StringComparison.OrdinalIgnoreCase)
-                || !string.IsNullOrWhiteSpace(_workspace.LlmSettings.ModelName));
-
-        ApiEndpoint = hasExplicitWorkspaceEndpoint
-            ? _workspace.LlmSettings.ApiEndpoint
-            : userConfig.DefaultLlmSettings.ApiEndpoint;
-        ModelName = !string.IsNullOrEmpty(_workspace.LlmSettings.ModelName)
-            ? _workspace.LlmSettings.ModelName
-            : userConfig.DefaultLlmSettings.ModelName;
+        var effectiveSettings = LlmSettingsResolver.ResolveEffectiveSettings(_workspace);
+        ApiEndpoint = effectiveSettings.ApiEndpoint;
+        ModelName = effectiveSettings.ModelName;
     }
 
     // ── Generation state ──────────────────────────────────────────────────────
@@ -288,8 +278,9 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
         }
 
         SaveSettings();
-        var queueSize = Math.Max(1, _workspace.LlmSettings.SummaryQueueSize);
-        var maxOutputTokens = _workspace.LlmSettings.SummaryMaxOutputTokens;
+        var effectiveSettings = LlmSettingsResolver.ResolveEffectiveSettings(_workspace);
+        var queueSize = Math.Max(1, effectiveSettings.SummaryQueueSize);
+        var maxOutputTokens = effectiveSettings.SummaryMaxOutputTokens;
 
         AppLogger.Info($"[LLM] GenerateSummaries starting: {selected.Count} file(s)  endpoint={ApiEndpoint}  model={ModelName}");
 

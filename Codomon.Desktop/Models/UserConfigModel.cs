@@ -7,9 +7,8 @@ namespace Codomon.Desktop.Models;
 public class UserConfigModel
 {
     /// <summary>
-    /// Default LLM API settings used across all workspaces.
-    /// A workspace can still override these via its own <see cref="LlmSettingsModel"/>;
-    /// these values are used as the initial seed when no workspace-level settings exist.
+    /// Default LLM API settings used across the app.
+    /// Endpoint/model are read from here; workspace files may still carry legacy copies.
     /// </summary>
     public LlmSettingsModel DefaultLlmSettings { get; set; } = new();
 
