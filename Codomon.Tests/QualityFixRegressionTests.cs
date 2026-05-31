@@ -54,4 +54,40 @@ public sealed class QualityFixRegressionTests : IDisposable
 
         Assert.Equal(content, await File.ReadAllTextAsync(Path.Combine(_tempDirectory, "summary_prompt.md")));
     }
+
+    [Fact]
+    public void SanitizeGeneratedSummary_RemovesThinkBlocksAndKeepsSummary()
+    {
+        const string content = """
+<think>
+Hidden reasoning here.
+</think>
+
+# Summary
+
+Visible summary content.
+""";
+
+        var sanitized = LlmSummaryService.SanitizeGeneratedSummary(content);
+
+        Assert.Equal("# Summary\n\nVisible summary content.", sanitized);
+    }
+
+    [Fact]
+    public void SanitizeGeneratedSummary_RemovesLeakedThinkingPreamble()
+    {
+        const string content = """
+Here's a thinking process that leads to the suggested Markdown summary:
+
+1.  **Analyze the Request:**
+
+# Summary
+
+Actual summary.
+""";
+
+        var sanitized = LlmSummaryService.SanitizeGeneratedSummary(content);
+
+        Assert.Equal("# Summary\n\nActual summary.", sanitized);
+    }
 }

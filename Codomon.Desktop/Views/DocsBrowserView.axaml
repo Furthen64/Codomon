@@ -120,12 +120,9 @@
                         HorizontalScrollBarVisibility="Disabled"
                         VerticalScrollBarVisibility="Auto"
                         IsVisible="False">
-            <SelectableTextBlock x:Name="SummaryContentBlock"
-                                 Margin="16,12"
-                                 FontSize="12.5"
-                                 TextWrapping="Wrap"
-                                 Foreground="{StaticResource TextSecondaryBrush}"
-                                 Background="Transparent"/>
+            <StackPanel x:Name="SummaryContentHost"
+                        Margin="16,12"
+                        Spacing="12"/>
           </ScrollViewer>
 
         </DockPanel>

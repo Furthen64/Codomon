@@ -2,6 +2,7 @@ using Codomon.Desktop.Models;
 using Codomon.Desktop.Persistence;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -21,6 +22,9 @@ public static class LlmSummaryService
     private const int MaxTotalSummaryRequests = 6;
     private const string ContinuationPrompt = "Continue exactly where you left off. Do not repeat previous text. Return only the remaining summary content.";
     private static readonly TimeSpan ConnectivityProbeTimeout = TimeSpan.FromSeconds(10);
+    private static readonly Regex ThinkBlockRegex = new(
+        @"<think\b[^>]*>.*?</think>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -471,7 +475,7 @@ public static class LlmSummaryService
                 summaryBuilder.Append(content);
 
                 if (!string.Equals(finishReason, "length", StringComparison.OrdinalIgnoreCase))
-                    return summaryBuilder.ToString();
+                    return SanitizeGeneratedSummary(summaryBuilder.ToString());
 
                 if (requestCount >= MaxTotalSummaryRequests)
                 {
@@ -617,8 +621,6 @@ public static class LlmSummaryService
             return choice.Message.Content;
         if (!string.IsNullOrWhiteSpace(choice?.Text))
             return choice.Text;
-        if (!string.IsNullOrWhiteSpace(choice?.Message?.ReasoningContent))
-            return choice.Message.ReasoningContent;
         return string.Empty;
     }
 
@@ -628,9 +630,30 @@ public static class LlmSummaryService
             return choice.Delta.Content;
         if (!string.IsNullOrEmpty(choice?.Text))
             return choice.Text;
-        if (!string.IsNullOrEmpty(choice?.Delta?.ReasoningContent))
-            return choice.Delta.ReasoningContent;
         return null;
+    }
+
+    internal static string SanitizeGeneratedSummary(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return string.Empty;
+
+        var sanitized = ThinkBlockRegex.Replace(content, string.Empty).Trim();
+
+        if (sanitized.StartsWith("Here's a thinking process", StringComparison.OrdinalIgnoreCase))
+        {
+            var firstHeadingIndex = sanitized.IndexOf("\n#", StringComparison.Ordinal);
+            if (firstHeadingIndex >= 0)
+            {
+                sanitized = sanitized[(firstHeadingIndex + 1)..].TrimStart();
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+
+        return sanitized.Trim();
     }
 
     private static async Task<string> WriteSummaryFileAsync(

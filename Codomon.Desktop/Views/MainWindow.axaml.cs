@@ -112,6 +112,7 @@ public partial class MainWindow : Window
     private bool _firstRunConfigCheckDone;
     private bool _updatingAutoAlignPreset;
     private bool _devConsoleAutoOpenedThisSession;
+    private readonly HashSet<string> _autoRefreshedNavTabs = new(StringComparer.Ordinal);
 
     // Tracks the currently active navigation tab.
     private string _activeNavTab = "Overview";
@@ -256,6 +257,9 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.HasWorkspace))
         {
+            if (!_vm.HasWorkspace)
+                _autoRefreshedNavTabs.Clear();
+
             RefreshDocsBrowserView();
             UpdateMainContentVisibility();
             UpdateWindowTitle();
@@ -266,6 +270,7 @@ public partial class MainWindow : Window
         }
         else if (e.PropertyName == nameof(MainViewModel.Workspace))
         {
+            _autoRefreshedNavTabs.Clear();
             _logListShowingLive = false;
             SetupCanvas();
             SetupCodeBrowserView();
@@ -353,6 +358,23 @@ public partial class MainWindow : Window
         _activeNavTab = tab;
         UpdateMainContentVisibility();
         UpdateNavTabStyles();
+        AutoRefreshNavTabOnFirstOpen(tab);
+    }
+
+    private void AutoRefreshNavTabOnFirstOpen(string tab)
+    {
+        if (!_vm.HasWorkspace || !_autoRefreshedNavTabs.Add(tab))
+            return;
+
+        switch (tab)
+        {
+            case "Code":
+                RefreshCodeBrowserView();
+                break;
+            case "Docs":
+                RefreshDocsBrowserView();
+                break;
+        }
     }
 
     /// <summary>
@@ -1768,7 +1790,10 @@ public partial class MainWindow : Window
 
         var sourceSnapshot = GetSourceSnapshotStats(_vm.Workspace.SourceProjectPath);
         var sourceFileCount = GetLatestScanAnalyzedFileCount(_vm.WorkspaceFolderPath);
-        var summariesCoverageComplete = sourceFileCount <= 0 || summaries.Count >= sourceFileCount;
+        var summariesCoverageComplete = sourceFileCount > 0 && summaries.Count >= sourceFileCount;
+        var summaryMissingCount = sourceFileCount > 0
+            ? Math.Max(sourceFileCount - summaries.Count, 0)
+            : 0;
         var summariesCoverageText = sourceFileCount > 0
             ? summariesCoverageComplete
                 ? "complete"
@@ -1803,10 +1828,13 @@ public partial class MainWindow : Window
             summariesAreStale,
             summariesCoverageComplete,
             summariesCoverageText,
+            summaryMissingCount,
             latestSummaryAt));
 
         ApplyOverviewStep(architectureIcon, architectureTitle, architectureDetail, BuildArchitectureState(
             summaries.Count,
+            summariesAreStale,
+            summariesCoverageComplete,
             hypotheses.Count,
             architectureIsStale,
             latestHypothesisAt,
@@ -1826,7 +1854,9 @@ public partial class MainWindow : Window
             savedScans.Count,
             scanIsStale,
             summaries.Count,
-            summariesAreStale || (sourceFileCount > 0 && !summariesCoverageComplete),
+            summariesAreStale,
+            summariesCoverageComplete,
+            summaryMissingCount,
             hypotheses.Count,
             architectureIsStale);
 
@@ -1886,6 +1916,7 @@ public partial class MainWindow : Window
         bool summariesAreStale,
         bool coverageComplete,
         string coverageText,
+        int missingCount,
         DateTime? latestSummaryAt)
     {
         if (savedScanCount == 0)
@@ -1908,8 +1939,13 @@ public partial class MainWindow : Window
             };
         }
 
+        var coverageLine = coverageComplete
+            ? $"{summaryCount:N0} summaries generated · Coverage: {coverageText}"
+            : missingCount > 0
+                ? $"{summaryCount:N0} summaries generated · Still missing: {missingCount:N0}"
+                : $"{summaryCount:N0} summaries generated · Coverage: {coverageText}";
         var detail =
-            $"{summaryCount:N0} summaries generated · Coverage: {coverageText}{Environment.NewLine}" +
+            $"{coverageLine}{Environment.NewLine}" +
             $"Last run: {FormatTime(latestSummaryAt)}";
 
         if (summariesAreStale)
@@ -1942,19 +1978,27 @@ public partial class MainWindow : Window
 
     private static OverviewStepState BuildArchitectureState(
         int summaryCount,
+        bool summariesAreStale,
+        bool summariesCoverageComplete,
         int hypothesisCount,
         bool architectureIsStale,
         DateTime? latestHypothesisAt,
         DateTime? latestScanAt,
         DateTime? latestSummaryAt)
     {
-        if (summaryCount == 0)
+        if (summaryCount == 0 || summariesAreStale || !summariesCoverageComplete)
         {
+            var prerequisiteDetail = summaryCount == 0
+                ? "Ready after file summaries are current."
+                : summariesAreStale
+                    ? "Waiting for file summaries to be refreshed from the latest scan."
+                    : "Waiting for file summaries to cover the latest scan.";
+
             return new OverviewStepState
             {
                 Kind = OverviewStatusKind.Blocked,
                 Title = "Architecture synthesis",
-                Detail = "Ready after file summaries are current."
+                Detail = prerequisiteDetail
             };
         }
 
@@ -2032,7 +2076,9 @@ public partial class MainWindow : Window
         int savedScanCount,
         bool scanIsStale,
         int summaryCount,
-        bool summariesNeedAttention,
+        bool summariesAreStale,
+        bool summariesCoverageComplete,
+        int summaryMissingCount,
         int hypothesisCount,
         bool architectureIsStale)
     {
@@ -2069,12 +2115,27 @@ public partial class MainWindow : Window
             };
         }
 
-        if (summariesNeedAttention)
+        if (summaryCount > 0 && !summariesCoverageComplete)
+        {
+            var description = summaryMissingCount > 0
+                ? $"Codomon still needs {summaryMissingCount:N0} more file summaries before architecture synthesis has complete context. Continue in LLM Summaries."
+                : "Codomon still needs more file summaries before architecture synthesis has complete context. Continue in LLM Summaries.";
+
+            return new OverviewRecommendation
+            {
+                Title = "Continue LLM summaries",
+                Description = description,
+                ButtonText = "Open LLM Summaries",
+                ActionKey = OverviewActionSummaries
+            };
+        }
+
+        if (summariesAreStale)
         {
             return new OverviewRecommendation
             {
                 Title = "Refresh file summaries",
-                Description = "The summaries are incomplete or older than the current scan. Refresh them so architecture synthesis has up-to-date context.",
+                Description = "The summaries are older than the current scan. Refresh them so architecture synthesis has up-to-date context.",
                 ButtonText = "Refresh file summaries",
                 ActionKey = OverviewActionSummaries
             };

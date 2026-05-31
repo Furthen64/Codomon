@@ -376,7 +376,7 @@ public class LlmSummaryViewModel : INotifyPropertyChanged
                     {
                         if (!verboseHeaderWritten)
                         {
-                            ReportProgress("  … Live stream:");
+                            ReportProgress("Thinking Process:");
                             verboseHeaderWritten = true;
                         }
 
