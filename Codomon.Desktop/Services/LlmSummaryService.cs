@@ -463,7 +463,9 @@ public static class LlmSummaryService
                 if (string.IsNullOrWhiteSpace(content))
                 {
                     AppLogger.Warn($"[LLM] CallLlm: response content is empty. finish_reason={finishReason}");
-                    throw new InvalidOperationException("LLM API returned a response with empty content.");
+                    throw new InvalidOperationException(
+                        $"LLM API returned no assistant text (finish_reason={finishReason}). " +
+                        "The server response was successful but did not include usable output in standard content fields.");
                 }
 
                 summaryBuilder.Append(content);
@@ -518,7 +520,7 @@ public static class LlmSummaryService
 
         var firstChoice = result.Choices?.FirstOrDefault();
         var finishReason = firstChoice?.FinishReason ?? "(null)";
-        var content = firstChoice?.Message?.Content ?? string.Empty;
+        var content = ExtractResponseText(firstChoice);
         return (content, finishReason);
     }
 
@@ -564,7 +566,7 @@ public static class LlmSummaryService
 
             var firstChoice = result.Choices?.FirstOrDefault();
             var finish = firstChoice?.FinishReason ?? "(null)";
-            var content = firstChoice?.Message?.Content ?? string.Empty;
+            var content = ExtractResponseText(firstChoice);
             return (content, finish);
         }
 
@@ -595,7 +597,7 @@ public static class LlmSummaryService
             }
 
             var choice = chunk?.Choices?.FirstOrDefault();
-            var token = choice?.Delta?.Content;
+            var token = ExtractStreamToken(choice);
             if (!string.IsNullOrEmpty(token))
             {
                 sb.Append(token);
@@ -607,6 +609,28 @@ public static class LlmSummaryService
         }
 
         return (sb.ToString(), finishReason ?? "stop");
+    }
+
+    private static string ExtractResponseText(ChatChoice? choice)
+    {
+        if (!string.IsNullOrWhiteSpace(choice?.Message?.Content))
+            return choice.Message.Content;
+        if (!string.IsNullOrWhiteSpace(choice?.Text))
+            return choice.Text;
+        if (!string.IsNullOrWhiteSpace(choice?.Message?.ReasoningContent))
+            return choice.Message.ReasoningContent;
+        return string.Empty;
+    }
+
+    private static string? ExtractStreamToken(ChatStreamChoice? choice)
+    {
+        if (!string.IsNullOrEmpty(choice?.Delta?.Content))
+            return choice.Delta.Content;
+        if (!string.IsNullOrEmpty(choice?.Text))
+            return choice.Text;
+        if (!string.IsNullOrEmpty(choice?.Delta?.ReasoningContent))
+            return choice.Delta.ReasoningContent;
+        return null;
     }
 
     private static async Task<string> WriteSummaryFileAsync(
@@ -827,6 +851,9 @@ public static class LlmSummaryService
 
         [JsonPropertyName("content")]
         public string Content { get; set; } = string.Empty;
+
+        [JsonPropertyName("reasoning_content")]
+        public string? ReasoningContent { get; set; }
     }
 
     private sealed class ChatResponse
@@ -842,6 +869,9 @@ public static class LlmSummaryService
 
         [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
+
+        [JsonPropertyName("text")]
+        public string? Text { get; set; }
     }
 
     private sealed class ChatStreamChunk
@@ -857,12 +887,18 @@ public static class LlmSummaryService
 
         [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
+
+        [JsonPropertyName("text")]
+        public string? Text { get; set; }
     }
 
     private sealed class ChatStreamDelta
     {
         [JsonPropertyName("content")]
         public string? Content { get; set; }
+
+        [JsonPropertyName("reasoning_content")]
+        public string? ReasoningContent { get; set; }
     }
 
     private sealed class ModelsResponse
