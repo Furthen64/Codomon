@@ -1,10 +1,12 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Codomon.Desktop.Models;
 using Codomon.Desktop.Persistence;
 using Codomon.Desktop.Services;
 using Codomon.Desktop.ViewModels;
+using System.Text;
 
 namespace Codomon.Desktop.Views;
 
@@ -30,7 +32,6 @@ public partial class LlmSummaryDialog : Window
     private bool _pendingShiftClick;
     private bool _isApplyingRangeSelection;
     private bool _hideSummarized;
-    private int _syncedProgressMessageCount;
 
     private DispatcherTimer? _spinnerTimer;
     private int _spinnerFrame;
@@ -488,37 +489,105 @@ public partial class LlmSummaryDialog : Window
 
     private void ScrollProgressToBottom()
     {
-        var progressTextBox = this.FindControl<TextBox>("ProgressTextBox");
-        if (progressTextBox == null) return;
+        var progressPanel = this.FindControl<StackPanel>("ProgressPanel");
+        var progressScrollViewer = this.FindControl<ScrollViewer>("ProgressScrollViewer");
+        if (progressPanel == null || progressScrollViewer == null) return;
 
-        if (_vm.ProgressMessages.Count < _syncedProgressMessageCount)
+        RebuildProgressPanel(progressPanel);
+        progressScrollViewer.Offset = new Avalonia.Vector(progressScrollViewer.Offset.X, double.MaxValue);
+    }
+
+    private void RebuildProgressPanel(StackPanel progressPanel)
+    {
+        progressPanel.Children.Clear();
+
+        Border? thinkingBlock = null;
+        TextBlock? thinkingContent = null;
+        var thinkingBuffer = new StringBuilder();
+
+        void FlushThinkingBlock()
         {
-            _syncedProgressMessageCount = 0;
-            progressTextBox.Text = string.Empty;
+            if (thinkingBlock == null || thinkingContent == null)
+                return;
+
+            thinkingContent.Text = thinkingBuffer.ToString().TrimEnd();
+            progressPanel.Children.Add(thinkingBlock);
+            thinkingBlock = null;
+            thinkingContent = null;
+            thinkingBuffer.Clear();
         }
 
-        if (_vm.ProgressMessages.Count > _syncedProgressMessageCount)
+        foreach (var message in _vm.ProgressMessages)
         {
-            var newMessages = _vm.ProgressMessages
-                .Skip(_syncedProgressMessageCount)
-                .ToList();
-
-            if (string.IsNullOrEmpty(progressTextBox.Text))
+            if (string.Equals(message, "Thinking Process:", StringComparison.Ordinal))
             {
-                progressTextBox.Text = string.Join(Environment.NewLine, newMessages);
-            }
-            else
-            {
-                var builder = new System.Text.StringBuilder(progressTextBox.Text);
-                builder.AppendLine();
-                builder.AppendJoin(Environment.NewLine, newMessages);
-                progressTextBox.Text = builder.ToString();
+                FlushThinkingBlock();
+                (thinkingBlock, thinkingContent) = CreateThinkingBlock();
+                continue;
             }
 
-            _syncedProgressMessageCount = _vm.ProgressMessages.Count;
+            if (thinkingBlock != null && message.StartsWith("    ", StringComparison.Ordinal))
+            {
+                if (thinkingBuffer.Length > 0)
+                    thinkingBuffer.AppendLine();
+
+                thinkingBuffer.Append(message.TrimStart());
+                continue;
+            }
+
+            FlushThinkingBlock();
+            progressPanel.Children.Add(CreateProgressLine(message));
         }
 
-        progressTextBox.CaretIndex = progressTextBox.Text?.Length ?? 0;
+        FlushThinkingBlock();
+    }
+
+    private static Control CreateProgressLine(string message)
+    {
+        return new TextBlock
+        {
+            Text = message,
+            Foreground = new SolidColorBrush(Color.Parse("#D4E1EE")),
+            FontFamily = FontFamily.Parse("Monospace"),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Avalonia.Thickness(0, 0, 0, 2)
+        };
+    }
+
+    private static (Border Container, TextBlock Content) CreateThinkingBlock()
+    {
+        var header = new TextBlock
+        {
+            Text = "Thinking Process:",
+            Foreground = new SolidColorBrush(Color.Parse("#C8D8EE")),
+            FontWeight = FontWeight.SemiBold,
+            FontSize = 11,
+            Margin = new Avalonia.Thickness(0, 0, 0, 6)
+        };
+
+        var content = new TextBlock
+        {
+            Foreground = Brushes.White,
+            FontFamily = FontFamily.Parse("Monospace"),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap
+        };
+
+        var panel = new StackPanel();
+        panel.Children.Add(header);
+        panel.Children.Add(content);
+
+        return (new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#243447")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#38506B")),
+            BorderThickness = new Avalonia.Thickness(1),
+            CornerRadius = new Avalonia.CornerRadius(6),
+            Padding = new Avalonia.Thickness(10, 8),
+            Margin = new Avalonia.Thickness(0, 2, 0, 6),
+            Child = panel
+        }, content);
     }
 
     // ── Browse tab ────────────────────────────────────────────────────────────

@@ -44,6 +44,8 @@
       <MenuItem Header="_Tools" Padding="8,4">
         <MenuItem Header="Roslyn Scan…"              Click="OnScanClick"
                   ToolTip.Tip="Run a Roslyn static analysis scan on the source project"/>
+        <MenuItem Header="Scan Tech Stack…"          Click="OnTechStackScanClick"
+                  ToolTip.Tip="Detect frameworks, packages, and infrastructure used by the workspace"/>
         <MenuItem Header="LLM Summaries…"            Click="OnSummariesClick"
                   ToolTip.Tip="Generate LLM-powered summaries for scanned source files"/>
         <MenuItem Header="Architecture Hypothesis…"  Click="OnHypothesisClick"
@@ -573,6 +575,19 @@
                     </Grid>
 
                     <Grid ColumnDefinitions="Auto,12,*">
+                      <TextBlock x:Name="OverviewTechStackIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
+                      <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock x:Name="OverviewTechStackTitleText" Text="Tech stack"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="OverviewTechStackDetailText"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,12,*">
                       <TextBlock x:Name="OverviewSummariesIconText" Text="○" FontSize="20" VerticalAlignment="Top"/>
                       <StackPanel Grid.Column="2" Spacing="4">
                         <TextBlock x:Name="OverviewSummariesTitleText" Text="File summaries"
@@ -732,7 +747,7 @@
           <DockPanel Margin="40,32">
             <TextBlock DockPanel.Dock="Top" Text="Analyze" FontSize="18" FontWeight="Bold"
                       Foreground="#AABBCC" Margin="0,0,0,6"/>
-            <TextBlock DockPanel.Dock="Top" Text="Run analysis in order: Scan → LLM Summaries → Architecture. Replay Logs and Dev Console are always available."
+            <TextBlock DockPanel.Dock="Top" Text="Run analysis in order: Scan → Tech Stack → LLM Summaries → Architecture. Replay Logs and Dev Console are always available."
                       FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,16"/>
 
             <StackPanel Spacing="10" DockPanel.Dock="Top">
@@ -741,6 +756,15 @@
                         Content="Run Scan" Click="OnScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
                 <TextBlock Grid.Column="1" Grid.Row="0" Text="Available always" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
                 <TextBlock x:Name="AnalyzeRunScanStatusText" Grid.Column="1" Grid.Row="1"
+                          Text="" FontSize="10" Foreground="#556677"/>
+              </Grid>
+
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <Button x:Name="AnalyzeTechStackBtn" Grid.Column="0" Grid.RowSpan="2"
+                        Content="Tech Stack" Click="OnTechStackScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                <TextBlock x:Name="AnalyzeTechStackAvailabilityText" Grid.Column="1" Grid.Row="0"
+                          Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
+                <TextBlock x:Name="AnalyzeTechStackStatusText" Grid.Column="1" Grid.Row="1"
                           Text="" FontSize="10" Foreground="#556677"/>
               </Grid>
 

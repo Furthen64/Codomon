@@ -1,173 +1,150 @@
 # Codomon
 
-A desktop "code telescope" for understanding and monitoring complex codebases. Codomon combines a visual architecture workspace, log import/replay/live monitoring, and static code analysis powered by Roslyn into a single cross-platform tool.
+Codomon is a cross-platform desktop application for understanding and monitoring complex codebases. It combines a visual architecture workspace, log import and replay, live log tailing, and Roslyn-based C# analysis into a single Avalonia app.
 
-## Features
+## What The App Does
 
-- **Visual workspace** — drag-and-drop canvas of Systems, Modules, and their connections
-- **Log ingestion and replay** — import log files, replay them against the canvas, or tail live log files
-- **Roslyn static analysis** — scan C# source code to automatically discover systems and modules
-- **System Map** — a structured architecture model built from code analysis and manual overrides
-- **LLM integration** — optional AI-powered architecture hypothesis and summary generation
-- **Persistent workspaces** — workspace layout, rules, and analysis artifacts saved as JSON on disk
+- maps a codebase into Systems, Modules, and Code Nodes
+- stores that model as a persistent workspace on disk
+- imports log files and replays them against the workspace
+- watches live log files and streams runtime events into the UI
+- scans C# source with Roslyn to discover structure and suggest relationships
+- supports manual overrides and optional LLM-assisted summaries and architecture hypotheses
+
+In the repo's terminology, the hierarchy is:
+
+```text
+Codebase
+└── System Map
+    └── System
+        └── Module
+            └── Code Node
+```
+
+## Tech Stack
+
+- .NET 8
+- Avalonia 11 for the desktop UI
+- MVVM-style ViewModels + Services + Persistence layers
+- NodifyAvalonia for graph editing and canvas interaction
+- Microsoft.CodeAnalysis (Roslyn) for static analysis
+- xUnit for tests
+
+## Solution Layout
+
+```text
+Codomon.Desktop/   Main application
+Codomon.Tests/     Unit and regression tests
+Vision/            Logos and design assets
+OVERVIEW.md        Developer architecture overview
+TERMINOLOGY.md     Domain terminology and hierarchy
+build.sh           Linux/macOS build script
+launch.sh          Linux/macOS launch script
+checkreq.sh        Ubuntu-oriented .NET SDK check/install helper
+winbuild.ps1       Windows build script
+winlaunch.ps1      Windows launch script
+```
+
+## Inside `Codomon.Desktop`
+
+- `Views/` and `Controls/`: Avalonia windows, dialogs, canvas, timeline
+- `ViewModels/`: application state and workflow orchestration
+- `Services/`: Roslyn scanning, log parsing/matching, system detection, LLM helpers, graph adapters
+- `Persistence/`: workspace save/load, autosave, recent workspace tracking, user config
+- `Models/`: workspace, graph, log, profile, and System Map data models
+
+The main composition root is the desktop app plus main window and `MainViewModel`, which wires together:
+
+- workspace lifecycle
+- graph and system map views
+- log replay and live monitoring
+- profile switching
+- scan status and persisted artifacts
+
+## Main Workflows
+
+### Workspace persistence
+
+Workspaces are stored as JSON plus supporting folders for scans, logs, autosaves, and prompts. The app captures both diagram layout and analysis/runtime artifacts.
+
+### Log ingestion
+
+Imported logs are parsed into entries, loaded into the replay model, and matched against workspace nodes for highlighting and timeline updates. Live monitoring uses a file watcher path and feeds entries into the same general matching flow.
+
+### Static analysis
+
+`RoslynScanService` scans C# files under a chosen source path, discovers projects, files, classes, methods, and logging call sites, then produces suggested relationships. Those results can be merged into the System Map, where manual overrides remain authoritative.
 
 ## Requirements
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8) or later
+- .NET 8 SDK or later
 
-Run the requirements check script to verify your environment:
+Optional environment check:
 
 ```bash
 ./checkreq.sh
 ```
 
+Note: `checkreq.sh` is geared toward Ubuntu setup paths and can attempt SDK installation there.
+
 ## Build
 
-**Linux / macOS**
+Linux / macOS:
 
 ```bash
 ./build.sh
 ```
 
-**Windows (PowerShell)**
+Windows PowerShell:
 
 ```powershell
 .\winbuild.ps1
 ```
 
-Both scripts build in `Release` configuration and stamp the binary with the current version (`0.1.0`) and build date.
+The build scripts compile `Codomon.Desktop` in `Release` and stamp version metadata into the app.
 
 ## Run
 
-**Linux / macOS**
+Linux / macOS:
 
 ```bash
 ./launch.sh
 ```
 
-**Windows (PowerShell)**
+Windows PowerShell:
 
 ```powershell
 .\winlaunch.ps1
 ```
 
-Alternatively, run directly with the .NET CLI from the repo root:
+Directly with the .NET CLI:
 
 ```bash
 dotnet run --project Codomon.Desktop/Codomon.Desktop.csproj
 ```
 
-## Project Structure
+## Test
 
-```
-Codomon/
-├── Codomon.Desktop/          # Single-project desktop application
-│   ├── Controls/             # Reusable Avalonia controls (canvas, timeline)
-│   ├── Models/               # Data structures (workspace, systems, logs, scan results)
-│   ├── Persistence/          # Workspace serialization and autosave
-│   ├── Services/             # Feature logic (scanning, parsing, matching, LLM, etc.)
-│   ├── ViewModels/           # MVVM view models
-│   └── Views/                # Avalonia windows and dialogs
-├── build.sh / winbuild.ps1   # Build scripts
-├── launch.sh / winlaunch.ps1 # Launch scripts
-├── checkreq.sh               # Requirements check
-├── OVERVIEW.md               # Developer architecture overview
-└── TERMINOLOGY.md            # Hierarchy terminology reference
+```bash
+dotnet test
 ```
 
-## Libraries
+Current tests cover focused behavior such as log matching, log entry handling, LLM settings resolution, system map identity, and regression cases.
 
-| Library | Version | Purpose |
-|---|---|---|
-| [Avalonia](https://avaloniaui.net/) | 11.2.3 | Cross-platform UI framework |
-| [Avalonia.Themes.Fluent](https://avaloniaui.net/) | 11.2.3 | Fluent design theme for Avalonia |
-| [Avalonia.Fonts.Inter](https://avaloniaui.net/) | 11.2.3 | Inter font for Avalonia |
-| [NodifyAvalonia](https://github.com/BAndysc/nodify-avalonia) | 6.6.0 | Node-based graph editor controls (port of Nodify for Avalonia) |
-| [Microsoft.CodeAnalysis.CSharp](https://github.com/dotnet/roslyn) | 4.9.2 | Roslyn C# compiler and analysis APIs |
+## Developer Reading Order
 
-## Developer Documentation
+For orientation, start here:
 
-- [OVERVIEW.md](OVERVIEW.md) — architecture overview, layer responsibilities, startup sequence, and recommended reading order for new developers
-- [TERMINOLOGY.md](TERMINOLOGY.md) — definitions for Codebase, System Map, System, Module, and Code Node
+1. `Codomon.Desktop/Program.cs`
+2. `Codomon.Desktop/App.axaml.cs`
+3. `Codomon.Desktop/Views/MainWindow.axaml.cs`
+4. `Codomon.Desktop/ViewModels/MainViewModel.cs`
+5. `Codomon.Desktop/Persistence/WorkspaceSerializer.cs`
+6. `Codomon.Desktop/Services/RoslynScanService.cs`
+7. `Codomon.Desktop/Services/SystemDetector.cs`
+8. `Codomon.Desktop/Services/SystemMapUpsertService.cs`
 
-## Example Workflow: Analyzing AnimalHaus with Codomon
+Additional repo docs:
 
-If you want a concrete repo to practice on, [`Furthen64/AnimalHaus`](https://github.com/Furthen64/AnimalHaus) is a good fit: it is small enough to understand in one sitting, but structured enough to exercise Codomon's system, module, docs, and runtime views.
-
-### 1. Start with repo shape and runnable units
-
-Open `README.md` and `AnimalHaus.sln` in the target repo first.
-
-This quickly establishes the top-level buckets Codomon should help you model:
-
-- 4 runnable systems: `Pigpen`, `Barn`, `Tractor`, `MarketPlace`
-- 3 shared libraries: `AnimalHaus.Shared.Core`, `AnimalHaus.Shared.Utils`, `AnimalHaus.Shared.Messaging`
-- 1 contracts project: `AnimalHaus.Contracts`
-- 1 tool: `AdministrationApp`
-- 2 test projects: `AnimalHaus.Shared.Tests`, `AnimalHaus.Integration.Tests`
-
-In Codomon terms, this is the first pass where the human decides what belongs to domain behavior, shared infrastructure, contracts, tooling, and validation.
-
-### 2. Read architecture docs before implementation files
-
-Next, read `docs/architecture.md` and `docs/message-contracts.md`.
-
-These files provide the mental model that makes the rest of the repo readable:
-
-- each process owns a PUB socket and a REP socket
-- systems communicate over ZeroMQ
-- the default happy-path is `Pigpen -> Barn -> Tractor -> Pigpen`
-- `MarketPlace` broadcasts price events to every other system
-
-In Codomon, this is the point where the user should begin sketching systems and high-level connections instead of reading code file-by-file without context.
-
-### 3. Understand the contracts and messaging layer
-
-After the docs, inspect the shared interaction layer:
-
-- `src/contracts/AnimalHaus.Contracts/Commands.cs`
-- `src/contracts/AnimalHaus.Contracts/Events.cs`
-- `src/shared/AnimalHaus.Shared.Messaging/*`
-
-This is the narrow waist of the sample. It defines:
-
-- which commands and events exist
-- how messages are wrapped
-- what metadata is attached
-- how topics are named
-- where ZeroMQ request/reply and pub/sub plumbing lives
-
-Once these files are clear, Codomon's system and module views become much easier to interpret because transport concerns can be separated from actual business behavior.
-
-### 4. Trace one end-to-end scenario through the host files
-
-Use the feed-dispatch scenario as the first walkthrough:
-
-1. start in `src/systems/AnimalHaus.Pigpen/PigpenHost.cs`
-2. follow `RequestDispatch` into `BarnHost.cs`
-3. follow `AssignTask` into `TractorHost.cs`
-4. then return to Pigpen's handling of `DispatchCompleted`, `TaskCompleted`, and `MarketPriceChanged`
-
-Only after the host-level orchestration is clear should you drop into each system's `Modules/` folder.
-
-That order matters: the host files explain system coordination, while the modules explain local state changes such as feeding, inventory, hauling, fuel, and health updates.
-
-### 5. Validate understanding with tests and runtime configuration
-
-Finish by checking how the scenario is exercised and configured:
-
-- `tests/AnimalHaus.Integration.Tests/DistributedSimulationTests.cs`
-- `tests/AnimalHaus.Shared.Tests/MessagingTests.cs`
-- system `appsettings.json` files
-- `build.sh`
-- `launch.sh`
-- `src/tools/AdministrationApp`
-
-These files answer the practical questions a human usually has at the end of a first pass:
-
-- what behavior is considered important enough to test
-- how the systems are launched together
-- how ports, peers, timing, startup delay, and seeds are configured
-- how the administration tool edits configuration without hand-editing JSON
-
-This is the final Codomon step: verify that the system map you built from docs and code matches the repo's actual runnable and testable behavior.
+- [OVERVIEW.md](OVERVIEW.md)
+- [TERMINOLOGY.md](TERMINOLOGY.md)

@@ -39,7 +39,7 @@ public static class RoslynAvailabilityService
         if (csFileCount == 0)
             return new RoslynAvailabilityResult(false,
                 $"No C# source files (.cs) found under:\n{searchRoot}\n\n" +
-                "Make sure the source path points to a C# project, solution, or folder.", 0, null);
+                "Make sure the source path points to a C# project (.csproj), solution (.sln or .slnx), or folder.", 0, null);
 
         // Optionally detect dotnet CLI version (not required for file-based Roslyn analysis).
         string? dotnetVersion = await TryGetDotnetVersionAsync();

@@ -142,15 +142,13 @@
                 <TextBlock Text="Progress" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
               </Border>
               <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" Margin="8">
-                <TextBox x:Name="ProgressTextBox"
-                         IsReadOnly="True"
-                         AcceptsReturn="True"
-                         Background="Transparent"
-                         FontFamily="Monospace"
-                         FontSize="11"
-                         TextWrapping="Wrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                <ScrollViewer x:Name="ProgressScrollViewer"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                  <StackPanel x:Name="ProgressPanel"
+                              Spacing="4"
+                              Margin="8"/>
+                </ScrollViewer>
               </Border>
             </DockPanel>
 
