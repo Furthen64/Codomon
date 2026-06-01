@@ -63,11 +63,11 @@
         <StackPanel x:Name="Step1Panel" Spacing="12" Margin="0,36,0,0">
           <TextBlock Text="Select the source project, solution, or folder that this workspace will track."
                      Foreground="#AABBCC" TextWrapping="Wrap"/>
-          <TextBlock Text="Accepted: .sln, .csproj, or project folder"
+          <TextBlock Text="Accepted: .sln, .slnx, .csproj, or project folder"
                      Foreground="#667788" FontSize="11"/>
           <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
             <TextBox x:Name="SourcePathBox" Grid.Column="0"
-                     Watermark="Path to .sln, .csproj, or folder…"
+                     Watermark="Path to .sln, .slnx, .csproj, or folder…"
                      TextChanged="OnSourcePathChanged"/>
             <Button Grid.Column="1" Content="Browse…" Click="OnBrowseSourceClick"
                     Margin="8,0,0,0" Padding="12,4"/>

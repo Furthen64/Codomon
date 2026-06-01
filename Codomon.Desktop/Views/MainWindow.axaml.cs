@@ -48,8 +48,8 @@ High-level overview of MainWindow and its responsibilities:
         `OnLiveEntryArrived`, and related methods are wired to UI and to `LogReplayViewModel`/
         `LiveMonitorViewModel` events.
 
-- Roslyn scan & architecture features
-    - `OnScanClick`, `OnHypothesisClick` and helpers run analysis dialogs and call
+- Roslyn scan, tech stack, and architecture features
+    - `OnScanClick`, `OnTechStackScanClick`, `OnHypothesisClick` and helpers run analysis dialogs and call
         services/VM methods to update SystemMap, Graph, and workspace state.
 
 - Canvas / SystemMap / Graph navigation
@@ -424,13 +424,14 @@ public partial class MainWindow : Window
     private const string WorkspaceLogsFolderName = "logs";
     private const string WorkspaceImportedLogsFolderName = "imported";
     private const string OverviewActionScan = "scan";
+    private const string OverviewActionTechStack = "techstack";
     private const string OverviewActionSummaries = "summaries";
     private const string OverviewActionArchitecture = "architecture";
     private const string OverviewActionGraph = "graph";
 
     private static readonly string[] SourceSnapshotExtensions =
     {
-        ".cs", ".csproj", ".sln", ".props", ".targets", ".md", ".markdown"
+        ".cs", ".csproj", ".sln", ".slnx", ".props", ".targets", ".md", ".markdown"
     };
 
     private static readonly string[] SourceSnapshotIgnoredDirectories =
@@ -1518,6 +1519,26 @@ public partial class MainWindow : Window
         RefreshAnalyzePanel();
     }
 
+    // ── Tech Stack Scan ───────────────────────────────────────────────────────
+
+    private async void OnTechStackScanClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before scanning the tech stack.");
+            return;
+        }
+
+        var scanVm = new ViewModels.TechStackScanViewModel(
+            _vm.Workspace.SourceProjectPath,
+            _vm.WorkspaceFolderPath);
+
+        var dialog = new TechStackScanDialog(scanVm);
+        await dialog.ShowDialog<ViewModels.TechStackScanViewModel?>(this);
+
+        RefreshAnalyzePanel();
+    }
+
     // ── LLM Summaries ─────────────────────────────────────────────────────────
 
     private async void OnSummariesClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1625,6 +1646,9 @@ public partial class MainWindow : Window
     private void RefreshAnalyzePanel()
     {
         var runScanStatus = this.FindControl<TextBlock>("AnalyzeRunScanStatusText");
+        var techStackBtn = this.FindControl<Button>("AnalyzeTechStackBtn");
+        var techStackAvailability = this.FindControl<TextBlock>("AnalyzeTechStackAvailabilityText");
+        var techStackStatus = this.FindControl<TextBlock>("AnalyzeTechStackStatusText");
         var summariesBtn = this.FindControl<Button>("AnalyzeLlmSummariesBtn");
         var summariesAvailability = this.FindControl<TextBlock>("AnalyzeLlmSummariesAvailabilityText");
         var summariesStatus = this.FindControl<TextBlock>("AnalyzeLlmSummariesStatusText");
@@ -1635,9 +1659,12 @@ public partial class MainWindow : Window
         if (!_vm.HasWorkspace || string.IsNullOrWhiteSpace(_vm.WorkspaceFolderPath))
         {
             if (runScanStatus != null) runScanStatus.Text = "No workspace loaded yet.";
+            if (techStackBtn != null) techStackBtn.IsEnabled = false;
+            if (techStackAvailability != null) techStackAvailability.Text = "Requires a completed source scan.";
+            if (techStackStatus != null) techStackStatus.Text = "Open a workspace and run Scan first.";
             if (summariesBtn != null) summariesBtn.IsEnabled = false;
-            if (summariesAvailability != null) summariesAvailability.Text = "Requires a completed scan.";
-            if (summariesStatus != null) summariesStatus.Text = "Open a workspace and run Scan first.";
+            if (summariesAvailability != null) summariesAvailability.Text = "Requires a current tech stack scan.";
+            if (summariesStatus != null) summariesStatus.Text = "Run source scan, then tech stack scan first.";
             if (architectureBtn != null) architectureBtn.IsEnabled = false;
             if (architectureAvailability != null) architectureAvailability.Text = "Requires LLM summaries.";
             if (architectureStatus != null) architectureStatus.Text = "Generate summaries to enable architecture synthesis.";
@@ -1649,6 +1676,14 @@ public partial class MainWindow : Window
         var hasSavedScan = savedScans.Count > 0;
         var latestScanTime = hasSavedScan ? savedScans[0].ScanTime : (DateTime?)null;
         var hasLoadedScanData = _vm.Workspace.SystemMap.AllCodeNodes.Any();
+        var sourceSnapshot = GetSourceSnapshotStats(_vm.Workspace.SourceProjectPath);
+        var techStackScans = TechStackScanService.ListSavedScans(_vm.WorkspaceFolderPath);
+        var latestTechStackAt = techStackScans.Count > 0 ? techStackScans[0].ScanTime : (DateTime?)null;
+        var techStackSummary = GetLatestTechStackSummary(_vm.WorkspaceFolderPath);
+        var techStackIsStale = latestTechStackAt.HasValue &&
+                               ((latestScanTime.HasValue && latestTechStackAt.Value < latestScanTime.Value) ||
+                                (sourceSnapshot.LatestChangeAt.HasValue && sourceSnapshot.LatestChangeAt.Value > latestTechStackAt.Value.AddSeconds(1)));
+        var hasCurrentTechStack = techStackScans.Count > 0 && !techStackIsStale;
 
         if (runScanStatus != null)
         {
@@ -1657,9 +1692,28 @@ public partial class MainWindow : Window
                 : "No saved scans yet.";
         }
 
-        if (summariesBtn != null) summariesBtn.IsEnabled = hasSavedScan;
+        if (techStackBtn != null) techStackBtn.IsEnabled = hasSavedScan;
+        if (techStackAvailability != null)
+            techStackAvailability.Text = hasSavedScan ? "Available after source scan" : "Locked until a source scan is completed.";
+
+        if (techStackStatus != null)
+        {
+            techStackStatus.Text = techStackScans.Count == 0
+                ? "No saved tech stack scans yet."
+                : techStackSummary.TechnologyCount == 0
+                    ? $"Last: {FormatTime(latestTechStackAt)} · No technologies detected."
+                    : $"Last: {FormatTime(latestTechStackAt)} · {techStackSummary.TechnologyCount} entries across {techStackSummary.ScopeCount} scope(s){(techStackIsStale ? " · Stale" : string.Empty)}";
+        }
+
+        if (summariesBtn != null) summariesBtn.IsEnabled = hasCurrentTechStack;
         if (summariesAvailability != null)
-            summariesAvailability.Text = hasSavedScan ? "Available (scan found)" : "Locked until a scan is completed.";
+            summariesAvailability.Text = !hasSavedScan
+                ? "Locked until a source scan is completed."
+                : hasCurrentTechStack
+                    ? "Available (source scan and tech stack are current)"
+                    : techStackScans.Count == 0
+                        ? "Locked until a tech stack scan is completed."
+                        : "Locked until the tech stack scan is refreshed.";
 
         var summaries = LlmSummaryService.ListSummaries(_vm.WorkspaceFolderPath);
         var summaryCount = summaries.Count;
@@ -1684,18 +1738,25 @@ public partial class MainWindow : Window
         }
 
         bool hasSummaries = summaryCount > 0;
-        if (architectureBtn != null) architectureBtn.IsEnabled = hasSummaries;
+        var canRunArchitecture = hasSummaries && hasCurrentTechStack;
+        if (architectureBtn != null) architectureBtn.IsEnabled = canRunArchitecture;
         if (architectureAvailability != null)
-            architectureAvailability.Text = hasSummaries ? "Available (summaries found)" : "Locked until LLM summaries are generated.";
+            architectureAvailability.Text = !hasCurrentTechStack
+                ? "Locked until a current tech stack scan exists."
+                : hasSummaries
+                    ? "Available (summaries found)"
+                    : "Locked until LLM summaries are generated.";
 
         var hypotheses = ArchitectureHypothesisService.ListHypotheses(_vm.WorkspaceFolderPath);
         var latestHypothesisAt = hypotheses.Count > 0 ? hypotheses.Max(h => h.CreatedAt) : (DateTime?)null;
 
         if (architectureStatus != null)
         {
-            architectureStatus.Text = hypotheses.Count == 0
-                ? "No architecture synthesis runs yet."
-                : $"Runs: {hypotheses.Count} · Last: {FormatTime(latestHypothesisAt)}";
+            architectureStatus.Text = !hasCurrentTechStack
+                ? "Run or refresh Tech Stack before architecture synthesis."
+                : hypotheses.Count == 0
+                    ? "No architecture synthesis runs yet."
+                    : $"Runs: {hypotheses.Count} · Last: {FormatTime(latestHypothesisAt)}";
         }
 
         RefreshOverviewPanel();
@@ -1707,6 +1768,9 @@ public partial class MainWindow : Window
         var sourceScanIcon = this.FindControl<TextBlock>("OverviewSourceScanIconText");
         var sourceScanTitle = this.FindControl<TextBlock>("OverviewSourceScanTitleText");
         var sourceScanDetail = this.FindControl<TextBlock>("OverviewSourceScanDetailText");
+        var techStackIcon = this.FindControl<TextBlock>("OverviewTechStackIconText");
+        var techStackTitle = this.FindControl<TextBlock>("OverviewTechStackTitleText");
+        var techStackDetail = this.FindControl<TextBlock>("OverviewTechStackDetailText");
         var summariesIcon = this.FindControl<TextBlock>("OverviewSummariesIconText");
         var summariesTitle = this.FindControl<TextBlock>("OverviewSummariesTitleText");
         var summariesDetail = this.FindControl<TextBlock>("OverviewSummariesDetailText");
@@ -1723,6 +1787,7 @@ public partial class MainWindow : Window
 
         if (workspaceMeta == null ||
             sourceScanIcon == null || sourceScanTitle == null || sourceScanDetail == null ||
+            techStackIcon == null || techStackTitle == null || techStackDetail == null ||
             summariesIcon == null || summariesTitle == null || summariesDetail == null ||
             architectureIcon == null || architectureTitle == null || architectureDetail == null ||
             graphIcon == null || graphTitle == null || graphDetail == null ||
@@ -1740,11 +1805,17 @@ public partial class MainWindow : Window
                 Title = "Source scan",
                 Detail = "Ready when a workspace is open."
             });
+            ApplyOverviewStep(techStackIcon, techStackTitle, techStackDetail, new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "Tech stack",
+                Detail = "Ready after a current source scan."
+            });
             ApplyOverviewStep(summariesIcon, summariesTitle, summariesDetail, new OverviewStepState
             {
                 Kind = OverviewStatusKind.Blocked,
                 Title = "File summaries",
-                Detail = "Ready after a source scan exists."
+                Detail = "Ready after a current tech stack scan."
             });
             ApplyOverviewStep(architectureIcon, architectureTitle, architectureDetail, new OverviewStepState
             {
@@ -1769,9 +1840,11 @@ public partial class MainWindow : Window
         }
 
         var savedScans = RoslynScanService.ListSavedScans(_vm.WorkspaceFolderPath);
+        var techStackScans = TechStackScanService.ListSavedScans(_vm.WorkspaceFolderPath);
         var summaries = LlmSummaryService.ListSummaries(_vm.WorkspaceFolderPath);
         var hypotheses = ArchitectureHypothesisService.ListHypotheses(_vm.WorkspaceFolderPath);
         var latestScanAt = savedScans.Count > 0 ? savedScans[0].ScanTime : (DateTime?)null;
+        var latestTechStackAt = techStackScans.Count > 0 ? techStackScans[0].ScanTime : (DateTime?)null;
         var latestSummaryAt = summaries.Count > 0 ? summaries.Max(s => s.GeneratedAt) : (DateTime?)null;
         var latestHypothesisAt = hypotheses.Count > 0 ? hypotheses.Max(h => h.CreatedAt) : (DateTime?)null;
 
@@ -1790,6 +1863,7 @@ public partial class MainWindow : Window
 
         var sourceSnapshot = GetSourceSnapshotStats(_vm.Workspace.SourceProjectPath);
         var sourceFileCount = GetLatestScanAnalyzedFileCount(_vm.WorkspaceFolderPath);
+        var techStackSummary = GetLatestTechStackSummary(_vm.WorkspaceFolderPath);
         var summariesCoverageComplete = sourceFileCount > 0 && summaries.Count >= sourceFileCount;
         var summaryMissingCount = sourceFileCount > 0
             ? Math.Max(sourceFileCount - summaries.Count, 0)
@@ -1805,6 +1879,9 @@ public partial class MainWindow : Window
         var scanIsStale = latestScanAt.HasValue &&
                           sourceSnapshot.LatestChangeAt.HasValue &&
                           sourceSnapshot.LatestChangeAt.Value > latestScanAt.Value.AddSeconds(1);
+        var techStackIsStale = latestTechStackAt.HasValue &&
+                               ((latestScanAt.HasValue && latestTechStackAt.Value < latestScanAt.Value) ||
+                                (sourceSnapshot.LatestChangeAt.HasValue && sourceSnapshot.LatestChangeAt.Value > latestTechStackAt.Value.AddSeconds(1)));
         var summariesAreStale = savedScans.Count > 0 &&
                                 (summaries.Count == 0 ||
                                  (latestScanAt.HasValue && latestSummaryAt.HasValue && latestSummaryAt.Value < latestScanAt.Value));
@@ -1812,6 +1889,7 @@ public partial class MainWindow : Window
                                   ((latestScanAt.HasValue && latestHypothesisAt.Value < latestScanAt.Value) ||
                                    (latestSummaryAt.HasValue && latestHypothesisAt.Value < latestSummaryAt.Value));
         var graphIsReady = latestHypothesisAt.HasValue && !architectureIsStale;
+        var techStackReady = techStackScans.Count > 0 && !techStackIsStale;
 
         workspaceMeta.Text = $"{_vm.Workspace.WorkspaceName} · {(_vm.IsDirty ? "Unsaved" : "Saved")}";
 
@@ -1822,8 +1900,17 @@ public partial class MainWindow : Window
             sourceSnapshot.MarkdownDocCount,
             latestScanAt));
 
+        ApplyOverviewStep(techStackIcon, techStackTitle, techStackDetail, BuildTechStackState(
+            savedScans.Count,
+            techStackScans.Count,
+            techStackIsStale,
+            techStackSummary.TechnologyCount,
+            techStackSummary.ScopeCount,
+            latestTechStackAt));
+
         ApplyOverviewStep(summariesIcon, summariesTitle, summariesDetail, BuildSummariesState(
             savedScans.Count,
+            techStackReady,
             summaries.Count,
             summariesAreStale,
             summariesCoverageComplete,
@@ -1832,6 +1919,7 @@ public partial class MainWindow : Window
             latestSummaryAt));
 
         ApplyOverviewStep(architectureIcon, architectureTitle, architectureDetail, BuildArchitectureState(
+            techStackReady,
             summaries.Count,
             summariesAreStale,
             summariesCoverageComplete,
@@ -1853,6 +1941,8 @@ public partial class MainWindow : Window
         var recommendation = BuildOverviewRecommendation(
             savedScans.Count,
             scanIsStale,
+            techStackScans.Count,
+            techStackIsStale,
             summaries.Count,
             summariesAreStale,
             summariesCoverageComplete,
@@ -1910,8 +2000,51 @@ public partial class MainWindow : Window
         };
     }
 
+    private static OverviewStepState BuildTechStackState(
+        int savedScanCount,
+        int techStackScanCount,
+        bool techStackIsStale,
+        int technologyCount,
+        int scopeCount,
+        DateTime? latestTechStackAt)
+    {
+        if (savedScanCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "Tech stack",
+                Detail = "Ready after a current source scan."
+            };
+        }
+
+        if (techStackScanCount == 0)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Pending,
+                Title = "Tech stack",
+                Detail = "No tech stack scan has been saved yet."
+            };
+        }
+
+        var detail =
+            $"{technologyCount:N0} technology entries across {scopeCount:N0} scope(s){Environment.NewLine}" +
+            $"Last run: {FormatTime(latestTechStackAt)}";
+
+        return new OverviewStepState
+        {
+            Kind = techStackIsStale ? OverviewStatusKind.Warning : OverviewStatusKind.Done,
+            Title = "Tech stack",
+            Detail = techStackIsStale
+                ? $"{detail}{Environment.NewLine}Refresh the tech stack after the latest source changes."
+                : detail
+        };
+    }
+
     private static OverviewStepState BuildSummariesState(
         int savedScanCount,
+        bool techStackReady,
         int summaryCount,
         bool summariesAreStale,
         bool coverageComplete,
@@ -1926,6 +2059,16 @@ public partial class MainWindow : Window
                 Kind = OverviewStatusKind.Blocked,
                 Title = "File summaries",
                 Detail = "Ready after a current source scan."
+            };
+        }
+
+        if (!techStackReady)
+        {
+            return new OverviewStepState
+            {
+                Kind = OverviewStatusKind.Blocked,
+                Title = "File summaries",
+                Detail = "Ready after a current tech stack scan."
             };
         }
 
@@ -1977,6 +2120,7 @@ public partial class MainWindow : Window
     }
 
     private static OverviewStepState BuildArchitectureState(
+        bool techStackReady,
         int summaryCount,
         bool summariesAreStale,
         bool summariesCoverageComplete,
@@ -1986,9 +2130,11 @@ public partial class MainWindow : Window
         DateTime? latestScanAt,
         DateTime? latestSummaryAt)
     {
-        if (summaryCount == 0 || summariesAreStale || !summariesCoverageComplete)
+        if (!techStackReady || summaryCount == 0 || summariesAreStale || !summariesCoverageComplete)
         {
-            var prerequisiteDetail = summaryCount == 0
+            var prerequisiteDetail = !techStackReady
+                ? "Ready after a current tech stack scan."
+                : summaryCount == 0
                 ? "Ready after file summaries are current."
                 : summariesAreStale
                     ? "Waiting for file summaries to be refreshed from the latest scan."
@@ -2075,6 +2221,8 @@ public partial class MainWindow : Window
     private static OverviewRecommendation BuildOverviewRecommendation(
         int savedScanCount,
         bool scanIsStale,
+        int techStackScanCount,
+        bool techStackIsStale,
         int summaryCount,
         bool summariesAreStale,
         bool summariesCoverageComplete,
@@ -2101,6 +2249,28 @@ public partial class MainWindow : Window
                 Description = "Newer source changes were detected after the last scan. Refresh the scan first so every downstream step uses current code.",
                 ButtonText = "Run source scan again",
                 ActionKey = OverviewActionScan
+            };
+        }
+
+        if (techStackScanCount == 0)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Scan tech stack",
+                Description = "The source scan is ready. Detect the workspace tech stack next so downstream analysis has concrete framework and infrastructure context.",
+                ButtonText = "Scan tech stack",
+                ActionKey = OverviewActionTechStack
+            };
+        }
+
+        if (techStackIsStale)
+        {
+            return new OverviewRecommendation
+            {
+                Title = "Refresh tech stack",
+                Description = "The tech stack scan is older than the latest source changes or source scan. Refresh it before generating summaries.",
+                ButtonText = "Refresh tech stack",
+                ActionKey = OverviewActionTechStack
             };
         }
 
@@ -2294,6 +2464,9 @@ public partial class MainWindow : Window
             case OverviewActionScan:
                 OnScanClick(sender, e);
                 break;
+            case OverviewActionTechStack:
+                OnTechStackScanClick(sender, e);
+                break;
             case OverviewActionSummaries:
                 OnSummariesClick(sender, e);
                 break;
@@ -2341,6 +2514,33 @@ public partial class MainWindow : Window
         catch (JsonException)
         {
             return 0;
+        }
+    }
+
+    private static (int TechnologyCount, int ScopeCount) GetLatestTechStackSummary(string workspaceFolderPath)
+    {
+        var scans = TechStackScanService.ListSavedScans(workspaceFolderPath);
+        if (scans.Count == 0) return (0, 0);
+
+        try
+        {
+            using var stream = File.OpenRead(scans[0].FilePath);
+            var result = JsonSerializer.Deserialize<TechStackScanResult>(stream);
+            if (result == null)
+                return (0, 0);
+
+            var scopeCount = result.Projects.Count > 0
+                ? result.Projects.Count
+                : result.Technologies
+                    .Select(t => string.IsNullOrWhiteSpace(t.ProjectName) ? "(workspace)" : t.ProjectName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+
+            return (result.Technologies.Count, Math.Max(scopeCount, result.Technologies.Count > 0 ? 1 : 0));
+        }
+        catch
+        {
+            return (0, 0);
         }
     }
 

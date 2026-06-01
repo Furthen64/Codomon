@@ -97,7 +97,7 @@ public partial class SetupWizardDialog : Window
     /// <summary>
     /// Derives a suggested workspace name from a source path.
     /// E.g. "C:\src\MyProj1\" → "myproj1_ws"
-    ///      "C:\src\MyProj1\MyProj1.sln" → "myproj1_ws"
+    ///      "C:\src\MyProj1\MyProj1.slnx" → "myproj1_ws"
     /// </summary>
     private static string SuggestWorkspaceName(string sourcePath)
     {
@@ -110,7 +110,7 @@ public partial class SetupWizardDialog : Window
         }
         else
         {
-            // Strip extension for files like .sln / .csproj
+            // Strip extension for files like .sln / .slnx / .csproj
             leafName = System.IO.Path.GetFileNameWithoutExtension(sourcePath);
         }
 
@@ -148,7 +148,7 @@ public partial class SetupWizardDialog : Window
         var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
         if (storageProvider == null) return;
 
-        // Offer the user a choice: pick a file (.sln/.csproj) or a folder.
+        // Offer the user a choice: pick a file (.sln/.slnx/.csproj) or a folder.
         // We start with a file picker; if they cancel we offer a folder picker.
         var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
@@ -156,7 +156,7 @@ public partial class SetupWizardDialog : Window
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("Solution or Project") { Patterns = new[] { "*.sln", "*.csproj" } },
+                new FilePickerFileType("Solution or Project") { Patterns = new[] { "*.sln", "*.slnx", "*.csproj" } },
                 new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
             }
         });

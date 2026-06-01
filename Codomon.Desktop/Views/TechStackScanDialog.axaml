@@ -1,0 +1,190 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Codomon.Desktop.Views.TechStackScanDialog"
+        Title="Scan Tech Stack"
+        Width="860" Height="700"
+        MinWidth="700" MinHeight="560"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#111820">
+
+  <DockPanel LastChildFill="True">
+
+    <Border DockPanel.Dock="Top" Background="#1E2A3A"
+            BorderThickness="0,0,0,1" BorderBrush="#2A3F5A" Padding="16,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Ellipse x:Name="Dot1" Width="10" Height="10" Fill="#3A8FBF"/>
+            <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="#2A3F5A"/>
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="Scan Tech Stack" FontSize="16" FontWeight="Bold" Foreground="White"/>
+          <TextBlock x:Name="StepTitleText" Text="Step 1 — Preflight Check"
+                     FontSize="12" Foreground="#88AABB"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="#1E2A3A"
+            BorderThickness="0,1,0,0" BorderBrush="#2A3F5A" Padding="16,10">
+      <DockPanel>
+        <Button x:Name="CloseButton" Content="Close" Click="OnCloseClick"
+                Padding="16,6" DockPanel.Dock="Left"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button x:Name="CancelScanButton" Content="⏹ Cancel Scan"
+                  Click="OnCancelScanClick"
+                  Padding="16,6" IsVisible="False"/>
+          <Button x:Name="StartScanButton" Content="▶ Start Scan"
+                  Click="OnStartScanClick"
+                  Padding="16,6" IsEnabled="False"/>
+          <Button x:Name="ViewResultsButton" Content="Browse Results →"
+                  Click="OnViewResultsClick"
+                  Padding="16,6" IsVisible="False"/>
+          <Button x:Name="RescanButton" Content="↻ Rescan"
+                  Click="OnRescanClick"
+                  Padding="16,6" IsVisible="False"/>
+          <Button x:Name="OkButton" Content="OK"
+                  Click="OnCloseClick"
+                  Padding="16,6" IsVisible="False"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Border Padding="0">
+      <Grid>
+
+        <DockPanel x:Name="PreflightPanel" Margin="24,20" IsVisible="True">
+          <StackPanel DockPanel.Dock="Top" Spacing="14">
+            <TextBlock Text="Checking whether a tech stack scan can be started for this workspace…"
+                       Foreground="#AABBCC" TextWrapping="Wrap"/>
+
+            <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                    CornerRadius="4" Padding="14,12">
+              <StackPanel Spacing="8">
+                <TextBlock x:Name="PreflightStatusIcon" Text="⏳" FontSize="20"/>
+                <TextBlock x:Name="PreflightMessageText"
+                           Text="Running preflight check…"
+                           Foreground="#AABBCC" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
+            <Border x:Name="PreflightDetailsCard" IsVisible="False"
+                    Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                    CornerRadius="4" Padding="14,12">
+              <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="180,*">
+                  <TextBlock Grid.Column="0" Text="Source path:" Foreground="#778899"/>
+                  <TextBlock x:Name="PreflightSourcePathText" Grid.Column="1"
+                             Text="—" Foreground="#AABBCC" TextWrapping="Wrap"/>
+                </Grid>
+                <Grid ColumnDefinitions="180,*">
+                  <TextBlock Grid.Column="0" Text="Project files found:" Foreground="#778899"/>
+                  <TextBlock x:Name="PreflightProjectCountText" Grid.Column="1"
+                             Text="—" Foreground="#AABBCC"/>
+                </Grid>
+                <Grid ColumnDefinitions="180,*">
+                  <TextBlock Grid.Column="0" Text="Known markers found:" Foreground="#778899"/>
+                  <TextBlock x:Name="PreflightMarkerCountText" Grid.Column="1"
+                             Text="—" Foreground="#AABBCC"/>
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </DockPanel>
+
+        <DockPanel x:Name="ScanningPanel" Margin="24,16" IsVisible="False" LastChildFill="True">
+          <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <TextBlock x:Name="ScanningStatusText"
+                       Text="Tech stack scan in progress — reading project files and known stack markers…"
+                       Foreground="#AABBCC" TextWrapping="Wrap"/>
+            <ProgressBar x:Name="ScanningProgressBar" IsIndeterminate="True" Height="4"/>
+          </StackPanel>
+
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="3">
+            <ListBox x:Name="ProgressListBox"
+                     Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     FontFamily="Monospace"
+                     FontSize="11"/>
+          </Border>
+        </DockPanel>
+
+        <Grid x:Name="ResultsPanel" IsVisible="False">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+
+          <Border Grid.Column="0" BorderBrush="#2A3F5A" BorderThickness="0,0,1,0">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Padding="10,7" Background="#1A2435">
+                <TextBlock Text="Categories" FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+              </Border>
+              <ListBox x:Name="CategoryListBox"
+                       Background="Transparent"
+                       Margin="4"
+                       SelectionChanged="OnCategorySelectionChanged"/>
+            </DockPanel>
+          </Border>
+
+          <DockPanel Grid.Column="1">
+            <Border x:Name="RestoredScanBanner"
+                    DockPanel.Dock="Top"
+                    IsVisible="False"
+                    Margin="12,10,12,0"
+                    Padding="10,8"
+                    Background="#1A3B2A"
+                    BorderBrush="#2D7A55"
+                    BorderThickness="1"
+                    CornerRadius="4">
+              <TextBlock x:Name="RestoredScanBannerText"
+                         Text=""
+                         Foreground="#CDEEDB"
+                         FontSize="11"
+                         TextWrapping="Wrap"/>
+            </Border>
+
+            <StackPanel DockPanel.Dock="Top" Margin="12,10,12,0" Spacing="8">
+              <TextBlock x:Name="ResultsSummaryText"
+                         Text="No technologies loaded."
+                         Foreground="#AABBCC"
+                         FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="160,*">
+                <TextBlock Grid.Column="0" Text="Project filter:" Foreground="#778899" VerticalAlignment="Center"/>
+                <ComboBox x:Name="ProjectFilterComboBox"
+                          Grid.Column="1"
+                          SelectionChanged="OnProjectFilterSelectionChanged"/>
+              </Grid>
+            </StackPanel>
+
+            <DockPanel DockPanel.Dock="Bottom" Margin="12,10" LastChildFill="True" Height="240">
+              <TextBlock DockPanel.Dock="Top" x:Name="DetailTitleText"
+                         Text="Select a technology to view details."
+                         Foreground="#778899" FontSize="12" Margin="0,0,0,8"/>
+              <ScrollViewer>
+                <StackPanel x:Name="DetailStackPanel" Spacing="6"/>
+              </ScrollViewer>
+            </DockPanel>
+
+            <Border Margin="12,10,12,0"
+                    BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="4">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Padding="10,7" Background="#1A2435">
+                  <TextBlock Text="Detected Technologies"
+                             FontWeight="Bold" Foreground="#AABBCC" FontSize="12"/>
+                </Border>
+                <ListBox x:Name="TechnologyListBox"
+                         Background="Transparent"
+                         SelectionChanged="OnTechnologySelectionChanged"/>
+              </DockPanel>
+            </Border>
+          </DockPanel>
+        </Grid>
+      </Grid>
+    </Border>
+
+  </DockPanel>
+</Window>

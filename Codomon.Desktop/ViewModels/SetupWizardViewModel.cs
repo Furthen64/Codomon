@@ -24,7 +24,7 @@ public class SetupWizardViewModel : INotifyPropertyChanged
         set { _currentStep = value; OnPropertyChanged(); OnPropertyChanged(nameof(StepTitle)); }
     }
 
-    /// <summary>Step 1 — path to a .sln, .csproj, or project folder.</summary>
+    /// <summary>Step 1 — path to a .sln, .slnx, .csproj, or project folder.</summary>
     public string SourceProjectPath
     {
         get => _sourceProjectPath;
