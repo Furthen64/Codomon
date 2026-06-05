@@ -430,6 +430,8 @@ public partial class MainWindow : Window
     private const string OverviewActionSummaries = "summaries";
     private const string OverviewActionArchitecture = "architecture";
     private const string OverviewActionGraph = "graph";
+    private const char GymGameTagDelimiter = '|';
+    private const int ExpectedGymGameTagParts = 3;
 
     private static readonly string[] SourceSnapshotExtensions =
     {
@@ -507,8 +509,8 @@ public partial class MainWindow : Window
         if (sender is not Button { Tag: string tag })
             return;
 
-        var parts = tag.Split('|', 3);
-        if (parts.Length != 3)
+        var parts = tag.Split(GymGameTagDelimiter, ExpectedGymGameTagParts);
+        if (parts.Length != ExpectedGymGameTagParts)
             return;
 
         var title = this.FindControl<TextBlock>("GymSelectedTitleText");
