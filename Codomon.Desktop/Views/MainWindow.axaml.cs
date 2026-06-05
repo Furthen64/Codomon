@@ -394,6 +394,7 @@ public partial class MainWindow : Window
         var scanPanel      = this.FindControl<Grid>("ScanPanel");
         var codePanel      = this.FindControl<Grid>("CodePanel");
         var docsPanel      = this.FindControl<Grid>("DocsPanel");
+        var gymPanel       = this.FindControl<Grid>("GymPanel");
 
         bool has = _vm.HasWorkspace;
 
@@ -404,9 +405,10 @@ public partial class MainWindow : Window
         if (workspaceCloseMenuItem != null) workspaceCloseMenuItem.IsEnabled = has;
         if (overviewPanel  != null) overviewPanel.IsVisible  = has && _activeNavTab == "Overview";
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
-        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Overview" or "Monitor" or "Graph" or "Design" or "Code" or "Docs";
+        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Overview" or "Monitor" or "Graph" or "Design" or "Gym" or "Code" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
         if (scanPanel      != null) scanPanel.IsVisible      = _activeNavTab == "Scan";
+        if (gymPanel       != null) gymPanel.IsVisible       = has && _activeNavTab == "Gym";
         if (codePanel      != null) codePanel.IsVisible      = has && _activeNavTab == "Code";
         if (docsPanel      != null) docsPanel.IsVisible      = has && _activeNavTab == "Docs";
 
@@ -474,6 +476,7 @@ public partial class MainWindow : Window
             ("NavScanBtn",    "Scan"),
             ("NavMonitorBtn", "Monitor"),
             ("NavGraphBtn",   "Graph"),
+            ("NavGymBtn",     "Gym"),
             ("NavCodeBtn",    "Code"),
             ("NavDocsBtn",    "Docs"),
         };
@@ -497,6 +500,68 @@ public partial class MainWindow : Window
                     Avalonia.Media.Color.Parse(NavTabInactiveForeground));
             }
         }
+    }
+
+    private void OnGymGameClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag })
+            return;
+
+        var game = tag switch
+        {
+            "GraphUnclutter" => (
+                Title: "Graph Unclutter",
+                Description: "Drag nodes apart, group related areas, reduce crossings, pin important nodes, and mark noise as less important.",
+                Output: "Score layout improvements: fewer crossings, shorter average edge length, fewer label overlaps, clearer clusters, and namespace/project grouping bonuses."),
+            "LostLabels" => (
+                Title: "Lost Labels",
+                Description: "Class, module, namespace, method, or event names fade out and the user recalls or chooses what belongs there.",
+                Output: "Creates UserKnowledgeCheckpoint signals for recognized components, confusing names, and memorable or forgettable parts of the codebase."),
+            "ReconnectWires" => (
+                Title: "Reconnect the Wires",
+                Description: "Some relationships are hidden and the user reconnects calls, imports, dependencies, or spots a wrong edge.",
+                Output: "Teaches which components call, import, depend on, or should not depend on each other."),
+            "BackendPuzzleAssembly" => (
+                Title: "Backend Puzzle Assembly",
+                Description: "Arrange controllers, services, repositories, models, events, logging, configuration, and external APIs into a reasonable backend structure.",
+                Output: "Reinforces layers, ownership, dependency direction, and infrastructure versus domain boundaries."),
+            "MissingInfo" => (
+                Title: "What is missing here",
+                Description: "Show a node or subgraph and ask the user to write missing docs, runtime edges, naming concerns, scan gaps, or architecture TODOs.",
+                Output: "Produces MissingInfoNote entries tied to a target node or subgraph."),
+            "NameCluster" => (
+                Title: "Name this cluster",
+                Description: "Show a cluster of nodes and ask the user to name the architectural concept it represents.",
+                Output: "Captures human labels for clusters, feature areas, integration layers, and bounded contexts."),
+            "OddOneOut" => (
+                Title: "Find the odd one out",
+                Description: "Show several nodes from a cluster and ask which one does not belong.",
+                Output: "Surfaces weak clustering, misplaced components, and confusing boundaries."),
+            "DependencyCourt" => (
+                Title: "Dependency Court",
+                Description: "Show an edge and ask whether it should exist: expected, smell, unknown, one-way only, or runtime-only.",
+                Output: "Turns architecture review into lightweight judgment calls about dependency health."),
+            _ => default
+        };
+
+        if (string.IsNullOrEmpty(game.Title))
+        {
+            AppLogger.Warn($"[Gym] Ignoring unknown game tag: '{tag}'");
+            if (_statusTextTb != null)
+                _statusTextTb.Text = "Gym game selection is unknown.";
+            return;
+        }
+
+        var titleControl = this.FindControl<TextBlock>("GymSelectedTitleText");
+        var descriptionControl = this.FindControl<TextBlock>("GymSelectedDescriptionText");
+        var outputControl = this.FindControl<TextBlock>("GymSelectedOutputText");
+
+        if (titleControl != null) titleControl.Text = game.Title;
+        if (descriptionControl != null) descriptionControl.Text = game.Description;
+        if (outputControl != null) outputControl.Text = game.Output;
+
+        if (_statusTextTb != null)
+            _statusTextTb.Text = $"Gym game selected: {game.Title}";
     }
 
     /// <summary>Refreshes the workspace name displayed in the top-bar dropdown button and the sidebar.</summary>

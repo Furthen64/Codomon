@@ -155,6 +155,8 @@
                   ToolTip.Tip="Monitor tab — system map and live log stream"/>
           <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Graph tab — AST relationship graph"/>
+          <Button x:Name="NavGymBtn"     Content="Gym"     Tag="Gym"     Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Gym tab — learn the codebase through architecture games"/>
           <Button x:Name="NavCodeBtn"    Content="Code"    Tag="Code"    Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Code tab — browse the repository tree and preview files"/>
           <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"
@@ -820,6 +822,155 @@
           <ContentControl x:Name="DocsBrowserHost"
                           HorizontalContentAlignment="Stretch"
                           VerticalContentAlignment="Stretch"/>
+        </Grid>
+
+        <!-- ── Gym tab ─── -->
+        <Grid x:Name="GymPanel" IsVisible="False" Background="{StaticResource PanelBgContentBrush}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,32,40,40" Spacing="22">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Gym" FontSize="28" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                <TextBlock Text="Practice codebase understanding with small architecture games. Pick a drill, then use its output as a learning checkpoint for the workspace."
+                           FontSize="15"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <Grid ColumnDefinitions="2*,24,*">
+                <Border Background="{StaticResource PanelBgCardBrush}"
+                        BorderBrush="{StaticResource BorderDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20">
+                  <StackPanel Spacing="16">
+                    <TextBlock Text="Choose a game"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <WrapPanel ItemWidth="235">
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="GraphUnclutter">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="🧶 Graph Unclutter" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Clean up a messy subgraph." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="LostLabels">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="🏷 Lost Labels" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Remember missing node names." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="ReconnectWires">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="🔌 Reconnect the Wires" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Restore missing relationships." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="BackendPuzzleAssembly">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="🧩 Backend Puzzle Assembly" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Assemble architecture pieces." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="MissingInfo">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="❓ What is missing here" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Write what needs to exist." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="NameCluster">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="🧠 Name this cluster" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Name architectural concepts." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="OddOneOut">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="🕵 Find the odd one out" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Spot an unrelated node." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                      <Button Margin="0,0,12,12" Padding="14,12"
+                              HorizontalContentAlignment="Stretch"
+                              Click="OnGymGameClick"
+                              Tag="DependencyCourt">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="⚖ Dependency Court" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="Judge dependency edges." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Button>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Background="{StaticResource PanelBgBaseBrush}"
+                        BorderBrush="{StaticResource AccentBlueBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="22">
+                  <StackPanel Spacing="16">
+                    <TextBlock x:Name="GymSelectedTitleText"
+                               Text="Graph Unclutter"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="GymSelectedDescriptionText"
+                               Text="Drag nodes apart, group related areas, reduce crossings, pin important nodes, and mark noise as less important."
+                               FontSize="14"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                    <Border Background="{StaticResource PanelBgDarkBrush}"
+                            BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Learning output"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextMutedBrush}"/>
+                        <TextBlock x:Name="GymSelectedOutputText"
+                                   Text="Score layout improvements: fewer crossings, shorter average edge length, fewer label overlaps, clearer clusters, and namespace/project grouping bonuses."
+                                   FontSize="13"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Border>
+                    <Button Content="Open Graph to practice"
+                            Click="OnOverviewOpenGraphClick"
+                            HorizontalAlignment="Left"
+                            Padding="16,8"
+                            FontWeight="SemiBold"
+                            ToolTip.Tip="Use the Graph tab as the first practice surface for the selected Gym drill."/>
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </ScrollViewer>
         </Grid>
 
         <!-- ── 1-column workspace layout ─── -->
