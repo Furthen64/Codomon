@@ -394,6 +394,7 @@ public partial class MainWindow : Window
         var scanPanel      = this.FindControl<Grid>("ScanPanel");
         var codePanel      = this.FindControl<Grid>("CodePanel");
         var docsPanel      = this.FindControl<Grid>("DocsPanel");
+        var gymPanel       = this.FindControl<Grid>("GymPanel");
 
         bool has = _vm.HasWorkspace;
 
@@ -404,9 +405,10 @@ public partial class MainWindow : Window
         if (workspaceCloseMenuItem != null) workspaceCloseMenuItem.IsEnabled = has;
         if (overviewPanel  != null) overviewPanel.IsVisible  = has && _activeNavTab == "Overview";
         if (workspaceGrid  != null) workspaceGrid.IsVisible  = has && _activeNavTab is "Monitor" or "Graph";
-        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Overview" or "Monitor" or "Graph" or "Design" or "Code" or "Docs";
+        if (welcomeOverlay != null) welcomeOverlay.IsVisible = !has && _activeNavTab is "Overview" or "Monitor" or "Graph" or "Design" or "Gym" or "Code" or "Docs";
         if (designPanel    != null) designPanel.IsVisible    = has && _activeNavTab == "Design";
         if (scanPanel      != null) scanPanel.IsVisible      = _activeNavTab == "Scan";
+        if (gymPanel       != null) gymPanel.IsVisible       = has && _activeNavTab == "Gym";
         if (codePanel      != null) codePanel.IsVisible      = has && _activeNavTab == "Code";
         if (docsPanel      != null) docsPanel.IsVisible      = has && _activeNavTab == "Docs";
 
@@ -474,6 +476,7 @@ public partial class MainWindow : Window
             ("NavScanBtn",    "Scan"),
             ("NavMonitorBtn", "Monitor"),
             ("NavGraphBtn",   "Graph"),
+            ("NavGymBtn",     "Gym"),
             ("NavCodeBtn",    "Code"),
             ("NavDocsBtn",    "Docs"),
         };
@@ -497,6 +500,27 @@ public partial class MainWindow : Window
                     Avalonia.Media.Color.Parse(NavTabInactiveForeground));
             }
         }
+    }
+
+    private void OnGymGameClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag })
+            return;
+
+        var parts = tag.Split('|', 3);
+        if (parts.Length != 3)
+            return;
+
+        var title = this.FindControl<TextBlock>("GymSelectedTitleText");
+        var description = this.FindControl<TextBlock>("GymSelectedDescriptionText");
+        var output = this.FindControl<TextBlock>("GymSelectedOutputText");
+
+        if (title != null) title.Text = parts[0];
+        if (description != null) description.Text = parts[1];
+        if (output != null) output.Text = parts[2];
+
+        if (_statusTextTb != null)
+            _statusTextTb.Text = $"Gym game selected: {parts[0]}";
     }
 
     /// <summary>Refreshes the workspace name displayed in the top-bar dropdown button and the sidebar.</summary>
