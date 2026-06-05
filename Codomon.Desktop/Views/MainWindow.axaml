@@ -872,7 +872,7 @@
                               Click="OnGymGameClick"
                               Tag="Reconnect the Wires|Some relationships are hidden and the user reconnects calls, imports, dependencies, or spots a wrong edge.|Teaches which components call, import, depend on, or should not depend on each other.">
                         <StackPanel Spacing="5">
-                          <TextBlock Text="🔌 Reconnect Wires" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="🔌 Reconnect the Wires" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Restore missing relationships." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Button>
@@ -890,7 +890,7 @@
                               Click="OnGymGameClick"
                               Tag="What is missing here?|Show a node or subgraph and ask the user to write missing docs, runtime edges, naming concerns, scan gaps, or architecture TODOs.|Produces MissingInfoNote entries tied to a target node or subgraph.">
                         <StackPanel Spacing="5">
-                          <TextBlock Text="❓ Missing Info" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="❓ What is missing here?" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Write what needs to exist." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Button>
@@ -899,7 +899,7 @@
                               Click="OnGymGameClick"
                               Tag="Name this cluster|Show a cluster of nodes and ask the user to name the architectural concept it represents.|Captures human labels for clusters, feature areas, integration layers, and bounded contexts.">
                         <StackPanel Spacing="5">
-                          <TextBlock Text="🧠 Name Cluster" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="🧠 Name this cluster" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Name architectural concepts." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Button>
@@ -908,7 +908,7 @@
                               Click="OnGymGameClick"
                               Tag="Find the odd one out|Show several nodes from a cluster and ask which one does not belong.|Surfaces weak clustering, misplaced components, and confusing boundaries.">
                         <StackPanel Spacing="5">
-                          <TextBlock Text="🕵 Odd One Out" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="🕵 Find the odd one out" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Spot an unrelated node." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Button>

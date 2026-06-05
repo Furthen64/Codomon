@@ -511,7 +511,12 @@ public partial class MainWindow : Window
 
         var parts = tag.Split(GymGameTagDelimiter, ExpectedGymGameTagParts);
         if (parts.Length != ExpectedGymGameTagParts)
+        {
+            AppLogger.Warn($"[Gym] Ignoring malformed game tag: '{tag}'");
+            if (_statusTextTb != null)
+                _statusTextTb.Text = "Gym game selection is malformed.";
             return;
+        }
 
         var title = this.FindControl<TextBlock>("GymSelectedTitleText");
         var description = this.FindControl<TextBlock>("GymSelectedDescriptionText");
