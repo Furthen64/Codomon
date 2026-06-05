@@ -431,7 +431,6 @@ public partial class MainWindow : Window
     private const string OverviewActionArchitecture = "architecture";
     private const string OverviewActionGraph = "graph";
     private const char GymGameTagDelimiter = '|';
-    private const int ExpectedGymGameTagParts = 3;
 
     private static readonly string[] SourceSnapshotExtensions =
     {
@@ -509,8 +508,7 @@ public partial class MainWindow : Window
         if (sender is not Button { Tag: string tag })
             return;
 
-        var parts = tag.Split(GymGameTagDelimiter, ExpectedGymGameTagParts);
-        if (parts.Length != ExpectedGymGameTagParts)
+        if (tag.Split(GymGameTagDelimiter) is not [var gameTitle, var gameDescription, var gameOutput])
         {
             AppLogger.Warn($"[Gym] Ignoring malformed game tag: '{tag}'");
             if (_statusTextTb != null)
@@ -518,16 +516,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        var title = this.FindControl<TextBlock>("GymSelectedTitleText");
-        var description = this.FindControl<TextBlock>("GymSelectedDescriptionText");
-        var output = this.FindControl<TextBlock>("GymSelectedOutputText");
+        var titleControl = this.FindControl<TextBlock>("GymSelectedTitleText");
+        var descriptionControl = this.FindControl<TextBlock>("GymSelectedDescriptionText");
+        var outputControl = this.FindControl<TextBlock>("GymSelectedOutputText");
 
-        if (title != null) title.Text = parts[0];
-        if (description != null) description.Text = parts[1];
-        if (output != null) output.Text = parts[2];
+        if (titleControl != null) titleControl.Text = gameTitle;
+        if (descriptionControl != null) descriptionControl.Text = gameDescription;
+        if (outputControl != null) outputControl.Text = gameOutput;
 
         if (_statusTextTb != null)
-            _statusTextTb.Text = $"Gym game selected: {parts[0]}";
+            _statusTextTb.Text = $"Gym game selected: {gameTitle}";
     }
 
     /// <summary>Refreshes the workspace name displayed in the top-bar dropdown button and the sidebar.</summary>
