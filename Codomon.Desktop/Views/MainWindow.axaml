@@ -881,16 +881,16 @@
                               Click="OnGymGameClick"
                               Tag="Backend Puzzle Assembly|Arrange controllers, services, repositories, models, events, logging, configuration, and external APIs into a reasonable backend structure.|Reinforces layers, ownership, dependency direction, and infrastructure versus domain boundaries.">
                         <StackPanel Spacing="5">
-                          <TextBlock Text="🧩 Backend Assembly" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="🧩 Backend Puzzle Assembly" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Assemble architecture pieces." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Button>
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="What is missing here?|Show a node or subgraph and ask the user to write missing docs, runtime edges, naming concerns, scan gaps, or architecture TODOs.|Produces MissingInfoNote entries tied to a target node or subgraph.">
+                              Tag="What is missing here|Show a node or subgraph and ask the user to write missing docs, runtime edges, naming concerns, scan gaps, or architecture TODOs.|Produces MissingInfoNote entries tied to a target node or subgraph.">
                         <StackPanel Spacing="5">
-                          <TextBlock Text="❓ What is missing here?" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                          <TextBlock Text="❓ What is missing here" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Write what needs to exist." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Button>
