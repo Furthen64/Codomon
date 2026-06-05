@@ -852,7 +852,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Graph Unclutter|Drag nodes apart, group related areas, reduce crossings, pin important nodes, and mark noise as less important.|Score layout improvements: fewer crossings, shorter average edge length, fewer label overlaps, clearer clusters, and namespace/project grouping bonuses.">
+                              Tag="GraphUnclutter">
                         <StackPanel Spacing="5">
                           <TextBlock Text="🧶 Graph Unclutter" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Clean up a messy subgraph." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -861,7 +861,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Lost Labels|Class, module, namespace, method, or event names fade out and the user recalls or chooses what belongs there.|Creates UserKnowledgeCheckpoint signals for recognized components, confusing names, and memorable or forgettable parts of the codebase.">
+                              Tag="LostLabels">
                         <StackPanel Spacing="5">
                           <TextBlock Text="🏷 Lost Labels" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Remember missing node names." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -870,7 +870,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Reconnect the Wires|Some relationships are hidden and the user reconnects calls, imports, dependencies, or spots a wrong edge.|Teaches which components call, import, depend on, or should not depend on each other.">
+                              Tag="ReconnectWires">
                         <StackPanel Spacing="5">
                           <TextBlock Text="🔌 Reconnect the Wires" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Restore missing relationships." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -879,7 +879,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Backend Puzzle Assembly|Arrange controllers, services, repositories, models, events, logging, configuration, and external APIs into a reasonable backend structure.|Reinforces layers, ownership, dependency direction, and infrastructure versus domain boundaries.">
+                              Tag="BackendPuzzleAssembly">
                         <StackPanel Spacing="5">
                           <TextBlock Text="🧩 Backend Puzzle Assembly" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Assemble architecture pieces." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -888,7 +888,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="What is missing here|Show a node or subgraph and ask the user to write missing docs, runtime edges, naming concerns, scan gaps, or architecture TODOs.|Produces MissingInfoNote entries tied to a target node or subgraph.">
+                              Tag="MissingInfo">
                         <StackPanel Spacing="5">
                           <TextBlock Text="❓ What is missing here" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Write what needs to exist." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -897,7 +897,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Name this cluster|Show a cluster of nodes and ask the user to name the architectural concept it represents.|Captures human labels for clusters, feature areas, integration layers, and bounded contexts.">
+                              Tag="NameCluster">
                         <StackPanel Spacing="5">
                           <TextBlock Text="🧠 Name this cluster" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Name architectural concepts." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -906,7 +906,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Find the odd one out|Show several nodes from a cluster and ask which one does not belong.|Surfaces weak clustering, misplaced components, and confusing boundaries.">
+                              Tag="OddOneOut">
                         <StackPanel Spacing="5">
                           <TextBlock Text="🕵 Find the odd one out" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Spot an unrelated node." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
@@ -915,7 +915,7 @@
                       <Button Margin="0,0,12,12" Padding="14,12"
                               HorizontalContentAlignment="Stretch"
                               Click="OnGymGameClick"
-                              Tag="Dependency Court|Show an edge and ask whether it should exist: expected, smell, unknown, one-way only, or runtime-only.|Turns architecture review into lightweight judgment calls about dependency health.">
+                              Tag="DependencyCourt">
                         <StackPanel Spacing="5">
                           <TextBlock Text="⚖ Dependency Court" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                           <TextBlock Text="Judge dependency edges." FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
