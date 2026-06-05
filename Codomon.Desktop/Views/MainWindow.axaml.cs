@@ -544,7 +544,7 @@ public partial class MainWindow : Window
             _ => default
         };
 
-        if (game == default)
+        if (string.IsNullOrEmpty(game.Title))
         {
             AppLogger.Warn($"[Gym] Ignoring unknown game tag: '{tag}'");
             if (_statusTextTb != null)
