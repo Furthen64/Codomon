@@ -424,17 +424,19 @@ public class GraphViewModel : INotifyPropertyChanged
         foreach (var module in modules)
         {
             if (!lowConf && module.Confidence == ConfidenceLevel.Unknown) continue;
+            var moduleOriginHint = ResolveModuleOriginHint(module);
 
             var node = new NodeViewModel
             {
                 Key = module.Id,
                 Title = module.Name,
-                Subtitle = $"{module.CodeNodes.Count} code node(s)",
+                Subtitle = BuildModuleSubtitle(module.CodeNodes.Count, moduleOriginHint),
                 KindLabel = module.Kind.ToString(),
                 KindBadgeBackground = "#1E3A5F",
                 KindBadgeForeground = "#8BD4FF",
                 EntityType = "Module",
                 Confidence = module.Confidence.ToString(),
+                FullName = string.IsNullOrWhiteSpace(moduleOriginHint) ? string.Empty : $"Origin: {moduleOriginHint}",
                 ModuleName = module.Name,
                 SystemName = system.Name,
                 RelatedFiles = module.CodeNodes
@@ -459,7 +461,7 @@ public class GraphViewModel : INotifyPropertyChanged
             return null;
         }
 
-        var relCounts = new Dictionary<(string From, string To, RelationshipKind Kind), int>();
+        var relCounts = new Dictionary<(string From, string To), Dictionary<RelationshipKind, int>>();
 
         foreach (var rel in map.Relationships)
         {
@@ -472,15 +474,37 @@ public class GraphViewModel : INotifyPropertyChanged
             if (!nodeMap.ContainsKey(fromModuleId) || !nodeMap.ContainsKey(toModuleId)) continue;
             if (string.Equals(fromModuleId, toModuleId, StringComparison.Ordinal)) continue;
 
-            var key = (fromModuleId, toModuleId, rel.Kind);
-            relCounts.TryGetValue(key, out var count);
-            relCounts[key] = count + 1;
+            var key = (fromModuleId, toModuleId);
+            if (!relCounts.TryGetValue(key, out var kindCounts))
+            {
+                kindCounts = new Dictionary<RelationshipKind, int>();
+                relCounts[key] = kindCounts;
+            }
+
+            kindCounts.TryGetValue(rel.Kind, out var count);
+            kindCounts[rel.Kind] = count + 1;
         }
 
-        foreach (var kvp in relCounts)
+        var processedPairs = new HashSet<(string From, string To)>();
+        foreach (var key in relCounts.Keys.OrderBy(k => k.From, StringComparer.Ordinal).ThenBy(k => k.To, StringComparer.Ordinal))
         {
-            var (fromId, toId, kind) = kvp.Key;
-            var count = kvp.Value;
+            if (processedPairs.Contains(key))
+                continue;
+
+            var reverseKey = (key.To, key.From);
+            relCounts.TryGetValue(reverseKey, out var reverseKindCounts);
+            var hasReverse = reverseKindCounts != null;
+
+            var forwardKindCounts = relCounts[key];
+            var forwardTotal = TotalRelationshipCount(forwardKindCounts);
+            var reverseTotal = hasReverse ? TotalRelationshipCount(reverseKindCounts!) : 0;
+
+            bool keepForwardDirection = !hasReverse
+                || forwardTotal > reverseTotal
+                || (forwardTotal == reverseTotal && string.CompareOrdinal(key.From, key.To) <= 0);
+
+            var fromId = keepForwardDirection ? key.From : key.To;
+            var toId = keepForwardDirection ? key.To : key.From;
 
             var fromNode = nodeMap[fromId];
             var toNode   = nodeMap[toId];
@@ -488,9 +512,17 @@ public class GraphViewModel : INotifyPropertyChanged
             fromNode.OutputConnector.IsConnected = true;
             toNode.InputConnector.IsConnected    = true;
 
-            var label = count > 1 ? $"{kind} x{count}" : kind.ToString();
+            var label = hasReverse
+                ? BuildBidirectionalRelationshipLabel(
+                    keepForwardDirection ? forwardKindCounts : reverseKindCounts!,
+                    keepForwardDirection ? reverseKindCounts! : forwardKindCounts)
+                : BuildRelationshipKindCountsLabel(forwardKindCounts);
             Connections.Add(new ConnectionViewModel(fromNode.OutputConnector, toNode.InputConnector, label));
             _nodeEdges.Add((fromNode, toNode));
+
+            processedPairs.Add(key);
+            if (hasReverse)
+                processedPairs.Add(reverseKey);
         }
 
         foreach (var node in Nodes) node.ChildCount = 0;
@@ -1319,6 +1351,52 @@ public class GraphViewModel : INotifyPropertyChanged
             ?.Name
             ?? "(unknown system)";
     }
+
+    private static string ResolveModuleOriginHint(ModuleModel module)
+    {
+        var bestFilePath = module.CodeNodes
+            .Select(node => node.FilePath)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .OrderBy(path => path.Count(c => c is '/' or '\\'))
+            .ThenBy(path => path.Length)
+            .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+
+        if (!string.IsNullOrWhiteSpace(bestFilePath))
+        {
+            var directory = Path.GetDirectoryName(bestFilePath)?.Replace('\\', '/');
+            if (!string.IsNullOrWhiteSpace(directory))
+                return directory;
+            return bestFilePath;
+        }
+
+        return module.Evidence
+            .Select(evidence => evidence.SourceRef)
+            .FirstOrDefault(sourceRef => !string.IsNullOrWhiteSpace(sourceRef))
+            ?? string.Empty;
+    }
+
+    private static string BuildModuleSubtitle(int codeNodeCount, string moduleOriginHint)
+    {
+        var countLabel = $"{codeNodeCount} code node(s)";
+        return string.IsNullOrWhiteSpace(moduleOriginHint)
+            ? countLabel
+            : $"{countLabel} · {moduleOriginHint}";
+    }
+
+    private static int TotalRelationshipCount(IReadOnlyDictionary<RelationshipKind, int> kindCounts)
+        => kindCounts.Sum(kvp => kvp.Value);
+
+    private static string BuildRelationshipKindCountsLabel(IReadOnlyDictionary<RelationshipKind, int> kindCounts)
+        => string.Join(", ",
+            kindCounts
+                .OrderBy(kvp => kvp.Key)
+                .Select(kvp => kvp.Value > 1 ? $"{kvp.Key} x{kvp.Value}" : kvp.Key.ToString()));
+
+    private static string BuildBidirectionalRelationshipLabel(
+        IReadOnlyDictionary<RelationshipKind, int> forwardKinds,
+        IReadOnlyDictionary<RelationshipKind, int> reverseKinds)
+        => $"Bi-dir · {BuildRelationshipKindCountsLabel(forwardKinds)} ↔ {BuildRelationshipKindCountsLabel(reverseKinds)}";
 
     private static string KindBadgeBackgroundForCodeNode(CodeNodeKind kind) => kind switch
     {
