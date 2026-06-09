@@ -70,6 +70,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private string? _codeNodeModuleId;
     private int _autoAlignRequestToken;
     private readonly Dictionary<string, Point> _savedPositions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, double> _savedNodeSizes = new(StringComparer.Ordinal);
     private string _breadcrumbSystemLabel = "System Map";
     private string _breadcrumbModuleLabel = "Module";
     private string _breadcrumbCodeNodesLabel = "Code nodes";
@@ -181,6 +182,9 @@ public class GraphViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelectedNode));
             OnPropertyChanged(nameof(SelectedNodeName));
+            OnPropertyChanged(nameof(SelectedNodeSizePercent));
+            OnPropertyChanged(nameof(CanIncreaseSelectedNodeSize));
+            OnPropertyChanged(nameof(CanDecreaseSelectedNodeSize));
             UpdateSelectedNodeDetails();
         }
     }
@@ -226,6 +230,11 @@ public class GraphViewModel : INotifyPropertyChanged
     public ObservableCollection<GraphNodeFileVm> SelectedNodeFiles => _selectedNodeFiles;
     public ObservableCollection<GraphCallerVm> SelectedNodeCallers => _selectedNodeCallers;
     public bool HasSelectedNodeCallers => _selectedNodeCallers.Count > 0;
+    public string SelectedNodeSizePercent => SelectedNode == null
+        ? "100%"
+        : $"{Math.Round(SelectedNode.SizeMultiplier * 100):0}%";
+    public bool CanIncreaseSelectedNodeSize => SelectedNode?.SizeMultiplier < NodeViewModel.MaxSizeMultiplier;
+    public bool CanDecreaseSelectedNodeSize => SelectedNode?.SizeMultiplier > NodeViewModel.MinSizeMultiplier;
 
     // ── Workspace context ─────────────────────────────────────────────────────
 
@@ -444,6 +453,7 @@ public class GraphViewModel : INotifyPropertyChanged
                     .Where(p => !string.IsNullOrWhiteSpace(p))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
+                SizeMultiplier = GetSavedNodeSize(module.Id),
                 Location = _savedPositions.TryGetValue(module.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, autoY)
@@ -595,6 +605,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 RelatedFiles = string.IsNullOrWhiteSpace(codeNode.FilePath)
                     ? Array.Empty<string>()
                     : new[] { codeNode.FilePath },
+                SizeMultiplier = GetSavedNodeSize(codeNode.Id),
                 Location = _savedPositions.TryGetValue(codeNode.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, defaultCodeNodeStartY)
@@ -670,6 +681,7 @@ public class GraphViewModel : INotifyPropertyChanged
                     .Where(p => !string.IsNullOrWhiteSpace(p))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
+                SizeMultiplier = GetSavedNodeSize(sys.Id),
                 Location = _savedPositions.TryGetValue(sys.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, autoY)
@@ -693,6 +705,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 KindBadgeForeground = "#C5A9FF",
                 EntityType = "External System",
                 Confidence = ext.Confidence.ToString(),
+                SizeMultiplier = GetSavedNodeSize(ext.Id),
                 Location = _savedPositions.TryGetValue(ext.Id, out var savedPosition)
                     ? savedPosition
                     : new Point(autoX, autoY + 160)
@@ -801,7 +814,7 @@ public class GraphViewModel : INotifyPropertyChanged
             double x = hasSavedPosition ? sys.X : autoX;
             double y = hasSavedPosition ? sys.Y : autoY;
 
-            var node = new NodeViewModel { Key = sys.Id, Title = sys.Name, Location = new Point(x, y) };
+            var node = new NodeViewModel { Key = sys.Id, Title = sys.Name, SizeMultiplier = GetSavedNodeSize(sys.Id), Location = new Point(x, y) };
             node.Subtitle = "System";
             node.KindLabel = "System";
             node.KindBadgeBackground = "#1F4335";
@@ -1049,6 +1062,39 @@ public class GraphViewModel : INotifyPropertyChanged
                 _savedPositions[node.Key] = node.Location;
         }
     }
+
+    public void IncreaseSelectedNodeSize()
+    {
+        AdjustSelectedNodeSize(NodeViewModel.SizeStep);
+    }
+
+    public void DecreaseSelectedNodeSize()
+    {
+        AdjustSelectedNodeSize(-NodeViewModel.SizeStep);
+    }
+
+    private void AdjustSelectedNodeSize(double delta)
+    {
+        if (SelectedNode == null)
+            return;
+
+        var previous = SelectedNode.SizeMultiplier;
+        SelectedNode.SizeMultiplier += delta;
+        if (Math.Abs(previous - SelectedNode.SizeMultiplier) < 0.001)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(SelectedNode.Key))
+            _savedNodeSizes[SelectedNode.Key] = SelectedNode.SizeMultiplier;
+
+        OnPropertyChanged(nameof(SelectedNodeSizePercent));
+        OnPropertyChanged(nameof(CanIncreaseSelectedNodeSize));
+        OnPropertyChanged(nameof(CanDecreaseSelectedNodeSize));
+    }
+
+    private double GetSavedNodeSize(string nodeKey)
+        => !string.IsNullOrWhiteSpace(nodeKey) && _savedNodeSizes.TryGetValue(nodeKey, out var size)
+            ? Math.Clamp(size, NodeViewModel.MinSizeMultiplier, NodeViewModel.MaxSizeMultiplier)
+            : 1d;
 
     private void UpdateBreadcrumbs(SystemModel? system, ModuleModel? module)
     {

@@ -152,6 +152,7 @@
       <!-- ── Graph Canvas ───────────────────────────────────────────────────── -->
       <nodify:NodifyEditor x:Name="Editor"
                            Grid.Column="0"
+                           DisplayConnectionsOnTop="False"
                            ItemsSource="{Binding Nodes}"
                            Connections="{Binding Connections}">
 
@@ -161,26 +162,30 @@
             <nodify:Node Input="{Binding Inputs}"
                          Output="{Binding Outputs}"
                          BorderThickness="{Binding BorderThickness}"
+                         MinWidth="{Binding NodeMinWidth}"
                          PointerPressed="OnNodePointerPressed">
 
               <nodify:Node.Header>
                 <StackPanel Spacing="4">
                   <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Title}"
+                               FontWeight="SemiBold"
+                               FontSize="{Binding TitleFontSize}"
+                               TextWrapping="Wrap"/>
                     <TextBlock Text="●"
                                IsVisible="{Binding IsCodeLeaf}"
-                               FontSize="18"
+                               FontSize="{Binding LeafIndicatorFontSize}"
                                Foreground="#8BD4FF"
                                VerticalAlignment="Center"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Border Background="{Binding KindBadgeBackground}" CornerRadius="3" Padding="5,2">
-                      <TextBlock Text="{Binding KindLabel}" FontSize="10"
+                      <TextBlock Text="{Binding KindLabel}" FontSize="{Binding BadgeFontSize}"
                                  Foreground="{Binding KindBadgeForeground}" FontWeight="SemiBold"/>
                     </Border>
-                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#8FA5BC"
+                    <TextBlock Text="{Binding Subtitle}" FontSize="{Binding SubtitleFontSize}" Foreground="#8FA5BC"
                                VerticalAlignment="Center"
-                               MaxWidth="170"
+                               MaxWidth="{Binding SubtitleMaxWidth}"
                                TextTrimming="CharacterEllipsis"/>
                   </StackPanel>
                 </StackPanel>
@@ -243,6 +248,22 @@
               <TextBlock Text="{Binding SelectedNodeConfidence}" Foreground="#778899"/>
               <TextBlock Text="{Binding SelectedNodeSystem}" Foreground="#778899"/>
               <TextBlock Text="{Binding SelectedNodeModule}" Foreground="#778899"/>
+
+              <Border Height="1" Background="#2A3F5A" Margin="0,4,0,0"/>
+              <TextBlock Text="Node size" Foreground="#AABBCC" FontWeight="SemiBold"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="−"
+                        Click="OnDecreaseNodeSizeClick"
+                        IsEnabled="{Binding CanDecreaseSelectedNodeSize}"
+                        Padding="8,2"/>
+                <TextBlock Text="{Binding SelectedNodeSizePercent}"
+                           Foreground="#AABBCC"
+                           VerticalAlignment="Center"/>
+                <Button Content="+"
+                        Click="OnIncreaseNodeSizeClick"
+                        IsEnabled="{Binding CanIncreaseSelectedNodeSize}"
+                        Padding="8,2"/>
+              </StackPanel>
 
               <Border Height="1" Background="#2A3F5A" Margin="0,4,0,0"/>
               <TextBlock Text="Files" Foreground="#AABBCC" FontWeight="SemiBold"/>

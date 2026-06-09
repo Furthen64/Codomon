@@ -9,6 +9,10 @@ namespace Codomon.Desktop.ViewModels;
 
 public class NodeViewModel : INotifyPropertyChanged
 {
+    public const double MinSizeMultiplier = 0.8;
+    public const double MaxSizeMultiplier = 2.2;
+    public const double SizeStep = 0.2;
+
     private string _key = string.Empty;
     private string _title = string.Empty;
     private string _subtitle = string.Empty;
@@ -24,6 +28,7 @@ public class NodeViewModel : INotifyPropertyChanged
     private int _childCount;
     private bool _isCodeLeaf;
     private IReadOnlyList<string> _relatedFiles = Array.Empty<string>();
+    private double _sizeMultiplier = 1d;
 
     public string Key
     {
@@ -138,6 +143,32 @@ public class NodeViewModel : INotifyPropertyChanged
         get => _isCodeLeaf;
         set { _isCodeLeaf = value; OnPropertyChanged(); }
     }
+
+    public double SizeMultiplier
+    {
+        get => _sizeMultiplier;
+        set
+        {
+            var clamped = Math.Clamp(value, MinSizeMultiplier, MaxSizeMultiplier);
+            if (Math.Abs(_sizeMultiplier - clamped) < 0.001) return;
+
+            _sizeMultiplier = clamped;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(NodeMinWidth));
+            OnPropertyChanged(nameof(TitleFontSize));
+            OnPropertyChanged(nameof(BadgeFontSize));
+            OnPropertyChanged(nameof(SubtitleFontSize));
+            OnPropertyChanged(nameof(SubtitleMaxWidth));
+            OnPropertyChanged(nameof(LeafIndicatorFontSize));
+        }
+    }
+
+    public double NodeMinWidth => 190 * _sizeMultiplier;
+    public double TitleFontSize => 14 * _sizeMultiplier;
+    public double BadgeFontSize => 10 * _sizeMultiplier;
+    public double SubtitleFontSize => 10 * _sizeMultiplier;
+    public double SubtitleMaxWidth => 170 * _sizeMultiplier;
+    public double LeafIndicatorFontSize => 18 * _sizeMultiplier;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
