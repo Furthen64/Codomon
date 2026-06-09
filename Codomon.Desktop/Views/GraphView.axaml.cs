@@ -134,6 +134,18 @@ public partial class GraphView : UserControl
         vm.SelectNode(ctrl.DataContext as NodeViewModel);
     }
 
+    private void OnIncreaseNodeSizeClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not GraphViewModel vm) return;
+        vm.IncreaseSelectedNodeSize();
+    }
+
+    private void OnDecreaseNodeSizeClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not GraphViewModel vm) return;
+        vm.DecreaseSelectedNodeSize();
+    }
+
     private void OnFileClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button button) return;
