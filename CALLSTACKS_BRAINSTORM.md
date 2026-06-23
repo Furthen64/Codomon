@@ -1,10 +1,10 @@
-# Callstacks Brainstorm
+# Call Stacks Brainstorm
 
 ## Rough idea
 
-Codomon could help users study an app by recording what happens during focused Start → Middle → End (SME) test runs. The user performs one user story at a time, signals when the story starts and ends, and Codomon stores the captured runtime evidence for that run.
+Codomon could help users study an app by recording what happens during focused Start → Middle → End (SME) test runs. In this note, SME specifically means Start → Middle → End, not subject matter expert. The user performs one user story at a time, signals when the story starts and ends, and Codomon stores the captured runtime evidence for that run.
 
-The key evidence for this brainstorm is callstack data, paired with errors and timestamps, so Codomon can later help connect user actions, runtime behavior, and failures.
+The key evidence for this brainstorm is call stack data, paired with errors and timestamps, so Codomon can later help connect user actions, runtime behavior, and failures.
 
 ## Assumptions
 
@@ -12,14 +12,14 @@ The key evidence for this brainstorm is callstack data, paired with errors and t
 - The user can signal when each SME starts and ends.
 - Each SME run is stored separately, for example in a folder like `sme0001/`.
 - Runtime errors can be captured with timestamps.
-- Runtime callstacks can be sampled during the run.
-- Callstack sampling frequency should be tweakable, because capturing every callstack may be too noisy or expensive.
+- Runtime call stacks can be sampled during the run.
+- Call stack sampling frequency should be tweakable, because capturing every call stack may be too noisy or expensive.
 
 ## Possible capture paths
 
 ### Codomon attaches to the app
 
-Codomon could connect directly to the target app while the user performs an SME. During the run, Codomon samples runtime callstacks and writes them into the SME folder.
+Codomon could connect directly to the target app while the user performs an SME. During the run, Codomon samples runtime call stacks and writes them into the SME folder.
 
 Questions:
 
@@ -30,11 +30,11 @@ Questions:
 
 ### Visual Studio or VS Code integration
 
-Visual Studio, VS Code, or an extension could provide callstack data while the target app is being debugged. Codomon might consume exported debugger data instead of attaching directly.
+Visual Studio, VS Code, or an extension could provide call stack data while the target app is being debugged. Codomon might consume exported debugger data instead of attaching directly.
 
 Questions:
 
-- Can IDE debugger APIs expose callstacks continuously or on demand?
+- Can IDE debugger APIs expose call stacks continuously or on demand?
 - Can the IDE mark SME start and end events?
 - Would this work only for developer workflows, or could it also work for non-developer users?
 - How portable is this across languages, runtimes, and platforms?
@@ -45,7 +45,7 @@ Another tool could capture stack samples, traces, exceptions, or profiling data.
 
 Questions:
 
-- Which existing tools already sample callstacks well?
+- Which existing tools already sample call stacks well?
 - Can they export simple CSV or structured trace data?
 - Can they be automated around SME start/end boundaries?
 - Is their output stable enough for Codomon to rely on?
@@ -103,16 +103,16 @@ Possible fields:
 ## Things Codomon could learn from the data
 
 - Which code paths appear during a specific user story.
-- Which callstacks are common across many SMEs.
-- Which callstacks are unique to one SME.
+- Which call stacks are common across many SMEs.
+- Which call stacks are unique to one SME.
 - Which errors happen near specific stack samples.
 - Which user stories touch the same functions, modules, or layers.
 - Whether a suspected feature area is actually exercised by the SME.
 
 ## Open questions
 
-- Should Codomon optimize for debugger-style exact callstacks or profiler-style sampled callstacks?
-- Should errors and callstacks share a common event timeline format?
+- Should Codomon optimize for debugger-style exact call stacks or profiler-style sampled call stacks?
+- Should errors and call stacks share a common event timeline format?
 - How should Codomon handle missing symbols, native frames, async frames, and generated code?
 - Should the first version support only one runtime or be import-first and tool-agnostic?
 - How should noisy framework/library frames be filtered?
