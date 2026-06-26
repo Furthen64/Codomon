@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Codomon.Desktop.Services;
 using Markdig;
+using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using System;
@@ -222,6 +223,9 @@ public partial class DocsBrowserView : UserControl
             case ListBlock list:
                 host.Children.Add(CreateListBlock(list, nestingLevel));
                 break;
+            case Table table:
+                host.Children.Add(CreateTableBlock(table, nestingLevel));
+                break;
             case FencedCodeBlock fencedCode:
                 host.Children.Add(CreateCodeBlock(fencedCode));
                 break;
@@ -235,6 +239,8 @@ public partial class DocsBrowserView : UserControl
                     Background = RuleBrush,
                     Margin = new Avalonia.Thickness(0, 4, 0, 4)
                 });
+                break;
+            case LinkReferenceDefinitionGroup:
                 break;
             default:
                 host.Children.Add(CreateFallbackBlock(block));
@@ -341,6 +347,69 @@ public partial class DocsBrowserView : UserControl
         Grid.SetColumn(content, 1);
         row.Children.Add(content);
         return row;
+    }
+
+    private static Control CreateTableBlock(Table table, int nestingLevel)
+    {
+        var rows = table.OfType<TableRow>().ToList();
+        if (rows.Count == 0)
+            return CreateMessageBlock(string.Empty);
+
+        var columnCount = Math.Max(
+            table.ColumnDefinitions.Count,
+            rows.Select(row => row.OfType<TableCell>().Count()).DefaultIfEmpty(0).Max());
+
+        if (columnCount == 0)
+            return CreateMessageBlock(string.Empty);
+
+        var grid = new Grid
+        {
+            Margin = new Avalonia.Thickness(nestingLevel * 18, 4, 0, 4),
+            RowDefinitions = new RowDefinitions(string.Join(",", Enumerable.Repeat("Auto", rows.Count))),
+            ColumnDefinitions = new ColumnDefinitions(string.Join(",", Enumerable.Repeat("*", columnCount)))
+        };
+
+        for (var rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+        {
+            var row = rows[rowIndex];
+            var cells = row.OfType<TableCell>().ToList();
+
+            for (var columnIndex = 0; columnIndex < columnCount; columnIndex++)
+            {
+                var cellContent = new StackPanel
+                {
+                    Spacing = 4
+                };
+
+                if (columnIndex < cells.Count)
+                {
+                    foreach (var child in cells[columnIndex])
+                        AddBlock(cellContent, child, nestingLevel + 1);
+                }
+
+                var border = new Border
+                {
+                    BorderBrush = RuleBrush,
+                    BorderThickness = new Avalonia.Thickness(1),
+                    Background = row.IsHeader
+                        ? new SolidColorBrush(Color.Parse("#18283A"))
+                        : new SolidColorBrush(Color.Parse("#101A27")),
+                    Padding = new Avalonia.Thickness(8, 6),
+                    Child = cellContent
+                };
+
+                Grid.SetRow(border, rowIndex);
+                Grid.SetColumn(border, columnIndex);
+                grid.Children.Add(border);
+            }
+        }
+
+        return new Border
+        {
+            BorderBrush = RuleBrush,
+            BorderThickness = new Avalonia.Thickness(1),
+            Child = grid
+        };
     }
 
     private static Control CreateCodeBlock(CodeBlock codeBlock)
