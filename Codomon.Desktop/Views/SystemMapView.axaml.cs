@@ -92,6 +92,8 @@ public partial class SystemMapView : UserControl
         public required string ItemId { get; init; }
         public required bool IsExternal { get; init; }
         public required Action ClickAction { get; init; }
+        public Action? DoubleClickAction { get; init; }
+        public int ClickCount { get; init; }
         public Point PointerOffset { get; init; }
         public Point StartPosition { get; init; }
         public bool WasDragged { get; set; }
@@ -428,6 +430,18 @@ public partial class SystemMapView : UserControl
             details.Children.Add(moduleInfo);
         }
 
+        if (!string.IsNullOrWhiteSpace(item.Description))
+        {
+            details.Children.Add(new TextBlock
+            {
+                Text         = item.Description,
+                Foreground   = new SolidColorBrush(Color.Parse(CardSecondaryFgHex)),
+                FontSize     = 11,
+                TextWrapping = TextWrapping.Wrap,
+                MaxLines     = 2
+            });
+        }
+
         if (!string.IsNullOrEmpty(item.StartupMechanism))
         {
             details.Children.Add(new TextBlock
@@ -458,7 +472,7 @@ public partial class SystemMapView : UserControl
             WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
             {
                 _vm.SelectSystem(item);
-            });
+            }, () => ShowDetailedRelationshipsRequested?.Invoke(item));
         }
 
         return card;
@@ -1252,7 +1266,7 @@ public partial class SystemMapView : UserControl
             WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
             {
                 _vm.SelectSystem(item);
-            });
+            }, () => ShowDetailedRelationshipsRequested?.Invoke(item));
         }
 
         return card;
@@ -1567,9 +1581,15 @@ public partial class SystemMapView : UserControl
         return Math.Clamp(mapped, 1, cellCount);
     }
 
-    private void WireOverviewCardDrag(Border card, Canvas canvas, string itemId, bool isExternal, Action clickAction)
+    private void WireOverviewCardDrag(
+        Border card,
+        Canvas canvas,
+        string itemId,
+        bool isExternal,
+        Action clickAction,
+        Action? doubleClickAction = null)
     {
-        card.PointerPressed += (_, e) => OnOverviewCardPointerPressed(e, card, canvas, itemId, isExternal, clickAction);
+        card.PointerPressed += (_, e) => OnOverviewCardPointerPressed(e, card, canvas, itemId, isExternal, clickAction, doubleClickAction);
         card.PointerMoved += (_, e) => OnOverviewCardPointerMoved(e, card);
         card.PointerReleased += (_, e) => OnOverviewCardPointerReleased(e, card);
         card.PointerCaptureLost += (_, _) =>
@@ -1585,7 +1605,8 @@ public partial class SystemMapView : UserControl
         Canvas canvas,
         string itemId,
         bool isExternal,
-        Action clickAction)
+        Action clickAction,
+        Action? doubleClickAction)
     {
         if (!e.GetCurrentPoint(card).Properties.IsLeftButtonPressed)
             return;
@@ -1601,6 +1622,8 @@ public partial class SystemMapView : UserControl
             ItemId = itemId,
             IsExternal = isExternal,
             ClickAction = clickAction,
+            DoubleClickAction = doubleClickAction,
+            ClickCount = e.ClickCount,
             PointerOffset = new Point(pointerPosition.X - currentX, pointerPosition.Y - currentY),
             StartPosition = new Point(currentX, currentY)
         };
@@ -1656,7 +1679,10 @@ public partial class SystemMapView : UserControl
         }
         else
         {
-            dragState.ClickAction();
+            if (dragState.ClickCount >= 2 && dragState.DoubleClickAction != null)
+                dragState.DoubleClickAction();
+            else
+                dragState.ClickAction();
         }
 
         e.Handled = true;

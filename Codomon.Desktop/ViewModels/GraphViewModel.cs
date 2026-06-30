@@ -448,6 +448,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 FullName = string.IsNullOrWhiteSpace(moduleOriginHint) ? string.Empty : $"Origin: {moduleOriginHint}",
                 ModuleName = module.Name,
                 SystemName = system.Name,
+                Summary = module.Notes,
                 RelatedFiles = module.CodeNodes
                     .Select(n => n.FilePath)
                     .Where(p => !string.IsNullOrWhiteSpace(p))
@@ -602,6 +603,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 FullName = codeNode.FullName,
                 ModuleName = module.Name,
                 SystemName = ownerSystem?.Name ?? string.Empty,
+                Summary = codeNode.Notes,
                 RelatedFiles = string.IsNullOrWhiteSpace(codeNode.FilePath)
                     ? Array.Empty<string>()
                     : new[] { codeNode.FilePath },
@@ -677,6 +679,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 KindBadgeForeground = "#7FE0B1",
                 EntityType = "System",
                 Confidence = sys.Confidence.ToString(),
+                Summary = sys.Notes,
                 RelatedFiles = sys.EntryPointCandidates
                     .Where(p => !string.IsNullOrWhiteSpace(p))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -705,6 +708,7 @@ public class GraphViewModel : INotifyPropertyChanged
                 KindBadgeForeground = "#C5A9FF",
                 EntityType = "External System",
                 Confidence = ext.Confidence.ToString(),
+                Summary = ext.Kind,
                 SizeMultiplier = GetSavedNodeSize(ext.Id),
                 Location = _savedPositions.TryGetValue(ext.Id, out var savedPosition)
                     ? savedPosition
@@ -1156,9 +1160,10 @@ public class GraphViewModel : INotifyPropertyChanged
         PopulateSelectedNodeCallers(node);
         PopulateCallerOverlay(node);
 
-        // Populate summary first paragraph for code nodes when a workspace is loaded.
-        string summaryText = string.Empty;
-        if (string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal)
+        string summaryText = node.Summary;
+        // Fall back to LLM summary files for code nodes when the System Map node has no notes.
+        if (string.IsNullOrWhiteSpace(summaryText)
+            && string.Equals(node.EntityType, CodeNodeEntityType, StringComparison.Ordinal)
             && !string.IsNullOrWhiteSpace(_workspaceFolderPath))
         {
             var filePath = node.RelatedFiles.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
