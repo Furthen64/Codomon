@@ -24,6 +24,7 @@ public class NodeViewModel : INotifyPropertyChanged
     private string _fullName = string.Empty;
     private string _moduleName = string.Empty;
     private string _systemName = string.Empty;
+    private string _summary = string.Empty;
     private Point _location;
     private int _childCount;
     private bool _isCodeLeaf;
@@ -94,6 +95,12 @@ public class NodeViewModel : INotifyPropertyChanged
     {
         get => _systemName;
         set { _systemName = value; OnPropertyChanged(); }
+    }
+
+    public string Summary
+    {
+        get => _summary;
+        set { _summary = value; OnPropertyChanged(); }
     }
 
     public IReadOnlyList<string> RelatedFiles

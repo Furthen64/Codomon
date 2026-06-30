@@ -429,7 +429,7 @@ public partial class MainWindow : Window
     private const string OverviewActionTechStack = "techstack";
     private const string OverviewActionSummaries = "summaries";
     private const string OverviewActionArchitecture = "architecture";
-    private const string OverviewActionGraph = "graph";
+    private const string OverviewActionSystemMap = "system-map";
 
     private static readonly string[] SourceSnapshotExtensions =
     {
@@ -2400,10 +2400,10 @@ public partial class MainWindow : Window
 
         return new OverviewRecommendation
         {
-            Title = "Explore architecture graph",
-            Description = "Codomon has current scan, summary, and architecture data. Open the graph to inspect the architecture map and navigate the codebase.",
-            ButtonText = "Open graph",
-            ActionKey = OverviewActionGraph
+            Title = "Explore architecture map",
+            Description = "Codomon has current scan, summary, and architecture data. Start in System Map to read the synthesized component cards, then double-click a card to inspect module interactions.",
+            ButtonText = "Open system map",
+            ActionKey = OverviewActionSystemMap
         };
     }
 
@@ -2538,8 +2538,8 @@ public partial class MainWindow : Window
             case OverviewActionArchitecture:
                 OnHypothesisClick(sender, e);
                 break;
-            case OverviewActionGraph:
-                OnOverviewOpenGraphClick(sender, e);
+            case OverviewActionSystemMap:
+                OnOverviewOpenSystemMapClick(sender, e);
                 break;
         }
     }
@@ -2549,6 +2549,12 @@ public partial class MainWindow : Window
 
     private void OnOverviewOpenGraphClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetActiveNavTab("Graph");
+
+    private void OnOverviewOpenSystemMapClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _vm.SystemMap.SetActiveView(SystemMapViewKind.SystemOverview);
+        SetActiveNavTab("Monitor");
+    }
 
     private void OnOverviewOpenMonitorClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetActiveNavTab("Monitor");
