@@ -2563,7 +2563,9 @@ public partial class MainWindow : Window
             using var stream = File.OpenRead(scans[0].FilePath);
             using var doc = JsonDocument.Parse(stream);
 
-            if (!doc.RootElement.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array)
+            if ((!doc.RootElement.TryGetProperty("Files", out var files) &&
+                 !doc.RootElement.TryGetProperty("files", out files)) ||
+                files.ValueKind != JsonValueKind.Array)
                 return 0;
 
             return files.GetArrayLength();
