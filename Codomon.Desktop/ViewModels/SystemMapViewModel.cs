@@ -69,6 +69,10 @@ public class ModuleItemVm
     public int CodeNodeCount   { get; init; }
     public string SystemId     { get; init; } = string.Empty;
     public HashSet<string> SystemIds { get; init; } = new(StringComparer.Ordinal);
+    public int OutboundRelationshipCount { get; init; }
+    public int InboundRelationshipCount { get; init; }
+    public IReadOnlyList<string> OutboundHighlights { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> InboundHighlights { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>Item view-model for a Code Node.</summary>
@@ -160,6 +164,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private bool _showStartupRelationships = false;
     private bool _showLowConfidenceItems = true;
     private bool _showOnlyHighValueCodeNodes = false;
+    private SystemMapModel? _currentModel;
 
     // Full unfiltered data — kept so filters can be re-applied without a full reload.
     private List<SystemItemVm>         _allSystems         = new();
@@ -174,6 +179,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     public ObservableCollection<SystemItemVm>         Systems                    { get; } = new();
     public ObservableCollection<ExternalSystemItemVm> ExternalSystems            { get; } = new();
     public ObservableCollection<ModuleItemVm>         ModulesForSelectedSystem   { get; } = new();
+    public ObservableCollection<RelationshipItemVm>   ModuleRelationshipsForSelectedSystem { get; } = new();
     public ObservableCollection<CodeNodeItemVm>       CodeNodesForSelectedScope  { get; } = new();
     public ObservableCollection<StartupItemVm>        StartupItems               { get; } = new();
     public ObservableCollection<RelationshipItemVm>   VisibleRelationships       { get; } = new();
@@ -388,6 +394,19 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
     public void SetActiveView(SystemMapViewKind view) => ActiveView = view;
 
+    /// <summary>
+    /// Resets the map to its top-level landing state used from the Overview page.
+    /// This ensures the user sees the system card canvas rather than stale deeper selections.
+    /// </summary>
+    public void OpenOverviewLanding()
+    {
+        SelectedSystem = null;
+        SelectedModule = null;
+        SelectedRelationship = null;
+        ClearInspector();
+        ActiveView = SystemMapViewKind.SystemOverview;
+    }
+
     public void SelectSystem(SystemItemVm? sys)
     {
         SelectedSystem = sys;
@@ -427,6 +446,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
     /// </summary>
     public void LoadFrom(SystemMapModel model, IReadOnlyDictionary<string, LayoutPosition>? layoutPositions = null)
     {
+        _currentModel = model;
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom starting. Systems={model.Systems.Count}, Modules={model.AllModules.Count()}, CodeNodes={model.AllCodeNodes.Count()}, ExternalSystems={model.ExternalSystems.Count}, Relationships={model.Relationships.Count}");
 
         // Pre-compute the base row for library systems so they are placed after all non-library
@@ -947,14 +967,180 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private void RebuildModulesForSelectedSystem()
     {
         bool lowConf = ShowLowConfidenceItems;
+        var selectedModules = _allModules
+            .Where(m => _selectedSystem == null
+                        || m.SystemIds.Contains(_selectedSystem.Id)
+                        || m.SystemId == _selectedSystem.Id)
+            .Where(m => lowConf || IsHighConfidence(m.Confidence))
+            .ToList();
+
+        var moduleRelationshipData = BuildModuleRelationshipData(selectedModules, lowConf);
+
         SyncCollection(ModulesForSelectedSystem,
-            _allModules
-                .Where(m => _selectedSystem == null
-                            || m.SystemIds.Contains(_selectedSystem.Id)
-                            || m.SystemId == _selectedSystem.Id)
-                .Where(m => lowConf || IsHighConfidence(m.Confidence))
+            selectedModules
+                .Select(m =>
+                {
+                    moduleRelationshipData.SummariesByModuleId.TryGetValue(m.Id, out var summary);
+                    return new ModuleItemVm
+                    {
+                        Id = m.Id,
+                        Name = m.Name,
+                        KindLabel = m.KindLabel,
+                        Confidence = m.Confidence,
+                        CodeNodeCount = m.CodeNodeCount,
+                        SystemId = m.SystemId,
+                        SystemIds = new HashSet<string>(m.SystemIds, StringComparer.Ordinal),
+                        OutboundRelationshipCount = summary?.OutboundCount ?? 0,
+                        InboundRelationshipCount = summary?.InboundCount ?? 0,
+                        OutboundHighlights = summary?.OutboundHighlights ?? Array.Empty<string>(),
+                        InboundHighlights = summary?.InboundHighlights ?? Array.Empty<string>()
+                    };
+                })
                 .ToList());
+
+        SyncCollection(
+            ModuleRelationshipsForSelectedSystem,
+            moduleRelationshipData.Relationships);
     }
+
+    private ModuleRelationshipData BuildModuleRelationshipData(
+        IReadOnlyList<ModuleItemVm> selectedModules,
+        bool includeLowConfidence)
+    {
+        var summaries = selectedModules.ToDictionary(
+            m => m.Id,
+            _ => new ModuleRelationshipSummary(),
+            StringComparer.Ordinal);
+        var relationships = new List<RelationshipItemVm>();
+
+        if (_currentModel == null || selectedModules.Count == 0)
+        {
+            return new ModuleRelationshipData(summaries, relationships);
+        }
+
+        var selectedModuleIds = selectedModules
+            .Select(m => m.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var moduleNamesById = selectedModules.ToDictionary(m => m.Id, m => m.Name, StringComparer.Ordinal);
+        var codeNodeToModule = _currentModel.AllModules
+            .SelectMany(m => m.CodeNodes.Select(cn => (CodeNodeId: cn.Id, ModuleId: m.Id)))
+            .ToDictionary(x => x.CodeNodeId, x => x.ModuleId, StringComparer.Ordinal);
+
+        string? ResolveModuleId(string entityId)
+        {
+            if (selectedModuleIds.Contains(entityId))
+                return entityId;
+
+            if (codeNodeToModule.TryGetValue(entityId, out var ownerModuleId) &&
+                selectedModuleIds.Contains(ownerModuleId))
+            {
+                return ownerModuleId;
+            }
+
+            return null;
+        }
+
+        var grouped = new Dictionary<(string FromId, string ToId), Dictionary<RelationshipKind, int>>();
+
+        foreach (var relationship in _currentModel.Relationships)
+        {
+            if (!includeLowConfidence && !IsHighConfidence(relationship.Confidence))
+                continue;
+
+            var fromModuleId = ResolveModuleId(relationship.FromId);
+            var toModuleId = ResolveModuleId(relationship.ToId);
+            if (fromModuleId == null || toModuleId == null)
+                continue;
+            if (string.Equals(fromModuleId, toModuleId, StringComparison.Ordinal))
+                continue;
+
+            var key = (fromModuleId, toModuleId);
+            if (!grouped.TryGetValue(key, out var kindCounts))
+            {
+                kindCounts = new Dictionary<RelationshipKind, int>();
+                grouped[key] = kindCounts;
+            }
+
+            kindCounts.TryGetValue(relationship.Kind, out var count);
+            kindCounts[relationship.Kind] = count + 1;
+        }
+
+        foreach (var pair in grouped)
+        {
+            var fromId = pair.Key.FromId;
+            var toId = pair.Key.ToId;
+            var label = FormatRelationshipKinds(pair.Value);
+            var counterpartName = moduleNamesById.TryGetValue(toId, out var outboundName) ? outboundName : toId;
+            var sourceName = moduleNamesById.TryGetValue(fromId, out var inboundName) ? inboundName : fromId;
+            var totalCount = pair.Value.Values.Sum();
+
+            summaries[fromId].OutboundCount++;
+            summaries[fromId].OutboundEntries.Add(new ModuleRelationshipEntry(
+                $"{label} -> {counterpartName}",
+                totalCount));
+
+            summaries[toId].InboundCount++;
+            summaries[toId].InboundEntries.Add(new ModuleRelationshipEntry(
+                $"{label} <- {sourceName}",
+                totalCount));
+
+            relationships.Add(new RelationshipItemVm
+            {
+                Id = $"module:{fromId}:{toId}:{label}",
+                FromId = fromId,
+                ToId = toId,
+                Kind = pair.Value
+                    .OrderByDescending(x => x.Value)
+                    .ThenBy(x => x.Key.ToString(), StringComparer.Ordinal)
+                    .First().Key,
+                Label = label,
+                Confidence = ConfidenceLevel.Likely,
+                Notes = $"{sourceName} -> {counterpartName}",
+                FromName = sourceName,
+                ToName = counterpartName
+            });
+        }
+
+        foreach (var summary in summaries.Values)
+        {
+            summary.OutboundHighlights = summary.OutboundEntries
+                .OrderByDescending(x => x.Weight)
+                .ThenBy(x => x.Label, StringComparer.Ordinal)
+                .Take(2)
+                .Select(x => x.Label)
+                .ToList();
+            summary.InboundHighlights = summary.InboundEntries
+                .OrderByDescending(x => x.Weight)
+                .ThenBy(x => x.Label, StringComparer.Ordinal)
+                .Take(2)
+                .Select(x => x.Label)
+                .ToList();
+        }
+
+        return new ModuleRelationshipData(summaries, relationships);
+    }
+
+    private static string FormatRelationshipKinds(Dictionary<RelationshipKind, int> kindCounts)
+        => string.Join(", ", kindCounts
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key.ToString(), StringComparer.Ordinal)
+            .Select(x => x.Value > 1 ? $"{x.Key}x{x.Value}" : x.Key.ToString()));
+
+    private sealed class ModuleRelationshipSummary
+    {
+        public int OutboundCount { get; set; }
+        public int InboundCount { get; set; }
+        public List<ModuleRelationshipEntry> OutboundEntries { get; } = new();
+        public List<ModuleRelationshipEntry> InboundEntries { get; } = new();
+        public IReadOnlyList<string> OutboundHighlights { get; set; } = Array.Empty<string>();
+        public IReadOnlyList<string> InboundHighlights { get; set; } = Array.Empty<string>();
+    }
+
+    private sealed record ModuleRelationshipData(
+        Dictionary<string, ModuleRelationshipSummary> SummariesByModuleId,
+        List<RelationshipItemVm> Relationships);
+
+    private sealed record ModuleRelationshipEntry(string Label, int Weight);
 
     private void RebuildCodeNodesForSelectedScope()
     {

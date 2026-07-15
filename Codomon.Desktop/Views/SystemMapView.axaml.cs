@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using Codomon.Desktop.Models.SystemMap;
 using Codomon.Desktop.ViewModels;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 
@@ -32,6 +33,9 @@ public partial class SystemMapView : UserControl
     private double _zoomLevel = 1.0;
     private double _zoomTarget = 1.0;
     private DispatcherTimer? _zoomAnimTimer;
+    private readonly Dictionary<string, Border> _moduleCards = new(StringComparer.Ordinal);
+    private bool _moduleOverlayRefreshQueued;
+    private int _moduleOverlayRefreshAttempts;
     /// <summary>
     /// Raised when the user requests a module-level relationship graph for the
     /// currently selected system in Module View.
@@ -115,6 +119,10 @@ public partial class SystemMapView : UserControl
         WireLayoutComboBox();
         SetupItemTemplates();
 
+        var moduleSurface = this.FindControl<Grid>("ModuleViewSurface");
+        if (moduleSurface != null)
+            moduleSurface.SizeChanged += (_, _) => QueueModuleRelationshipOverlayRefresh();
+
         _vm.PropertyChanged   += OnViewModelPropertyChanged;
         _vm.Systems.CollectionChanged           += (_, _) =>
         {
@@ -124,6 +132,7 @@ public partial class SystemMapView : UserControl
         _vm.ExternalSystems.CollectionChanged   += (_, _) => RefreshSystemOverview();
         _vm.VisibleRelationships.CollectionChanged += (_, _) => RefreshSystemOverview();
         _vm.ModulesForSelectedSystem.CollectionChanged += (_, _) => RefreshModuleView();
+        _vm.ModuleRelationshipsForSelectedSystem.CollectionChanged += (_, _) => QueueModuleRelationshipOverlayRefresh();
         _vm.CodeNodesForSelectedScope.CollectionChanged += (_, _) => RefreshCodeDetailView();
         _vm.StartupItems.CollectionChanged      += (_, _) => RefreshStartupView();
 
@@ -472,7 +481,11 @@ public partial class SystemMapView : UserControl
             WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
             {
                 _vm.SelectSystem(item);
-            }, () => ShowDetailedRelationshipsRequested?.Invoke(item));
+            }, () =>
+            {
+                _vm.SelectSystem(item);
+                _vm.SetActiveView(SystemMapViewKind.ModuleView);
+            });
         }
 
         return card;
@@ -525,9 +538,7 @@ public partial class SystemMapView : UserControl
     {
         if (item == null) return new Border();
 
-        var confColor = ConfidenceColor(item.Confidence);
         var kindBadge = MakeBadge(item.KindLabel, "#1A2A4A", "#5A8ABF");
-        var confBadge = MakeBadge(item.Confidence.ToString(), "#2A1A2A", confColor);
 
         var card = new Border
         {
@@ -535,13 +546,13 @@ public partial class SystemMapView : UserControl
             BorderBrush     = new SolidColorBrush(Color.Parse("#2A3F5A")),
             BorderThickness = new Avalonia.Thickness(1),
             CornerRadius    = new Avalonia.CornerRadius(6),
-            Padding         = new Avalonia.Thickness(14, 10),
-            Margin          = new Avalonia.Thickness(0, 0, 10, 10),
-            Width           = 200,
+            Padding         = new Avalonia.Thickness(12, 10),
+            Margin          = new Avalonia.Thickness(0, 0, 18, 16),
+            Width           = 184,
             Cursor          = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
             Child = new StackPanel
             {
-                Spacing = 8,
+                Spacing = 6,
                 Children =
                 {
                     new TextBlock
@@ -549,28 +560,24 @@ public partial class SystemMapView : UserControl
                         Text       = item.Name,
                         Foreground = Brushes.White,
                         FontWeight = FontWeight.SemiBold,
-                        FontSize   = 13,
-                        TextWrapping = TextWrapping.Wrap
+                        FontSize   = 12,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxLines   = 2
                     },
                     new StackPanel
                     {
                         Orientation = Orientation.Vertical,
-                        Spacing = 4,
+                        Spacing = 3,
                         Children =
                         {
-                            kindBadge,
-                            confBadge,
-                            new TextBlock
-                            {
-                                Text       = $"{item.CodeNodeCount} code node(s)",
-                                Foreground = new SolidColorBrush(Color.Parse("#778899")),
-                                FontSize   = 11
-                            }
+                            kindBadge
                         }
                     }
                 }
             }
         };
+
+        _moduleCards[item.Id] = card;
 
         card.PointerPressed += (_, _) =>
         {
@@ -763,6 +770,7 @@ public partial class SystemMapView : UserControl
         var modCtrl   = this.FindControl<ItemsControl>("ModulesItemsControl")!;
         var noModText = this.FindControl<TextBlock>("NoModulesText")!;
         var detailBtn = this.FindControl<Button>("ShowDetailedRelationshipsButton");
+        _moduleCards.Clear();
 
         header.Text = _vm.SelectedSystem != null
             ? $"Modules — {_vm.SelectedSystemName}"
@@ -773,6 +781,8 @@ public partial class SystemMapView : UserControl
 
         if (detailBtn != null)
             detailBtn.IsEnabled = _vm.SelectedSystem != null && _vm.ModulesForSelectedSystem.Count > 0;
+
+        QueueModuleRelationshipOverlayRefresh();
     }
 
     private void RefreshCodeDetailView()
@@ -1013,6 +1023,8 @@ public partial class SystemMapView : UserControl
         {
             case nameof(SystemMapViewModel.ActiveView):
                 ShowView(_vm.ActiveView);
+                if (_vm.ActiveView == SystemMapViewKind.ModuleView)
+                    QueueModuleRelationshipOverlayRefresh();
                 break;
 
             case nameof(SystemMapViewModel.InspectorName):
@@ -1266,7 +1278,11 @@ public partial class SystemMapView : UserControl
             WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
             {
                 _vm.SelectSystem(item);
-            }, () => ShowDetailedRelationshipsRequested?.Invoke(item));
+            }, () =>
+            {
+                _vm.SelectSystem(item);
+                _vm.SetActiveView(SystemMapViewKind.ModuleView);
+            });
         }
 
         return card;
@@ -1775,6 +1791,97 @@ public partial class SystemMapView : UserControl
         }
     }
 
+    private bool TryRefreshModuleRelationshipOverlay()
+    {
+        var canvas = this.FindControl<Canvas>("ModuleRelationshipsCanvas");
+        var surface = this.FindControl<Grid>("ModuleViewSurface");
+        if (canvas == null || surface == null)
+            return true;
+
+        canvas.Children.Clear();
+
+        if (_vm.ActiveView != SystemMapViewKind.ModuleView ||
+            _vm.ModuleRelationshipsForSelectedSystem.Count == 0)
+        {
+            canvas.Width = Math.Max(surface.Bounds.Width, 0);
+            canvas.Height = Math.Max(surface.Bounds.Height, 0);
+            return true;
+        }
+
+        if (surface.Bounds.Width <= 0 || surface.Bounds.Height <= 0)
+            return false;
+
+        if (_moduleCards.Count < _vm.ModulesForSelectedSystem.Count)
+            return false;
+
+        double maxRight = surface.Bounds.Width;
+        double maxBottom = surface.Bounds.Height;
+        var cardBoundsById = new Dictionary<string, Rect>(StringComparer.Ordinal);
+
+        foreach (var (moduleId, card) in _moduleCards)
+        {
+            if (card.Bounds.Width <= 0 || card.Bounds.Height <= 0)
+                return false;
+
+            var topLeft = card.TranslatePoint(new Point(0, 0), canvas);
+            if (topLeft == null)
+                return false;
+
+            var bounds = new Rect(topLeft.Value.X, topLeft.Value.Y, card.Bounds.Width, card.Bounds.Height);
+            cardBoundsById[moduleId] = bounds;
+            maxRight = Math.Max(maxRight, bounds.Right);
+            maxBottom = Math.Max(maxBottom, bounds.Bottom);
+        }
+
+        canvas.Width = Math.Ceiling(maxRight + 24);
+        canvas.Height = Math.Ceiling(maxBottom + 24);
+
+        foreach (var relationship in _vm.ModuleRelationshipsForSelectedSystem)
+        {
+            if (!cardBoundsById.TryGetValue(relationship.FromId, out var fromBounds) ||
+                !cardBoundsById.TryGetValue(relationship.ToId, out var toBounds))
+                continue;
+
+            var (fromPt, toPt) = GetModuleConnectorPoints(fromBounds, toBounds);
+
+            AddModuleArrowToCanvas(
+                canvas,
+                fromPt,
+                toPt,
+                new SolidColorBrush(Color.Parse(RelationshipColor(relationship.Kind))),
+                relationship);
+        }
+
+        Models.AppLogger.Debug($"[SystemMap] Module overlay refreshed. Modules={_vm.ModulesForSelectedSystem.Count} Cards={_moduleCards.Count} Edges={_vm.ModuleRelationshipsForSelectedSystem.Count} Surface={surface.Bounds.Width:0}x{surface.Bounds.Height:0} Overlay={canvas.Width:0}x{canvas.Height:0}");
+        return true;
+    }
+
+    private void QueueModuleRelationshipOverlayRefresh()
+    {
+        if (_moduleOverlayRefreshQueued)
+            return;
+
+        _moduleOverlayRefreshQueued = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _moduleOverlayRefreshQueued = false;
+            if (TryRefreshModuleRelationshipOverlay())
+            {
+                _moduleOverlayRefreshAttempts = 0;
+                return;
+            }
+
+            if (_moduleOverlayRefreshAttempts++ < 8)
+            {
+                QueueModuleRelationshipOverlayRefresh();
+                return;
+            }
+
+            _moduleOverlayRefreshAttempts = 0;
+            Models.AppLogger.Warn($"[SystemMap] Module overlay refresh skipped because layout did not stabilize. Modules={_vm.ModulesForSelectedSystem.Count} Cards={_moduleCards.Count} Edges={_vm.ModuleRelationshipsForSelectedSystem.Count}");
+        }, DispatcherPriority.Loaded);
+    }
+
     /// <summary>
     /// Returns the point on a card's bounding-box border in direction (ux, uy) from the card centre.
     /// Uses the axis-aligned bounding-box intersection formula with the given half-dimensions.
@@ -1787,6 +1894,47 @@ public partial class SystemMapView : UserControl
         double ty = Math.Abs(uy) > Epsilon ? hh / Math.Abs(uy) : double.MaxValue;
         double t  = Math.Min(tx, ty);
         return new Point(center.X + ux * t, center.Y + uy * t);
+    }
+
+    private static (Point From, Point To) GetModuleConnectorPoints(Rect fromBounds, Rect toBounds)
+    {
+        const double sameRowThreshold = 36.0;
+        const double sameColumnThreshold = 36.0;
+
+        var fromCenter = new Point(fromBounds.X + fromBounds.Width / 2d, fromBounds.Y + fromBounds.Height / 2d);
+        var toCenter = new Point(toBounds.X + toBounds.Width / 2d, toBounds.Y + toBounds.Height / 2d);
+        double dx = toCenter.X - fromCenter.X;
+        double dy = toCenter.Y - fromCenter.Y;
+
+        if (Math.Abs(dy) <= sameRowThreshold)
+        {
+            bool leftToRight = dx >= 0;
+            return leftToRight
+                ? (new Point(fromBounds.Right, fromCenter.Y), new Point(toBounds.X, toCenter.Y))
+                : (new Point(fromBounds.X, fromCenter.Y), new Point(toBounds.Right, toCenter.Y));
+        }
+
+        if (Math.Abs(dx) <= sameColumnThreshold)
+        {
+            bool topToBottom = dy >= 0;
+            return topToBottom
+                ? (new Point(fromCenter.X, fromBounds.Bottom), new Point(toCenter.X, toBounds.Y))
+                : (new Point(fromCenter.X, fromBounds.Y), new Point(toCenter.X, toBounds.Bottom));
+        }
+
+        bool routeMostlyHorizontal = Math.Abs(dx) >= Math.Abs(dy);
+        if (routeMostlyHorizontal)
+        {
+            bool leftToRight = dx >= 0;
+            return leftToRight
+                ? (new Point(fromBounds.Right, fromCenter.Y), new Point(toBounds.X, toCenter.Y))
+                : (new Point(fromBounds.X, fromCenter.Y), new Point(toBounds.Right, toCenter.Y));
+        }
+
+        bool topDown = dy >= 0;
+        return topDown
+            ? (new Point(fromCenter.X, fromBounds.Bottom), new Point(toCenter.X, toBounds.Y))
+            : (new Point(fromCenter.X, fromBounds.Y), new Point(toCenter.X, toBounds.Bottom));
     }
 
     /// <summary>Draws a directed arrow with an optional kind label between two canvas points.</summary>
@@ -1877,6 +2025,79 @@ public partial class SystemMapView : UserControl
                 _vm.SelectRelationship(rel);
                 e.Handled = true;
             }
+        };
+        canvas.Children.Add(hitArea);
+    }
+
+    private void AddModuleArrowToCanvas(
+        Canvas canvas,
+        Point from,
+        Point to,
+        IBrush brush,
+        RelationshipItemVm rel)
+    {
+        const double headLen = 10.0;
+        const double headHalf = 5.0;
+
+        double dx = to.X - from.X;
+        double dy = to.Y - from.Y;
+        double len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 10)
+            return;
+
+        double ux = dx / len;
+        double uy = dy / len;
+        double px = -uy;
+        double py = ux;
+        var wingBase = new Point(to.X - ux * headLen, to.Y - uy * headLen);
+        var wing1End = new Point(wingBase.X + px * headHalf, wingBase.Y + py * headHalf);
+        var wing2End = new Point(wingBase.X - px * headHalf, wingBase.Y - py * headHalf);
+
+        var shaft = new Line
+        {
+            StartPoint = from,
+            EndPoint = wingBase,
+            Stroke = brush,
+            StrokeThickness = 1.35,
+            Opacity = 0.6
+        };
+        canvas.Children.Add(shaft);
+        AddModuleRelationshipHitArea(canvas, from, wingBase, rel);
+        canvas.Children.Add(new Line
+        {
+            StartPoint = to,
+            EndPoint = wing1End,
+            Stroke = brush,
+            StrokeThickness = 1.35,
+            Opacity = 0.6
+        });
+        canvas.Children.Add(new Line
+        {
+            StartPoint = to,
+            EndPoint = wing2End,
+            Stroke = brush,
+            StrokeThickness = 1.35,
+            Opacity = 0.6
+        });
+    }
+
+    private void AddModuleRelationshipHitArea(Canvas canvas, Point from, Point to, RelationshipItemVm rel)
+    {
+        var hitArea = new Line
+        {
+            StartPoint = from,
+            EndPoint = to,
+            Stroke = Brushes.Transparent,
+            StrokeThickness = 10,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        hitArea.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(hitArea).Properties.IsLeftButtonPressed)
+                return;
+
+            _vm.SelectRelationship(rel);
+            e.Handled = true;
         };
         canvas.Children.Add(hitArea);
     }

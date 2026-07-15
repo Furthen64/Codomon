@@ -157,17 +157,24 @@
             </Border>
             <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
-              <StackPanel Margin="16,12" Spacing="12">
+              <StackPanel Margin="26,22" Spacing="18">
                 <TextBlock x:Name="NoModulesText"
                            Text="No modules found for the selected system."
                            Foreground="#445566" FontSize="11" IsVisible="False"/>
-                <ItemsControl x:Name="ModulesItemsControl">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                <Grid x:Name="ModuleViewSurface"
+                      Margin="8">
+                  <Canvas x:Name="ModuleRelationshipsCanvas"
+                          IsHitTestVisible="True"
+                          ZIndex="0"/>
+                  <ItemsControl x:Name="ModulesItemsControl"
+                                ZIndex="1">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                  </ItemsControl>
+                </Grid>
               </StackPanel>
             </ScrollViewer>
           </DockPanel>

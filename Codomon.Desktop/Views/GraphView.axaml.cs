@@ -1,6 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Codomon.Desktop.ViewModels;
 using Nodify;
 using System;
@@ -15,6 +17,9 @@ public partial class GraphView : UserControl
 {
     private int _lastHandledAutoAlignToken = -1;
     private GraphViewModel? _subscribedViewModel;
+    private bool _autoAlignAndFitPending;
+    private bool _autoAlignAndFitQueued;
+    private int _autoAlignAndFitRetries;
     public event Action? NavigateToSystemMapRequested;
     public event Action<string>? NavigateToModuleRequested;
     public event Action<string>? NavigateToCodeNodesRequested;
@@ -28,6 +33,11 @@ public partial class GraphView : UserControl
         FitToViewButton.Click += (_, _) => Editor.FitToScreen();
         ZoomInButton.Click    += (_, _) => Editor.ZoomIn();
         ZoomOutButton.Click   += (_, _) => Editor.ZoomOut();
+        Editor.SizeChanged += (_, _) =>
+        {
+            if (_autoAlignAndFitPending && DataContext is GraphViewModel vm)
+                QueueAutoAlignAndFit(vm);
+        };
 
         // ── ALIGN SELECTED ───────────────────────────────────────────────────
         // Nodify's EditorCommands.Align routes through the NodifyEditor and
@@ -94,8 +104,48 @@ public partial class GraphView : UserControl
         if (vm.AutoAlignRequestToken == _lastHandledAutoAlignToken) return;
 
         _lastHandledAutoAlignToken = vm.AutoAlignRequestToken;
+        QueueAutoAlignAndFit(vm);
+    }
+
+    private void QueueAutoAlignAndFit(GraphViewModel vm)
+    {
+        _autoAlignAndFitPending = true;
+        if (_autoAlignAndFitQueued)
+            return;
+
+        _autoAlignAndFitQueued = true;
+        Dispatcher.UIThread.Post(() => RunQueuedAutoAlignAndFit(vm), DispatcherPriority.Loaded);
+    }
+
+    private void RunQueuedAutoAlignAndFit(GraphViewModel vm)
+    {
+        _autoAlignAndFitQueued = false;
+
+        if (!_autoAlignAndFitPending)
+            return;
+        if (!ReferenceEquals(DataContext, vm))
+            return;
+
+        var bounds = Editor.Bounds;
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            if (_autoAlignAndFitRetries++ < 8)
+            {
+                QueueAutoAlignAndFit(vm);
+                return;
+            }
+
+            Models.AppLogger.Warn($"[Graph] Auto-align fit skipped because editor bounds stayed empty. Nodes={vm.Nodes.Count} Connections={vm.Connections.Count} Bounds={bounds.Width:0}x{bounds.Height:0}");
+            _autoAlignAndFitPending = false;
+            _autoAlignAndFitRetries = 0;
+            return;
+        }
+
+        _autoAlignAndFitPending = false;
+        _autoAlignAndFitRetries = 0;
         vm.AutoAlign();
         Editor.FitToScreen();
+        Models.AppLogger.Debug($"[Graph] Auto-align fit applied. Nodes={vm.Nodes.Count} Connections={vm.Connections.Count} Editor={bounds.Width:0}x{bounds.Height:0}");
     }
 
     private void ApplyFilterChange()

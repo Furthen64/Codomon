@@ -2401,7 +2401,7 @@ public partial class MainWindow : Window
         return new OverviewRecommendation
         {
             Title = "Explore architecture map",
-            Description = "Codomon has current scan, summary, and architecture data. Start in System Map to read the synthesized component cards, then double-click a card to inspect module interactions.",
+            Description = "Codomon has current scan, summary, and architecture data. Start in System Map to read the synthesized component cards, then double-click a card to open its module breakdown.",
             ButtonText = "Open system map",
             ActionKey = OverviewActionSystemMap
         };
@@ -2552,7 +2552,7 @@ public partial class MainWindow : Window
 
     private void OnOverviewOpenSystemMapClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _vm.SystemMap.SetActiveView(SystemMapViewKind.SystemOverview);
+        _vm.SystemMap.OpenOverviewLanding();
         SetActiveNavTab("Monitor");
     }
 

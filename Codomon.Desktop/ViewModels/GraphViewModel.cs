@@ -71,6 +71,7 @@ public class GraphViewModel : INotifyPropertyChanged
     private int _autoAlignRequestToken;
     private readonly Dictionary<string, Point> _savedPositions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, double> _savedNodeSizes = new(StringComparer.Ordinal);
+    private bool _skipPositionSaveOnNextApplyFilters;
     private string _breadcrumbSystemLabel = "System Map";
     private string _breadcrumbModuleLabel = "Module";
     private string _breadcrumbCodeNodesLabel = "Code nodes";
@@ -107,28 +108,60 @@ public class GraphViewModel : INotifyPropertyChanged
     public bool ShowLowConfidenceItems
     {
         get => _showLowConfidenceItems;
-        set { if (_showLowConfidenceItems == value) return; _showLowConfidenceItems = value; OnPropertyChanged(); ApplyFilters(); }
+        set
+        {
+            if (_showLowConfidenceItems == value) return;
+            _showLowConfidenceItems = value;
+            OnPropertyChanged();
+            SkipPositionSaveForRelationshipMode();
+            ApplyFilters();
+            RequestAutoAlignForRelationshipMode();
+        }
     }
 
     /// <summary>Show / hide edges of kind <see cref="RelationshipKind.Calls"/>.</summary>
     public bool ShowCallsRelationships
     {
         get => _showCallsRelationships;
-        set { if (_showCallsRelationships == value) return; _showCallsRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+        set
+        {
+            if (_showCallsRelationships == value) return;
+            _showCallsRelationships = value;
+            OnPropertyChanged();
+            SkipPositionSaveForRelationshipMode();
+            ApplyFilters();
+            RequestAutoAlignForRelationshipMode();
+        }
     }
 
     /// <summary>Show / hide edges of kind <see cref="RelationshipKind.Depends"/>.</summary>
     public bool ShowDependsRelationships
     {
         get => _showDependsRelationships;
-        set { if (_showDependsRelationships == value) return; _showDependsRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+        set
+        {
+            if (_showDependsRelationships == value) return;
+            _showDependsRelationships = value;
+            OnPropertyChanged();
+            SkipPositionSaveForRelationshipMode();
+            ApplyFilters();
+            RequestAutoAlignForRelationshipMode();
+        }
     }
 
     /// <summary>Show / hide edges of kind <see cref="RelationshipKind.Imports"/>.</summary>
     public bool ShowImportsRelationships
     {
         get => _showImportsRelationships;
-        set { if (_showImportsRelationships == value) return; _showImportsRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+        set
+        {
+            if (_showImportsRelationships == value) return;
+            _showImportsRelationships = value;
+            OnPropertyChanged();
+            SkipPositionSaveForRelationshipMode();
+            ApplyFilters();
+            RequestAutoAlignForRelationshipMode();
+        }
     }
 
     /// <summary>
@@ -138,7 +171,15 @@ public class GraphViewModel : INotifyPropertyChanged
     public bool ShowOtherRelationships
     {
         get => _showOtherRelationships;
-        set { if (_showOtherRelationships == value) return; _showOtherRelationships = value; OnPropertyChanged(); ApplyFilters(); }
+        set
+        {
+            if (_showOtherRelationships == value) return;
+            _showOtherRelationships = value;
+            OnPropertyChanged();
+            SkipPositionSaveForRelationshipMode();
+            ApplyFilters();
+            RequestAutoAlignForRelationshipMode();
+        }
     }
 
     public string BreadcrumbSystemLabel
@@ -319,6 +360,8 @@ public class GraphViewModel : INotifyPropertyChanged
         _renderMode = GraphRenderMode.ModuleRelationships;
         _moduleSystemId = systemId;
         _codeNodeModuleId = null;
+        ClearSavedPositionsForSystemModules(map, systemId);
+        _skipPositionSaveOnNextApplyFilters = true;
         ApplyFilters();
         AutoAlignRequestToken++;
     }
@@ -333,6 +376,8 @@ public class GraphViewModel : INotifyPropertyChanged
         _renderMode = GraphRenderMode.CodeNodeRelationships;
         _moduleSystemId = null;
         _codeNodeModuleId = moduleId;
+        ClearSavedPositionsForModuleCodeNodes(map, moduleId);
+        _skipPositionSaveOnNextApplyFilters = true;
         ApplyFilters();
         AutoAlignRequestToken++;
     }
@@ -374,7 +419,11 @@ public class GraphViewModel : INotifyPropertyChanged
     /// </summary>
     private void ApplyFilters()
     {
-        SavePositions();
+        if (_skipPositionSaveOnNextApplyFilters)
+            _skipPositionSaveOnNextApplyFilters = false;
+        else
+            SavePositions();
+
         if (_currentSystemMap != null)
         {
             if (_renderMode == GraphRenderMode.ModuleRelationships)
@@ -387,6 +436,38 @@ public class GraphViewModel : INotifyPropertyChanged
         else if (_currentWorkspace != null)
             BuildFromWorkspaceConnections(_currentWorkspace);
         // If neither is set (design-time demo graph), do nothing.
+    }
+
+    private void RequestAutoAlignForRelationshipMode()
+    {
+        if (_renderMode is GraphRenderMode.ModuleRelationships or GraphRenderMode.CodeNodeRelationships)
+            AutoAlignRequestToken++;
+    }
+
+    private void SkipPositionSaveForRelationshipMode()
+    {
+        if (_renderMode is GraphRenderMode.ModuleRelationships or GraphRenderMode.CodeNodeRelationships)
+            _skipPositionSaveOnNextApplyFilters = true;
+    }
+
+    private void ClearSavedPositionsForSystemModules(SystemMapModel map, string systemId)
+    {
+        var system = map.Systems.FirstOrDefault(s => string.Equals(s.Id, systemId, StringComparison.Ordinal));
+        if (system == null)
+            return;
+
+        foreach (var module in GetModulesForSystem(map, system))
+            _savedPositions.Remove(module.Id);
+    }
+
+    private void ClearSavedPositionsForModuleCodeNodes(SystemMapModel map, string moduleId)
+    {
+        var module = map.AllModules.FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.Ordinal));
+        if (module == null)
+            return;
+
+        foreach (var codeNode in module.CodeNodes)
+            _savedPositions.Remove(codeNode.Id);
     }
 
     private void BuildModuleRelationshipsForSystem(SystemMapModel map, string? systemId)
@@ -541,7 +622,7 @@ public class GraphViewModel : INotifyPropertyChanged
         foreach (var node in Nodes) node.IsCodeLeaf = false;
         EnsureSelectedNodeIsValid();
 
-        AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count}");
+        AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count} LowConfidence={ShowLowConfidenceItems} Calls={ShowCallsRelationships} Depends={ShowDependsRelationships} Imports={ShowImportsRelationships} Other={ShowOtherRelationships}");
     }
 
     private void BuildCodeNodeRelationshipsForModule(SystemMapModel map, string? moduleId)
@@ -643,7 +724,7 @@ public class GraphViewModel : INotifyPropertyChanged
         foreach (var node in Nodes) node.IsCodeLeaf = node.ChildCount == 0;
         EnsureSelectedNodeIsValid();
 
-        AppLogger.Debug($"[Graph] BuildCodeNodeRelationshipsForModule complete. Module='{module.Name}' CodeNodes={Nodes.Count} Connections={Connections.Count}");
+        AppLogger.Debug($"[Graph] BuildCodeNodeRelationshipsForModule complete. Module='{module.Name}' CodeNodes={Nodes.Count} Connections={Connections.Count} LowConfidence={ShowLowConfidenceItems} Calls={ShowCallsRelationships} Depends={ShowDependsRelationships} Imports={ShowImportsRelationships} Other={ShowOtherRelationships}");
     }
 
     private void BuildFromSystemMap(SystemMapModel map)
