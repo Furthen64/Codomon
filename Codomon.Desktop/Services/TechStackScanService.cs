@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Codomon.Desktop.Models;
 
@@ -24,6 +25,7 @@ public static class TechStackScanService
         "Dockerfile",
         "docker-compose.yml",
         "docker-compose.yaml",
+        "project.godot",
         "serilog.json",
         "serilog.*.json",
         "nlog.config",
@@ -41,6 +43,8 @@ public static class TechStackScanService
     private static readonly TechnologyPattern[] PackagePatterns =
     {
         new("Avalonia", "Avalonia", "UI", PrefixMatch: true),
+        new("GodotSharp", "Godot", "Game Engine", PrefixMatch: true),
+        new("Godot.NET.Sdk", "Godot", "Game Engine", PrefixMatch: true),
         new("Microsoft.EntityFrameworkCore", "Entity Framework Core", "Data", PrefixMatch: true),
         new("Dapper", "Dapper", "Data"),
         new("Npgsql", "Npgsql", "Database", PrefixMatch: true),
@@ -80,18 +84,22 @@ public static class TechStackScanService
                 0, 0);
 
         var projectFiles = await Task.Run(() => EnumerateProjectFiles(searchRoot).ToList());
+        var godotProjectFiles = await Task.Run(() => EnumerateGodotProjectFiles(searchRoot).ToList());
         var markerCount = await Task.Run(() => CountKnownMarkers(searchRoot));
 
-        if (projectFiles.Count == 0 && markerCount == 0)
+        if (projectFiles.Count == 0 && godotProjectFiles.Count == 0 && markerCount == 0)
         {
             return new TechStackAvailabilityResult(false,
-                $"No .csproj files or known stack markers were found under:\n{searchRoot}\n\n" +
-                "Tech stack scanning needs at least one C# project or an infrastructure/config marker such as Dockerfile or serilog.json.",
+                $"No project files or known stack markers were found under:\n{searchRoot}\n\n" +
+                "Tech stack scanning needs at least one supported project file (such as .csproj or project.godot) or an infrastructure/config marker such as Dockerfile or serilog.json.",
                 0, 0);
         }
 
-        var summary = $"{projectFiles.Count} project(s) and {markerCount} known stack marker(s) found.";
-        return new TechStackAvailabilityResult(true, summary, projectFiles.Count, markerCount);
+        var projectCount = projectFiles.Count + godotProjectFiles.Count(projectFile =>
+            !projectFiles.Any(csproj => string.Equals(
+                Path.GetDirectoryName(csproj), Path.GetDirectoryName(projectFile), StringComparison.OrdinalIgnoreCase)));
+        var summary = $"{projectCount} project(s) and {markerCount} known stack marker(s) found.";
+        return new TechStackAvailabilityResult(true, summary, projectCount, markerCount);
     }
 
     public static async Task<TechStackScanResult> ScanAsync(
@@ -109,7 +117,8 @@ public static class TechStackScanService
         progress?.Report($"Scanning tech stack under: {searchRoot}");
 
         var projectFiles = await Task.Run(() => EnumerateProjectFiles(searchRoot).OrderBy(p => p).ToList(), cancellationToken);
-        progress?.Report($"Discovered {projectFiles.Count} project file(s).");
+        var godotProjectFiles = await Task.Run(() => EnumerateGodotProjectFiles(searchRoot).OrderBy(p => p).ToList(), cancellationToken);
+        progress?.Report($"Discovered {projectFiles.Count + godotProjectFiles.Count} project file(s).");
 
         var technologies = new Dictionary<string, DetectedTechnology>(StringComparer.OrdinalIgnoreCase);
 
@@ -129,6 +138,32 @@ public static class TechStackScanService
             progress?.Report($"Analyzing project: {projectName}");
             await AnalyzeProjectFileAsync(projectFile, projectName, projectFolder, technologies, cancellationToken);
             DetectProjectFiles(projectName, projectFile, projectFolder, technologies);
+        }
+
+        foreach (var godotProjectFile in godotProjectFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var projectFolder = Path.GetDirectoryName(godotProjectFile) ?? searchRoot;
+            var associatedCsproj = projectFiles.FirstOrDefault(projectFile =>
+                string.Equals(Path.GetDirectoryName(projectFile), projectFolder, StringComparison.OrdinalIgnoreCase));
+            var projectName = associatedCsproj == null
+                ? Path.GetFileName(projectFolder)
+                : Path.GetFileNameWithoutExtension(associatedCsproj);
+
+            if (associatedCsproj == null)
+            {
+                result.Projects.Add(new TechStackProject
+                {
+                    Name = projectName,
+                    ProjectFilePath = godotProjectFile,
+                    FolderPath = projectFolder
+                });
+            }
+
+            progress?.Report($"Analyzing Godot project: {projectName}");
+            await AnalyzeGodotProjectFileAsync(godotProjectFile, projectName, associatedCsproj ?? godotProjectFile,
+                technologies, cancellationToken);
         }
 
         DetectWorkspaceInfrastructure(searchRoot, projectFiles, technologies);
@@ -192,6 +227,10 @@ public static class TechStackScanService
         => Directory.EnumerateFiles(searchRoot, "*.csproj", SearchOption.AllDirectories)
             .Where(path => !IsExcluded(path));
 
+    private static IEnumerable<string> EnumerateGodotProjectFiles(string searchRoot)
+        => Directory.EnumerateFiles(searchRoot, "project.godot", SearchOption.AllDirectories)
+            .Where(path => !IsExcluded(path));
+
     private static async Task AnalyzeProjectFileAsync(
         string projectFilePath,
         string projectName,
@@ -208,6 +247,27 @@ public static class TechStackScanService
         var sdkValue = project.Attribute("Sdk")?.Value?.Trim() ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(sdkValue))
         {
+            if (sdkValue.Contains("Godot.NET.Sdk", StringComparison.OrdinalIgnoreCase))
+            {
+                AddOrUpdateTechnology(technologies, new DetectedTechnology
+                {
+                    Name = "Godot",
+                    Category = "Game Engine",
+                    Confidence = "Likely",
+                    ProjectName = projectName,
+                    ProjectFilePath = projectFilePath,
+                    Evidence = new List<TechnologyEvidence>
+                    {
+                        new()
+                        {
+                            Source = "ProjectSdk",
+                            Description = $"Project SDK '{sdkValue}' indicates a Godot .NET project.",
+                            SourceRef = projectFilePath
+                        }
+                    }
+                });
+            }
+
             if (sdkValue.Contains("Web", StringComparison.OrdinalIgnoreCase))
             {
                 AddOrUpdateTechnology(technologies, new DetectedTechnology
@@ -347,6 +407,39 @@ public static class TechStackScanService
         }
 
         _ = projectFolder;
+    }
+
+    private static async Task AnalyzeGodotProjectFileAsync(
+        string godotProjectFilePath,
+        string projectName,
+        string projectFilePath,
+        Dictionary<string, DetectedTechnology> technologies,
+        CancellationToken cancellationToken)
+    {
+        var projectConfig = await File.ReadAllTextAsync(godotProjectFilePath, cancellationToken);
+        var versionMatch = Regex.Match(projectConfig,
+            @"^config/features\s*=\s*PackedStringArray\(\s*""(?<version>\d+(?:\.\d+)+)",
+            RegexOptions.Multiline);
+        var version = versionMatch.Success ? versionMatch.Groups["version"].Value : string.Empty;
+
+        AddOrUpdateTechnology(technologies, new DetectedTechnology
+        {
+            Name = "Godot",
+            Category = "Game Engine",
+            Confidence = "Likely",
+            Version = version,
+            ProjectName = projectName,
+            ProjectFilePath = projectFilePath,
+            Evidence = new List<TechnologyEvidence>
+            {
+                new()
+                {
+                    Source = "ProjectFile",
+                    Description = "Godot project configuration file 'project.godot' found.",
+                    SourceRef = godotProjectFilePath
+                }
+            }
+        });
     }
 
     private static void DetectProjectFiles(

@@ -61,4 +61,62 @@ public sealed class TechStackScanServiceTests : IDisposable
         Assert.Equal(0, result.ProjectCount);
         Assert.Equal(0, result.DetectionMarkerCount);
     }
+
+    [Fact]
+    public async Task ScanAsync_DetectsGodotProjectAndVersion()
+    {
+        var gameDir = Path.Combine(_tempDirectory, "MyGame");
+        Directory.CreateDirectory(gameDir);
+        var projectFile = Path.Combine(gameDir, "project.godot");
+        await File.WriteAllTextAsync(projectFile, """
+; Engine configuration file.
+config_version=5
+
+[application]
+config/name="My Game"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+
+config/features=PackedStringArray("4.3", "GL Compatibility")
+""");
+
+        var availability = await TechStackScanService.CheckAsync(_tempDirectory);
+        var result = await TechStackScanService.ScanAsync(_tempDirectory);
+
+        Assert.True(availability.IsAvailable);
+        Assert.Equal(1, availability.ProjectCount);
+        Assert.Contains(result.Projects, project => project.ProjectFilePath == projectFile);
+        var godot = Assert.Single(result.Technologies.Where(tech => tech.Name == "Godot"));
+        Assert.Equal("Game Engine", godot.Category);
+        Assert.Equal("4.3", godot.Version);
+        Assert.Equal("MyGame", godot.ProjectName);
+        Assert.Contains(godot.Evidence, evidence => evidence.SourceRef == projectFile);
+    }
+
+    [Fact]
+    public async Task ScanAsync_MergesGodotProjectFileWithItsDotNetProject()
+    {
+        var gameDir = Path.Combine(_tempDirectory, "MyGame");
+        Directory.CreateDirectory(gameDir);
+        var csprojFile = Path.Combine(gameDir, "MyGame.csproj");
+        await File.WriteAllTextAsync(csprojFile, """
+<Project Sdk="Godot.NET.Sdk/4.3.0">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+""");
+        await File.WriteAllTextAsync(Path.Combine(gameDir, "project.godot"),
+            "config/features=PackedStringArray(\"4.3\", \"GL Compatibility\")");
+
+        var result = await TechStackScanService.ScanAsync(_tempDirectory);
+
+        Assert.Single(result.Projects);
+        var godot = Assert.Single(result.Technologies.Where(tech => tech.Name == "Godot"));
+        Assert.Equal("MyGame", godot.ProjectName);
+        Assert.Equal(csprojFile, godot.ProjectFilePath);
+        Assert.Equal("4.3", godot.Version);
+        Assert.Equal(2, godot.Evidence.Count);
+    }
 }
