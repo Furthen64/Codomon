@@ -147,20 +147,20 @@
                     Spacing="2" VerticalAlignment="Center">
           <Button x:Name="NavOverviewBtn" Content="Overview" Tag="Overview" Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Overview tab — project progress and next actions"/>
-          <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"
-                  ToolTip.Tip="Design tab — architecture component editor"/>
-          <Button x:Name="NavScanBtn"    Content="Analyze" Tag="Scan"    Click="OnNavTabClick" Padding="14,5"
-                  ToolTip.Tip="Analyze tab — run scan, summaries and architecture synthesis"/>
-          <Button x:Name="NavMonitorBtn" Content="Monitor" Tag="Monitor" Click="OnNavTabClick" Padding="14,5"
-                  ToolTip.Tip="Monitor tab — system map and live log stream"/>
-          <Button x:Name="NavGraphBtn"   Content="Graph"   Tag="Graph"   Click="OnNavTabClick" Padding="14,5"
-                  ToolTip.Tip="Graph tab — AST relationship graph"/>
-          <Button x:Name="NavGymBtn"     Content="Gym"     Tag="Gym"     Click="OnNavTabClick" Padding="14,5"
-                  ToolTip.Tip="Gym tab — learn the codebase through architecture games"/>
+          <Button x:Name="NavMonitorBtn" Content="Codebase" Tag="Monitor" Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Codebase — explore the system map and live log stream"/>
           <Button x:Name="NavCodeBtn"    Content="Code"    Tag="Code"    Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Code tab — browse the repository tree and preview files"/>
           <Button x:Name="NavDocsBtn"    Content="Docs"    Tag="Docs"    Click="OnNavTabClick" Padding="14,5"
                   ToolTip.Tip="Docs tab — workspace documentation browser"/>
+          <Button x:Name="NavScanBtn"    Content="Analyze" Tag="Scan"    Click="OnNavTabClick" Padding="14,5"
+                  ToolTip.Tip="Analyze — run scans, summaries, and architecture synthesis"/>
+          <Button x:Name="NavGymBtn"     Content="Gym"     Tag="Gym"     Click="OnNavTabClick" Padding="14,5"
+                  IsEnabled="False"
+                  ToolTip.Tip="Gym is not available yet."/>
+          <Button x:Name="NavDesignBtn"  Content="Design"  Tag="Design"  Click="OnNavTabClick" Padding="14,5"
+                  IsEnabled="False"
+                  ToolTip.Tip="Design is not available yet."/>
         </StackPanel>
 
         <!-- Right: running indicator + stop button + settings gear -->
@@ -749,7 +749,7 @@
           <DockPanel Margin="40,32">
             <TextBlock DockPanel.Dock="Top" Text="Analyze" FontSize="18" FontWeight="Bold"
                       Foreground="#AABBCC" Margin="0,0,0,6"/>
-            <TextBlock DockPanel.Dock="Top" Text="Run analysis in order: Scan → Tech Stack → LLM Summaries → Architecture. Replay Logs and Dev Console are always available."
+            <TextBlock DockPanel.Dock="Top" Text="Source scan → Tech stack → LLM summaries → Architecture"
                       FontSize="12" Foreground="#778899" TextWrapping="Wrap" Margin="0,0,0,16"/>
 
             <StackPanel Spacing="10" DockPanel.Dock="Top">
@@ -763,7 +763,7 @@
 
               <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
                 <Button x:Name="AnalyzeTechStackBtn" Grid.Column="0" Grid.RowSpan="2"
-                        Content="Tech Stack" Click="OnTechStackScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
+                        Content="Update tech stack" Click="OnTechStackScanClick" Padding="14,6" HorizontalAlignment="Left" Margin="0,0,12,0"/>
                 <TextBlock x:Name="AnalyzeTechStackAvailabilityText" Grid.Column="1" Grid.Row="0"
                           Text="" FontSize="11" Foreground="#AABBCC" Margin="0,0,0,2"/>
                 <TextBlock x:Name="AnalyzeTechStackStatusText" Grid.Column="1" Grid.Row="1"
@@ -976,14 +976,14 @@
         <!-- ── 1-column workspace layout ─── -->
         <Grid x:Name="WorkspaceGrid" IsVisible="False">
 
-          <!-- Center Panel: Graph / System Map tabs -->
+          <!-- Codebase primary modes -->
           <Border Background="#0F141E" ClipToBounds="True">
             <TabControl x:Name="CenterTabControl"
                         SelectionChanged="OnCenterTabSelectionChanged"
                         Background="Transparent"
                         BorderThickness="0,0,0,1"
                         BorderBrush="#2A3F5A">
-              <TabItem Header="System Map">
+              <TabItem Header="Map">
                 <ContentControl x:Name="SystemMapHost"
                                 HorizontalContentAlignment="Stretch"
                                 VerticalContentAlignment="Stretch"/>

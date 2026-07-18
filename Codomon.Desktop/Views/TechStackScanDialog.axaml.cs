@@ -7,10 +7,7 @@ using Codomon.Desktop.ViewModels;
 namespace Codomon.Desktop.Views;
 
 /// <summary>
-/// Multi-step dialog for tech stack scanning.
-/// Step 1 — Preflight check.
-/// Step 2 — Scan progress.
-/// Step 3 — Browse detected technologies.
+/// Dialog for running a tech stack scan and reviewing its results.
 /// </summary>
 public partial class TechStackScanDialog : Window
 {
@@ -200,7 +197,7 @@ public partial class TechStackScanDialog : Window
                 if (preflightPanel != null) preflightPanel.IsVisible = true;
                 if (scanningPanel != null) scanningPanel.IsVisible = false;
                 if (resultsPanel != null) resultsPanel.IsVisible = false;
-                if (stepTitle != null) stepTitle.Text = "Step 1 of 3 — Preflight Check";
+                if (stepTitle != null) stepTitle.Text = "Ready to scan";
                 if (dot1 != null) dot1.Fill = activeFill;
                 if (dot2 != null) dot2.Fill = inactiveFill;
                 if (dot3 != null) dot3.Fill = inactiveFill;
@@ -210,7 +207,7 @@ public partial class TechStackScanDialog : Window
                 if (preflightPanel != null) preflightPanel.IsVisible = false;
                 if (scanningPanel != null) scanningPanel.IsVisible = true;
                 if (resultsPanel != null) resultsPanel.IsVisible = false;
-                if (stepTitle != null) stepTitle.Text = "Step 2 of 3 — Scanning…";
+                if (stepTitle != null) stepTitle.Text = "Scanning…";
                 if (dot1 != null) dot1.Fill = doneFill;
                 if (dot2 != null) dot2.Fill = activeFill;
                 if (dot3 != null) dot3.Fill = inactiveFill;
@@ -222,7 +219,7 @@ public partial class TechStackScanDialog : Window
                 if (preflightPanel != null) preflightPanel.IsVisible = false;
                 if (scanningPanel != null) scanningPanel.IsVisible = false;
                 if (resultsPanel != null) resultsPanel.IsVisible = true;
-                if (stepTitle != null) stepTitle.Text = "Step 3 of 3 — Browse Results";
+                if (stepTitle != null) stepTitle.Text = "Results";
                 if (dot1 != null) dot1.Fill = doneFill;
                 if (dot2 != null) dot2.Fill = doneFill;
                 if (dot3 != null) dot3.Fill = activeFill;
@@ -270,8 +267,8 @@ public partial class TechStackScanDialog : Window
         if (statusText != null)
         {
             statusText.Text = _vm.Step == TechStackScanDialogStep.Scanning && !_vm.IsRunning && _vm.ScanFinished
-                ? "Tech stack scan complete. Review the log below or continue to the results view."
-                : "Tech stack scan in progress — reading project files and known stack markers…";
+                ? "Tech stack scan complete."
+                : "Scanning project files and configuration…";
         }
 
         if (progressBar != null)

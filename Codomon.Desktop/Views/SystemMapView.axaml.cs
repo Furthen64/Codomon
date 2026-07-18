@@ -114,7 +114,6 @@ public partial class SystemMapView : UserControl
         _vm = vm;
 
         WireFilterCheckBoxes();
-        WireViewButtons();
         WireZoomButtons();
         WireLayoutComboBox();
         SetupItemTemplates();
@@ -143,21 +142,6 @@ public partial class SystemMapView : UserControl
         RefreshStartupView();
         UpdateInspector();
         UpdateInspectorActionPanel();
-    }
-
-    // ── View switching ────────────────────────────────────────────────────
-
-    private void WireViewButtons()
-    {
-        var btnOverview  = this.FindControl<Button>("BtnSystemOverview")!;
-        var btnModule    = this.FindControl<Button>("BtnModuleView")!;
-        var btnCode      = this.FindControl<Button>("BtnCodeDetailView")!;
-        var btnStartup   = this.FindControl<Button>("BtnStartupView")!;
-
-        btnOverview.Click += (_, _) => _vm.SetActiveView(SystemMapViewKind.SystemOverview);
-        btnModule.Click   += (_, _) => _vm.SetActiveView(SystemMapViewKind.ModuleView);
-        btnCode.Click     += (_, _) => _vm.SetActiveView(SystemMapViewKind.CodeDetailView);
-        btnStartup.Click  += (_, _) => _vm.SetActiveView(SystemMapViewKind.StartupView);
     }
 
     // ── Zoom controls ─────────────────────────────────────────────────────
@@ -276,20 +260,7 @@ public partial class SystemMapView : UserControl
         this.FindControl<ScrollViewer>("PanelSystemOverview")!.IsVisible = view == SystemMapViewKind.SystemOverview;
         this.FindControl<DockPanel>   ("PanelModuleView")!.IsVisible     = view == SystemMapViewKind.ModuleView;
         this.FindControl<DockPanel>   ("PanelCodeDetail")!.IsVisible     = view == SystemMapViewKind.CodeDetailView;
-        this.FindControl<ScrollViewer>("PanelStartup")!.IsVisible        = view == SystemMapViewKind.StartupView;
-
-        // Highlight the active view button.
-        SetButtonActive("BtnSystemOverview",  view == SystemMapViewKind.SystemOverview);
-        SetButtonActive("BtnModuleView",      view == SystemMapViewKind.ModuleView);
-        SetButtonActive("BtnCodeDetailView",  view == SystemMapViewKind.CodeDetailView);
-        SetButtonActive("BtnStartupView",     view == SystemMapViewKind.StartupView);
-    }
-
-    private void SetButtonActive(string name, bool active)
-    {
-        var btn = this.FindControl<Button>(name);
-        if (btn != null)
-            btn.Background = active ? ActiveButtonBg : InactiveButtonBg;
+        this.FindControl<DockPanel>("PanelStartup")!.IsVisible           = view == SystemMapViewKind.StartupView;
     }
 
     // ── Filter checkboxes ─────────────────────────────────────────────────
@@ -1082,6 +1053,9 @@ public partial class SystemMapView : UserControl
         if (_vm.SelectedSystem == null) return;
         _vm.SetActiveView(SystemMapViewKind.ModuleView);
     }
+
+    public void OnReturnToMapClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => _vm.SetActiveView(SystemMapViewKind.SystemOverview);
 
     public void OnShowDetailedRelationshipsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

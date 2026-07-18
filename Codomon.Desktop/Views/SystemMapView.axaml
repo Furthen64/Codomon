@@ -12,75 +12,16 @@
             Padding="6,4">
       <DockPanel>
 
-        <!-- View buttons + Layout dropdown -->
+        <!-- Map layout -->
         <StackPanel Orientation="Horizontal" Spacing="4">
-          <TextBlock Text="VIEW:" VerticalAlignment="Center"
-                     Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
-                     LetterSpacing="1" Margin="0,0,4,0"/>
-          <Button x:Name="BtnSystemOverview"  Content="System Overview" Padding="8,3"/>
-          <Button x:Name="BtnModuleView"      Content="Modules"         Padding="8,3"/>
-          <Button x:Name="BtnCodeDetailView"  Content="Code Detail"     Padding="8,3"/>
-          <Button x:Name="BtnStartupView"     Content="Startup"         Padding="8,3"/>
-          <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
           <TextBlock Text="LAYOUT:" VerticalAlignment="Center"
                      Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
-                     LetterSpacing="1" Margin="4,0,4,0"/>
+                     LetterSpacing="1" Margin="0,0,4,0"/>
           <ComboBox x:Name="LayoutViewComboBox" SelectedIndex="1" MaxHeight="28" MinWidth="120">
             <ComboBoxItem Content="Layered View"/>
             <ComboBoxItem Content="Flat View"/>
             <ComboBoxItem Content="Compact View"/>
           </ComboBox>
-
-          <Border Width="1" Background="#2A3F5A" Margin="4,2"/>
-          <TextBlock Text="ORGANISE:" VerticalAlignment="Center"
-                     Foreground="#4A6A8A" FontSize="9" FontWeight="Bold"
-                     LetterSpacing="1" Margin="4,0,4,0"/>
-          <DropDownButton Content="Organise" Padding="8,3">
-            <DropDownButton.Flyout>
-              <Flyout Placement="BottomEdgeAlignedLeft">
-                <StackPanel Spacing="6" Margin="4" Width="220">
-
-                  <Button x:Name="CleanupNamesButton"
-                          Content="Cleanup Names"
-                          Click="OnCleanupNamesClick"
-                          HorizontalAlignment="Stretch"
-                          Padding="8,4"
-                          ToolTip.Tip="Detect the most common repeating prefix across all card names (e.g. a company name or namespace) and strip it to reduce clutter."/>
-
-                  <Button x:Name="SortAllButton"
-                          Content="Sort All"
-                          Click="OnSortAllClick"
-                          HorizontalAlignment="Stretch"
-                          Padding="8,4"
-                          ToolTip.Tip="Sort all systems by kind sections: Desktop App first, then Backend Service, then Class Libraries."/>
-
-                  <Button x:Name="ArrangeButton"
-                          Content="Arrange"
-                          Click="OnArrangeClick"
-                          HorizontalAlignment="Stretch"
-                          Padding="8,4"
-                          ToolTip.Tip="Re-arrange all system cards in alphabetical order by name."/>
-
-                  <Button x:Name="SortByLayersButton"
-                          Content="Sort by Layers"
-                          Click="OnSortByLayersClick"
-                          HorizontalAlignment="Stretch"
-                          Padding="8,4"
-                          ToolTip.Tip="Arrange system cards into Presentation / Application / Domain / Infrastructure rows and show coloured layer bands."/>
-
-                  <Button x:Name="ClearCanvasButton"
-                          Content="Clear Canvas"
-                          Click="OnClearCanvasClick"
-                          HorizontalAlignment="Stretch"
-                          Padding="8,4"
-                          Background="#3A1A1A"
-                          Foreground="#FFAAAA"
-                          ToolTip.Tip="Remove all Systems, Modules, External Systems and Relationships from the current System Map."/>
-
-                </StackPanel>
-              </Flyout>
-            </DropDownButton.Flyout>
-          </DropDownButton>
         </StackPanel>
 
         <!-- Filters -->
@@ -145,6 +86,11 @@
             <Border DockPanel.Dock="Top" Background="#141C28"
                     Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
               <DockPanel>
+                <Button Content="← Map"
+                        Click="OnReturnToMapClick"
+                        Padding="8,3"
+                        Margin="0,0,10,0"
+                        ToolTip.Tip="Return to the system map."/>
                 <TextBlock x:Name="ModuleViewHeader" Foreground="#AABBCC" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <Button x:Name="ShowDetailedRelationshipsButton"
                         DockPanel.Dock="Right"
@@ -184,6 +130,11 @@
             <Border DockPanel.Dock="Top" Background="#141C28"
                     Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
               <DockPanel>
+                <Button Content="← Map"
+                        Click="OnReturnToMapClick"
+                        Padding="8,3"
+                        Margin="0,0,10,0"
+                        ToolTip.Tip="Return to the system map."/>
                 <TextBlock x:Name="CodeDetailHeader" Foreground="#AABBCC" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 <Button x:Name="ShowCodeNodeRelationshipsButton"
                         DockPanel.Dock="Right"
@@ -205,9 +156,17 @@
           </DockPanel>
 
           <!-- Startup View panel -->
-          <ScrollViewer x:Name="PanelStartup" IsVisible="False"
-                        HorizontalScrollBarVisibility="Disabled"
-                        VerticalScrollBarVisibility="Auto">
+          <DockPanel x:Name="PanelStartup" IsVisible="False">
+            <Border DockPanel.Dock="Top" Background="#141C28"
+                    Padding="12,8" BorderThickness="0,0,0,1" BorderBrush="#2A3F5A">
+              <Button Content="← Map"
+                      Click="OnReturnToMapClick"
+                      Padding="8,3"
+                      HorizontalAlignment="Left"
+                      ToolTip.Tip="Return to the system map."/>
+            </Border>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="16,12" Spacing="16">
 
               <TextBlock x:Name="EmptyStartupText"
@@ -224,7 +183,8 @@
               </StackPanel>
 
             </StackPanel>
-          </ScrollViewer>
+            </ScrollViewer>
+          </DockPanel>
 
           <!-- Zoom overlay — absolutely positioned top-right of content area -->
           <Border x:Name="CanvasZoomOverlay"
@@ -276,7 +236,7 @@
                       Padding="0">
 
             <!-- ── Component tab ──────────────────────────────────────── -->
-            <TabItem Header="Component" Padding="10,4">
+            <TabItem Header="Summary" Padding="10,4">
               <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="12,10" Spacing="6">
 
@@ -370,7 +330,7 @@
             </TabItem>
 
             <!-- ── Connections tab ────────────────────────────────────── -->
-            <TabItem Header="Connections" Padding="10,4">
+            <TabItem Header="Relationships" Padding="10,4">
               <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="12,10" Spacing="6">
 
@@ -400,7 +360,7 @@
             </TabItem>
 
             <!-- ── Properties tab ─────────────────────────────────────── -->
-            <TabItem Header="Properties" Padding="10,4">
+            <TabItem Header="Details" Padding="10,4">
               <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="12,10" Spacing="6">
 

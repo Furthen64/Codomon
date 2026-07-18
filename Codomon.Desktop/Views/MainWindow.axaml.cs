@@ -478,7 +478,6 @@ public partial class MainWindow : Window
             ("NavDesignBtn",  "Design"),
             ("NavScanBtn",    "Scan"),
             ("NavMonitorBtn", "Monitor"),
-            ("NavGraphBtn",   "Graph"),
             ("NavGymBtn",     "Gym"),
             ("NavCodeBtn",    "Code"),
             ("NavDocsBtn",    "Docs"),
@@ -2325,7 +2324,7 @@ public partial class MainWindow : Window
             return new OverviewRecommendation
             {
                 Title = "Scan tech stack",
-                Description = "The source scan is ready. Detect the workspace tech stack next so downstream analysis has concrete framework and infrastructure context.",
+                Description = "Detect the frameworks and infrastructure used by this codebase.",
                 ButtonText = "Scan tech stack",
                 ActionKey = OverviewActionTechStack
             };
@@ -2335,9 +2334,9 @@ public partial class MainWindow : Window
         {
             return new OverviewRecommendation
             {
-                Title = "Refresh tech stack",
-                Description = "The tech stack scan is older than the latest source changes or source scan. Refresh it before generating summaries.",
-                ButtonText = "Refresh tech stack",
+                Title = "Code changed",
+                Description = "Update the tech stack to match the latest code.",
+                ButtonText = "Redo tech stack",
                 ActionKey = OverviewActionTechStack
             };
         }
@@ -2527,7 +2526,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnOverviewPrimaryActionClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnOverviewPrimaryActionClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var actionKey = (sender as Button)?.Tag?.ToString();
         switch (actionKey)
@@ -2536,7 +2535,7 @@ public partial class MainWindow : Window
                 OnScanClick(sender, e);
                 break;
             case OverviewActionTechStack:
-                OnTechStackScanClick(sender, e);
+                await RefreshTechStackFromOverviewAsync(sender as Button);
                 break;
             case OverviewActionSummaries:
                 OnSummariesClick(sender, e);
@@ -2547,6 +2546,40 @@ public partial class MainWindow : Window
             case OverviewActionSystemMap:
                 OnOverviewOpenSystemMapClick(sender, e);
                 break;
+        }
+    }
+
+    private async Task RefreshTechStackFromOverviewAsync(Button? actionButton)
+    {
+        if (!_vm.HasWorkspace)
+        {
+            await ShowErrorAsync("Please open or create a workspace before scanning the tech stack.");
+            return;
+        }
+
+        if (actionButton != null)
+        {
+            actionButton.IsEnabled = false;
+            actionButton.Content = "Updating tech stack…";
+        }
+
+        var recommendationTitle = this.FindControl<TextBlock>("OverviewRecommendationTitleText");
+        var recommendationBody = this.FindControl<TextBlock>("OverviewRecommendationBodyText");
+        if (recommendationTitle != null) recommendationTitle.Text = "Updating tech stack";
+        if (recommendationBody != null) recommendationBody.Text = "Checking the latest code and project configuration.";
+
+        try
+        {
+            var result = await TechStackScanService.ScanAsync(_vm.Workspace.SourceProjectPath);
+            await TechStackScanService.SaveAsync(result, _vm.WorkspaceFolderPath);
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorAsync($"Tech stack scan failed: {ex.Message}");
+        }
+        finally
+        {
+            RefreshAnalyzePanel();
         }
     }
 
