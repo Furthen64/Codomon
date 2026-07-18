@@ -150,11 +150,11 @@
       </Grid.ColumnDefinitions>
 
       <!-- ── Graph Canvas ───────────────────────────────────────────────────── -->
-      <nodify:NodifyEditor x:Name="Editor"
-                           Grid.Column="0"
-                           DisplayConnectionsOnTop="False"
-                           ItemsSource="{Binding Nodes}"
-                           Connections="{Binding Connections}">
+      <Grid Grid.Column="0">
+        <nodify:NodifyEditor x:Name="Editor"
+                             DisplayConnectionsOnTop="False"
+                             ItemsSource="{Binding Nodes}"
+                             Connections="{Binding Connections}">
 
       <!-- Node template: explicit left-side inputs and right-side outputs -->
         <nodify:NodifyEditor.ItemTemplate>
@@ -231,7 +231,42 @@
           </DataTemplate>
         </nodify:NodifyEditor.ConnectionTemplate>
 
-      </nodify:NodifyEditor>
+        </nodify:NodifyEditor>
+
+        <Border IsVisible="{Binding ShowEmptyState}"
+                IsHitTestVisible="True"
+                Background="#E60F141E"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+          <StackPanel HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      MaxWidth="460"
+                      Spacing="12">
+            <TextBlock Text="Nothing to show here yet"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="#E7EEF9"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding EmptyStateMessage}"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Foreground="#9DB2C7"/>
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="8">
+              <Button x:Name="RevealLowConfidenceButton"
+                      Content="Reveal low-confidence items"
+                      IsVisible="{Binding CanRevealLowConfidenceItems}"
+                      Click="OnRevealLowConfidenceClick"
+                      Padding="12,7"/>
+              <Button x:Name="OpenAnalyzeButton"
+                      Content="Open Analyze"
+                      Click="OnOpenAnalyzeClick"
+                      Padding="12,7"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Grid>
 
       <!-- ── Node details panel ───────────────────────────────────────────── -->
       <Border Grid.Column="1" Background="#141C28" BorderBrush="#2A3F5A" BorderThickness="1,0,0,0">

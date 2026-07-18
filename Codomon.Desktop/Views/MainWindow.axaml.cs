@@ -2851,6 +2851,7 @@ public partial class MainWindow : Window
         graphView.NavigateToModuleRequested += OnGraphNavigateToModuleRequested;
         graphView.NavigateToCodeNodesRequested += OnGraphNavigateToCodeNodesRequested;
         graphView.NavigateToCallerModuleRequested += OnGraphNavigateToCallerModuleRequested;
+        graphView.OpenAnalyzeRequested += OnGraphOpenAnalyzeRequested;
 
         var host = this.FindControl<ContentControl>("CanvasHost");
         if (host != null)
@@ -2947,6 +2948,9 @@ public partial class MainWindow : Window
         SetActiveNavTab("Monitor");
         _vm.SystemMap.SetActiveView(SystemMapViewKind.SystemOverview);
     }
+
+    private void OnGraphOpenAnalyzeRequested()
+        => SetActiveNavTab("Scan");
 
     private void OnGraphNavigateToModuleRequested(string systemId)
     {

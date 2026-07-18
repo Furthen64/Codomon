@@ -85,6 +85,9 @@ public class GraphViewModel : INotifyPropertyChanged
     private string _selectedNodeModule = string.Empty;
     private string _selectedNodeSystem = string.Empty;
     private string _selectedNodeSummaryFirstParagraph = string.Empty;
+    private bool _hasVisibleNodes;
+    private bool _canRevealLowConfidenceItems;
+    private string _emptyStateMessage = "Run a source scan to build an architecture graph.";
     private readonly ObservableCollection<GraphNodeFileVm> _selectedNodeFiles = new();
     private readonly ObservableCollection<GraphCallerVm> _selectedNodeCallers = new();
     private readonly HashSet<string> _callerOverlayNodeKeys = new(StringComparer.Ordinal);
@@ -271,6 +274,28 @@ public class GraphViewModel : INotifyPropertyChanged
     public ObservableCollection<GraphNodeFileVm> SelectedNodeFiles => _selectedNodeFiles;
     public ObservableCollection<GraphCallerVm> SelectedNodeCallers => _selectedNodeCallers;
     public bool HasSelectedNodeCallers => _selectedNodeCallers.Count > 0;
+    /// <summary>Whether the current graph filters produced at least one visible node.</summary>
+    public bool HasVisibleNodes
+    {
+        get => _hasVisibleNodes;
+        private set { _hasVisibleNodes = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowEmptyState)); }
+    }
+
+    /// <summary>Whether revealing Unknown-confidence items can recover an empty graph.</summary>
+    public bool CanRevealLowConfidenceItems
+    {
+        get => _canRevealLowConfidenceItems;
+        private set { _canRevealLowConfidenceItems = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Human-readable explanation shown when the graph has no visible nodes.</summary>
+    public string EmptyStateMessage
+    {
+        get => _emptyStateMessage;
+        private set { _emptyStateMessage = value; OnPropertyChanged(); }
+    }
+
+    public bool ShowEmptyState => !HasVisibleNodes;
     public string SelectedNodeSizePercent => SelectedNode == null
         ? "100%"
         : $"{Math.Round(SelectedNode.SizeMultiplier * 100):0}%";
@@ -498,6 +523,7 @@ public class GraphViewModel : INotifyPropertyChanged
         if (modules.Count == 0)
         {
             AppLogger.Debug($"[Graph] Module relationship view: system '{system.Name}' has no modules.");
+            UpdateEmptyState(0, "This system has no modules yet. Run a source scan or add modules in Design.");
             return;
         }
 
@@ -623,6 +649,7 @@ public class GraphViewModel : INotifyPropertyChanged
         EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildModuleRelationshipsForSystem complete. System='{system.Name}' Modules={Nodes.Count} Connections={Connections.Count} LowConfidence={ShowLowConfidenceItems} Calls={ShowCallsRelationships} Depends={ShowDependsRelationships} Imports={ShowImportsRelationships} Other={ShowOtherRelationships}");
+        UpdateEmptyState(modules.Count, "This system has no visible modules for the current filters.");
     }
 
     private void BuildCodeNodeRelationshipsForModule(SystemMapModel map, string? moduleId)
@@ -661,6 +688,7 @@ public class GraphViewModel : INotifyPropertyChanged
         if (codeNodes.Count == 0)
         {
             AppLogger.Debug($"[Graph] Code-node relationship view: module '{module.Name}' has no code nodes.");
+            UpdateEmptyState(0, "This module has no code nodes yet. Run a source scan to populate it.");
             return;
         }
 
@@ -725,6 +753,7 @@ public class GraphViewModel : INotifyPropertyChanged
         EnsureSelectedNodeIsValid();
 
         AppLogger.Debug($"[Graph] BuildCodeNodeRelationshipsForModule complete. Module='{module.Name}' CodeNodes={Nodes.Count} Connections={Connections.Count} LowConfidence={ShowLowConfidenceItems} Calls={ShowCallsRelationships} Depends={ShowDependsRelationships} Imports={ShowImportsRelationships} Other={ShowOtherRelationships}");
+        UpdateEmptyState(codeNodes.Count, "This module has no visible code nodes for the current filters.");
     }
 
     private void BuildFromSystemMap(SystemMapModel map)
@@ -827,6 +856,8 @@ public class GraphViewModel : INotifyPropertyChanged
 
         AppLogger.Debug($"[Graph] BuildFromSystemMap complete. " +
                         $"Nodes={Nodes.Count}  Connections={Connections.Count}");
+        UpdateEmptyState(map.Systems.Count + map.ExternalSystems.Count,
+            "No systems are visible in the graph yet. Run a source scan to discover architecture.");
     }
 
     private bool IsKindVisible(RelationshipKind kind) => kind switch
@@ -937,6 +968,17 @@ public class GraphViewModel : INotifyPropertyChanged
 
         AppLogger.Debug($"[Graph] BuildFromWorkspaceConnections complete. Nodes={Nodes.Count}  Connections={Connections.Count}  " +
                         $"(workspace had {workspace.Connections.Count} connection(s) total).");
+        UpdateEmptyState(workspace.Systems.Count,
+            "No systems have been added to this workspace yet. Run a source scan or add components in Design.");
+    }
+
+    private void UpdateEmptyState(int availableItemCount, string noDataMessage)
+    {
+        HasVisibleNodes = Nodes.Count > 0;
+        CanRevealLowConfidenceItems = !HasVisibleNodes && !ShowLowConfidenceItems && availableItemCount > 0;
+        EmptyStateMessage = CanRevealLowConfidenceItems
+            ? "All available items are hidden because their confidence is still unknown. Reveal them to inspect the first-pass graph."
+            : noDataMessage;
     }
 
     /// <summary>

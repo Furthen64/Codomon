@@ -24,6 +24,7 @@ public partial class GraphView : UserControl
     public event Action<string>? NavigateToModuleRequested;
     public event Action<string>? NavigateToCodeNodesRequested;
     public event Action<string>? NavigateToCallerModuleRequested;
+    public event Action? OpenAnalyzeRequested;
 
     public GraphView()
     {
@@ -80,6 +81,17 @@ public partial class GraphView : UserControl
             NavigateToCodeNodesRequested?.Invoke(vm.BreadcrumbModuleId);
         };
     }
+
+    private void OnRevealLowConfidenceClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not GraphViewModel vm) return;
+
+        FilterLowConfidenceCheck.IsChecked = true;
+        vm.ShowLowConfidenceItems = true;
+    }
+
+    private void OnOpenAnalyzeClick(object? sender, RoutedEventArgs e)
+        => OpenAnalyzeRequested?.Invoke();
 
     protected override void OnDataContextChanged(EventArgs e)
     {

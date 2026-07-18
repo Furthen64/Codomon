@@ -1,0 +1,5 @@
+# Rough edges and invisible graphs
+
+So using this app for analyzing a code repo is hard. There are many rough edges and much is hidden.
+I try to follow a desktop app and get lost and nothing shows up eventually. 
+
