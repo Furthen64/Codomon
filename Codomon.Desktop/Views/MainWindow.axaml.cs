@@ -431,9 +431,12 @@ public partial class MainWindow : Window
     private const string OverviewActionArchitecture = "architecture";
     private const string OverviewActionSystemMap = "system-map";
 
+    // A source scan parses C# source only. Keep documentation in the snapshot for the
+    // overview count, but do not let documentation, project metadata, or other assets
+    // make a completed code scan appear stale.
     private static readonly string[] SourceSnapshotExtensions =
     {
-        ".cs", ".csproj", ".sln", ".slnx", ".props", ".targets", ".md", ".markdown"
+        ".cs", ".md", ".markdown"
     };
 
     private static readonly string[] SourceSnapshotIgnoredDirectories =
@@ -2451,9 +2454,12 @@ public partial class MainWindow : Window
                     markdownDocCount++;
                 }
 
-                var lastWrite = File.GetLastWriteTimeUtc(filePath);
-                if (!latestChangeAt.HasValue || lastWrite > latestChangeAt.Value)
-                    latestChangeAt = lastWrite;
+                if (extension.Equals(".cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    var lastWrite = File.GetLastWriteTimeUtc(filePath);
+                    if (!latestChangeAt.HasValue || lastWrite > latestChangeAt.Value)
+                        latestChangeAt = lastWrite;
+                }
             }
         }
         catch
