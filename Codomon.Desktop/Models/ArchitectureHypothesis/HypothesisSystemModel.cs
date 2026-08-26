@@ -12,6 +12,10 @@ public class HypothesisSystemModel
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>One short product-level sentence explaining what the system does for its user.</summary>
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
     /// <summary>The kind of system the LLM believes this to be.</summary>
     [JsonPropertyName("kind")]
     [JsonConverter(typeof(LenientStringEnumConverter<SystemKind>))]

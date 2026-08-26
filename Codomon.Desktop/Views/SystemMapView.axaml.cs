@@ -67,10 +67,10 @@ public partial class SystemMapView : UserControl
     private static readonly IBrush InactiveButtonBg = new SolidColorBrush(Color.Parse("#1A2435"));
 
     // ── Arrow rendering constants ─────────────────────────────────────────
-    /// <summary>Half of the fixed 220 px card width; used for card-edge intersection.</summary>
-    private const double ArrowCardHalfWidth  = 110.0;
+    /// <summary>Half of the fixed 280 px card width; used for card-edge intersection.</summary>
+    private const double ArrowCardHalfWidth  = 140.0;
     /// <summary>Approximate half-height of a typical system card; used for card-edge intersection.</summary>
-    private const double ArrowCardHalfHeight =  65.0;
+    private const double ArrowCardHalfHeight =  82.0;
     /// <summary>Half of the fixed 180 px external-system card width.</summary>
     private const double ExternalCardHalfWidth  = 90.0;
     /// <summary>Approximate half-height of an external system card.</summary>
@@ -113,9 +113,7 @@ public partial class SystemMapView : UserControl
         InitializeComponent();
         _vm = vm;
 
-        WireFilterCheckBoxes();
         WireZoomButtons();
-        WireLayoutComboBox();
         SetupItemTemplates();
 
         var moduleSurface = this.FindControl<Grid>("ModuleViewSurface");
@@ -140,8 +138,6 @@ public partial class SystemMapView : UserControl
         RefreshModuleView();
         RefreshCodeDetailView();
         RefreshStartupView();
-        UpdateInspector();
-        UpdateInspectorActionPanel();
     }
 
     // ── Zoom controls ─────────────────────────────────────────────────────
@@ -293,58 +289,6 @@ public partial class SystemMapView : UserControl
         // Startup items
         var startupCtrl = this.FindControl<ItemsControl>("StartupItemsControl")!;
         startupCtrl.ItemTemplate = new FuncDataTemplate<StartupItemVm>(BuildStartupCard, supportsRecycling: false);
-
-        // Inspector details list
-        var detailCtrl = this.FindControl<ItemsControl>("InspDetailsItemsControl")!;
-        detailCtrl.ItemTemplate = new FuncDataTemplate<string>((s, _) =>
-        {
-            if (s == null) return new TextBlock();
-            return new TextBlock
-            {
-                Text = s,
-                Foreground = new SolidColorBrush(Color.Parse("#88CCAA")),
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap
-            };
-        }, supportsRecycling: false);
-
-        // Connections tab — outbound list
-        var outboundCtrl = this.FindControl<ItemsControl>("CompOutboundItemsControl")!;
-        outboundCtrl.ItemTemplate = new FuncDataTemplate<RelationshipItemVm>(BuildConnectionRow, supportsRecycling: false);
-
-        // Connections tab — inbound list
-        var inboundCtrl = this.FindControl<ItemsControl>("CompInboundItemsControl")!;
-        inboundCtrl.ItemTemplate = new FuncDataTemplate<RelationshipItemVm>(BuildConnectionRow, supportsRecycling: false);
-
-        // Component tab — responsibilities list
-        var respCtrl = this.FindControl<ItemsControl>("CompResponsibilitiesItemsControl")!;
-        respCtrl.ItemTemplate = new FuncDataTemplate<string>((s, _) =>
-        {
-            if (s == null) return new TextBlock();
-            return new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "•",
-                        Foreground = new SolidColorBrush(Color.Parse("#4A6A8A")),
-                        FontSize = 11,
-                        VerticalAlignment = VerticalAlignment.Top,
-                        Margin = new Avalonia.Thickness(0, 1, 0, 0)
-                    },
-                    new TextBlock
-                    {
-                        Text = s,
-                        Foreground = new SolidColorBrush(Color.Parse("#AABBCC")),
-                        FontSize = 11,
-                        TextWrapping = TextWrapping.Wrap
-                    }
-                }
-            };
-        }, supportsRecycling: false);
     }
 
     // ── Card / row builders ───────────────────────────────────────────────
@@ -368,7 +312,7 @@ public partial class SystemMapView : UserControl
                     Text       = item.Name,
                     Foreground = Brushes.White,
                     FontWeight = FontWeight.SemiBold,
-                    FontSize   = 14,
+                    FontSize   = 16,
                     TextWrapping = TextWrapping.Wrap
                 }
             }
@@ -392,7 +336,7 @@ public partial class SystemMapView : UserControl
                     {
                         Text       = $"{item.ModuleCount} module(s)",
                         Foreground = new SolidColorBrush(Color.Parse("#778899")),
-                        FontSize   = 11
+                        FontSize   = 12
                     },
                     BuildModuleSizeIndicator(item.ModuleCount)
                 }
@@ -416,7 +360,7 @@ public partial class SystemMapView : UserControl
             {
                 Text         = item.Description,
                 Foreground   = new SolidColorBrush(Color.Parse(CardSecondaryFgHex)),
-                FontSize     = 11,
+                FontSize     = 12,
                 TextWrapping = TextWrapping.Wrap,
                 MaxLines     = 2
             });
@@ -428,7 +372,7 @@ public partial class SystemMapView : UserControl
             {
                 Text       = $"⚙ {item.StartupMechanism}",
                 Foreground = new SolidColorBrush(Color.Parse("#88AABB")),
-                FontSize   = 11
+                FontSize   = 12
             });
         }
 
@@ -438,28 +382,25 @@ public partial class SystemMapView : UserControl
             Background      = new SolidColorBrush(Color.Parse("#141C28")),
             BorderBrush     = new SolidColorBrush(Color.Parse(isFlatSelected ? "#4A90D9" : "#2A3F5A")),
             BorderThickness = new Avalonia.Thickness(isFlatSelected ? 2 : 1),
-            CornerRadius    = new Avalonia.CornerRadius(6),
-            Padding         = new Avalonia.Thickness(14, 10),
-            Margin          = new Avalonia.Thickness(0, 0, 10, 10),
-            Width           = 220,
+            CornerRadius    = new Avalonia.CornerRadius(8),
+            Padding         = new Avalonia.Thickness(18, 14),
+            Margin          = new Avalonia.Thickness(0, 0, 14, 14),
+            Width           = 280,
             Cursor          = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
-            Child = new StackPanel { Spacing = 8, Children = { header, details } }
+            Child = new StackPanel { Spacing = 10, Children = { header, details } }
         };
 
         var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
         if (systemsCanvas != null)
         {
-            WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
+            WireOverviewCardClick(card, () =>
             {
                 _vm.SelectSystem(item);
-            }, () =>
-            {
-                _vm.SelectSystem(item);
-                _vm.SetActiveView(SystemMapViewKind.ModuleView);
+                ShowDetailedRelationshipsRequested?.Invoke(item);
             });
         }
 
-        return card;
+        return BuildSystemOverviewRow(card, item);
     }
 
     private Control BuildExternalSystemCard(ExternalSystemItemVm? item, INameScope? _scope)
@@ -500,9 +441,58 @@ public partial class SystemMapView : UserControl
 
         var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
         if (systemsCanvas != null)
-            WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: true, () => _vm.SelectExternalSystem(item));
+            WireOverviewCardClick(card, () => _vm.SelectExternalSystem(item));
 
         return card;
+    }
+
+    private static Control BuildSystemOverviewRow(Border card, SystemItemVm item)
+    {
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 22
+        };
+        row.Children.Add(card);
+
+        if (item.AnalysisHighlights.Count == 0)
+            return row;
+
+        var analysisContent = new StackPanel { Spacing = 8 };
+        analysisContent.Children.Add(new TextBlock
+        {
+            Text = "ARCHITECTURE ANALYSIS",
+            Foreground = new SolidColorBrush(Color.Parse("#4A90D9")),
+            FontSize = 10,
+            FontWeight = FontWeight.Bold,
+            LetterSpacing = 1.2
+        });
+
+        foreach (var highlight in item.AnalysisHighlights)
+        {
+            analysisContent.Children.Add(new TextBlock
+            {
+                Text = highlight,
+                Foreground = new SolidColorBrush(Color.Parse("#AABBCC")),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                MaxLines = 3
+            });
+        }
+
+        row.Children.Add(new Border
+        {
+            Width = 560,
+            MinHeight = 150,
+            Padding = new Avalonia.Thickness(18, 14),
+            Background = new SolidColorBrush(Color.Parse("#111A26")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#2A4A6A")),
+            BorderThickness = new Avalonia.Thickness(1),
+            CornerRadius = new Avalonia.CornerRadius(8),
+            Child = analysisContent
+        });
+
+        return row;
     }
 
     private Control BuildModuleCard(ModuleItemVm? item, INameScope _scope)
@@ -998,28 +988,6 @@ public partial class SystemMapView : UserControl
                     QueueModuleRelationshipOverlayRefresh();
                 break;
 
-            case nameof(SystemMapViewModel.InspectorName):
-            case nameof(SystemMapViewModel.InspectorType):
-            case nameof(SystemMapViewModel.InspectorKind):
-            case nameof(SystemMapViewModel.InspectorNotes):
-            case nameof(SystemMapViewModel.InspectorConfidence):
-            case nameof(SystemMapViewModel.InspectorDetails):
-            case nameof(SystemMapViewModel.InspectorIsSystemSelected):
-            case nameof(SystemMapViewModel.InspectorLayerLabel):
-            case nameof(SystemMapViewModel.InspectorLayerColor):
-            case nameof(SystemMapViewModel.InspectorDescription):
-            case nameof(SystemMapViewModel.InspectorSourceFile):
-            case nameof(SystemMapViewModel.InspectorSourceLineRange):
-            case nameof(SystemMapViewModel.InspectorResponsibilities):
-            case nameof(SystemMapViewModel.InspectorInboundConnections):
-            case nameof(SystemMapViewModel.InspectorOutboundConnections):
-                UpdateInspector();
-                break;
-
-            case nameof(SystemMapViewModel.SelectedRelationship):
-                UpdateInspectorActionPanel();
-                break;
-
             case nameof(SystemMapViewModel.SelectedSystemName):
                 RefreshModuleView();
                 RefreshCodeDetailView();
@@ -1196,21 +1164,21 @@ public partial class SystemMapView : UserControl
         var header = new Border
         {
             Background = new SolidColorBrush(Color.Parse(headerBgColor)),
-            Padding    = new Avalonia.Thickness(14, 8),
+            Padding    = new Avalonia.Thickness(18, 11),
             Child = new TextBlock
             {
                 Text         = item.Name,
                 Foreground   = Brushes.White,
                 FontWeight   = FontWeight.Bold,
-                FontSize     = 14,
+                FontSize     = 16,
                 TextWrapping = TextWrapping.Wrap
             }
         };
 
         var body = new StackPanel
         {
-            Margin  = new Avalonia.Thickness(14, 8),
-            Spacing = 6
+            Margin  = new Avalonia.Thickness(18, 11),
+            Spacing = 8
         };
 
         if (!string.IsNullOrEmpty(item.Description))
@@ -1219,7 +1187,7 @@ public partial class SystemMapView : UserControl
             {
                 Text         = item.Description,
                 Foreground   = new SolidColorBrush(Color.Parse(CardSecondaryFgHex)),
-                FontSize     = 11,
+                FontSize     = 12,
                 TextWrapping = TextWrapping.Wrap,
                 MaxLines     = 2
             });
@@ -1236,7 +1204,7 @@ public partial class SystemMapView : UserControl
             BorderBrush     = new SolidColorBrush(Color.Parse(accentColor)),
             BorderThickness = new Avalonia.Thickness(1.5),
             CornerRadius    = new Avalonia.CornerRadius(8),
-            Width           = 220,
+            Width           = 280,
             ClipToBounds    = true,
             Cursor          = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
             Child           = new StackPanel { Children = { header, body } }
@@ -1249,17 +1217,14 @@ public partial class SystemMapView : UserControl
         var systemsCanvas = this.FindControl<Canvas>("SystemsCanvas");
         if (systemsCanvas != null)
         {
-            WireOverviewCardDrag(card, systemsCanvas, item.Id, isExternal: false, () =>
+            WireOverviewCardClick(card, () =>
             {
                 _vm.SelectSystem(item);
-            }, () =>
-            {
-                _vm.SelectSystem(item);
-                _vm.SetActiveView(SystemMapViewKind.ModuleView);
+                ShowDetailedRelationshipsRequested?.Invoke(item);
             });
         }
 
-        return card;
+        return BuildSystemOverviewRow(card, item);
     }
 
     /// <summary>
@@ -1442,8 +1407,8 @@ public partial class SystemMapView : UserControl
         const double legendX          = 24.0;
         const double padBelowY        = 32.0;
         // Card row height used to ensure the legend clears the last card row.
-        // Matches the SystemMapViewModel.CardGapY value (220 px).
-        const double systemCardRowH   = 220.0;
+        // Matches the compact SystemMapViewModel.CardGapY value (210 px).
+        const double systemCardRowH   = 210.0;
         // Approximate height of a compact external-system card plus its padding.
         const double externalCardRowH = 140.0;
 
@@ -1571,21 +1536,15 @@ public partial class SystemMapView : UserControl
         return Math.Clamp(mapped, 1, cellCount);
     }
 
-    private void WireOverviewCardDrag(
-        Border card,
-        Canvas canvas,
-        string itemId,
-        bool isExternal,
-        Action clickAction,
-        Action? doubleClickAction = null)
+    private static void WireOverviewCardClick(Border card, Action clickAction)
     {
-        card.PointerPressed += (_, e) => OnOverviewCardPointerPressed(e, card, canvas, itemId, isExternal, clickAction, doubleClickAction);
-        card.PointerMoved += (_, e) => OnOverviewCardPointerMoved(e, card);
-        card.PointerReleased += (_, e) => OnOverviewCardPointerReleased(e, card);
-        card.PointerCaptureLost += (_, _) =>
+        card.PointerReleased += (_, e) =>
         {
-            if (_dragState?.Card == card)
-                _dragState = null;
+            if (e.InitialPressMouseButton != MouseButton.Left)
+                return;
+
+            clickAction();
+            e.Handled = true;
         };
     }
 

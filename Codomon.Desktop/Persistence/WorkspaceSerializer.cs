@@ -49,6 +49,7 @@ public static class WorkspaceSerializer
           "systems": [
             {
               "name": "string",
+              "description": "One short sentence (max 20 words) explaining what this system does for its user; avoid class names and implementation details.",
               "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
               "confidence": "Likely|Possible|Unknown",
               "evidence": ["string"],

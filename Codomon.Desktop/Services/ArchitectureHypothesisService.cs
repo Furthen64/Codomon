@@ -52,6 +52,7 @@ public static class ArchitectureHypothesisService
                     "systems": [
                         {
                             "name": "string",
+                            "description": "One short sentence (max 20 words) explaining what this system does for its user; avoid class names and implementation details.",
                             "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
                             "confidence": "Likely|Possible|Unknown",
                             "evidence": ["string"],
@@ -104,6 +105,7 @@ public static class ArchitectureHypothesisService
                     "systems": [
                         {
                             "name": "string",
+                            "description": "One short sentence (max 20 words) explaining what this system does for its user; avoid class names and implementation details.",
                             "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
                             "confidence": "Likely|Possible|Unknown",
                             "evidence": ["string"],
@@ -156,6 +158,7 @@ public static class ArchitectureHypothesisService
                     "systems": [
                         {
                             "name": "string",
+                            "description": "One short sentence (max 20 words) explaining what this system does for its user; avoid class names and implementation details.",
                             "kind": "DesktopApp|WebApp|BackendService|WorkerService|ScheduledJob|CliTool|DatabaseProcess|LibraryOnly|Unknown",
                             "confidence": "Likely|Possible|Unknown",
                             "evidence": ["string"],
@@ -258,16 +261,25 @@ public static class ArchitectureHypothesisService
         }
 
         var largeCodebasePath = Path.Combine(templatesFolder, "LARGE_CODEBASE.md");
-        if (!File.Exists(largeCodebasePath))
+        if (await BuiltInTemplateNeedsRefreshAsync(largeCodebasePath))
             await File.WriteAllTextAsync(largeCodebasePath, LargeCodebasePrompt);
 
         var oneDesktopAppPath = Path.Combine(templatesFolder, "ONE_DESKTOP_APP.md");
-        if (!File.Exists(oneDesktopAppPath))
+        if (await BuiltInTemplateNeedsRefreshAsync(oneDesktopAppPath))
             await File.WriteAllTextAsync(oneDesktopAppPath, OneDesktopAppPrompt);
 
         var oneWebAppPath = Path.Combine(templatesFolder, "ONE_WEB_APP.md");
-        if (!File.Exists(oneWebAppPath))
+        if (await BuiltInTemplateNeedsRefreshAsync(oneWebAppPath))
             await File.WriteAllTextAsync(oneWebAppPath, OneWebAppPrompt);
+    }
+
+    private static async Task<bool> BuiltInTemplateNeedsRefreshAsync(string path)
+    {
+        if (!File.Exists(path))
+            return true;
+
+        var content = await File.ReadAllTextAsync(path);
+        return !content.Contains("\"description\"", StringComparison.Ordinal);
     }
 
     /// <summary>Returns built-in prompt preset names and descriptions.</summary>
@@ -592,6 +604,12 @@ public static class ArchitectureHypothesisService
             {
                 target.Systems.Add(s);
                 continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.Description) &&
+                !string.IsNullOrWhiteSpace(s.Description))
+            {
+                existing.Description = s.Description;
             }
 
             // Merge modules by module name.

@@ -41,6 +41,8 @@ public class SystemItemVm
     public int SourceLineEnd { get; init; }
     /// <summary>Bullet-list responsibilities; populated from manual notes or empty.</summary>
     public IReadOnlyList<string> Responsibilities { get; init; } = Array.Empty<string>();
+    /// <summary>Concise accepted facts and LLM synthesis evidence shown beside the map card.</summary>
+    public IReadOnlyList<string> AnalysisHighlights { get; init; } = Array.Empty<string>();
 
     /// <summary>True when this system is a class-library rather than a runnable app.</summary>
     public bool IsLibrary =>
@@ -137,9 +139,9 @@ public class SystemMapViewModel : INotifyPropertyChanged
     private const string LayoutPrefix = "systemmap:";
     private const double CardStartX = 24;
     private const double CardStartY = 18;
-    private const double CardGapX = 248;
-    private const double CardGapY = 220;
-    private const int CardsPerRow = 4;
+    private const double CardGapX = 312;
+    private const double CardGapY = 210;
+    private const int CardsPerRow = 1;
     /// <summary>
     /// Default base row for external system card layout on the unified canvas.
     /// Keeps externals below the typical system area without hard-coding a pixel offset.
@@ -449,23 +451,14 @@ public class SystemMapViewModel : INotifyPropertyChanged
         _currentModel = model;
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom starting. Systems={model.Systems.Count}, Modules={model.AllModules.Count()}, CodeNodes={model.AllCodeNodes.Count()}, ExternalSystems={model.ExternalSystems.Count}, Relationships={model.Relationships.Count}");
 
-        // Pre-compute the base row for library systems so they are placed after all non-library
-        // rows, preventing overlap when there are more than CardsPerRow non-library systems.
-        // Only systems without a saved layout position contribute to the auto-layout grid.
-        int autoLayoutNonLibCount = model.Systems.Count(s =>
-            s.Kind != SystemKind.LibraryOnly &&
-            !string.Equals(s.StartupMechanism, "Class Library", StringComparison.OrdinalIgnoreCase) &&
-            !TryGetSavedPosition(GetLayoutPositionKey(s.Id, isExternal: false), layoutPositions, out _));
-        int nonLibraryRowCount = autoLayoutNonLibCount == 0 ? 0
-            : (autoLayoutNonLibCount + CardsPerRow - 1) / CardsPerRow;
-        int libraryBaseRow = nonLibraryRowCount == 0 ? 0 : nonLibraryRowCount + 1;
+        int systemIndex = 0;
 
-        int topLaneIndex = 0;
-        int lowerLaneIndex = 0;
-
-        _allSystems = model.Systems.Select(s =>
+        _allSystems = model.Systems
+            .OrderBy(s => GetOverviewPriority(s.Kind))
+            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(s =>
         {
-            var position = GetSystemPosition(s, layoutPositions, ref topLaneIndex, ref lowerLaneIndex, libraryBaseRow);
+            var position = CreateGridPosition(systemIndex++, baseRow: 0);
             return new SystemItemVm
             {
                 Id               = s.Id,
@@ -481,6 +474,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
                 SourceLineStart  = 0,
                 SourceLineEnd    = 0,
                 Responsibilities = Array.Empty<string>(),
+                AnalysisHighlights = BuildAnalysisHighlights(s),
                 X                = position.X,
                 Y                = position.Y
             };
@@ -490,7 +484,7 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
         _allExternalSystems = model.ExternalSystems.Select(e =>
         {
-            var position = GetExternalPosition(e.Id, layoutPositions, externalIndex++);
+            var position = CreateGridPosition(externalIndex++, baseRow: model.Systems.Count + 1);
             return new ExternalSystemItemVm
             {
                 Id         = e.Id,
@@ -595,6 +589,40 @@ public class SystemMapViewModel : INotifyPropertyChanged
 
         AppLogger.Debug($"[SystemMapViewModel] LoadFrom completed. VisibleSystems={Systems.Count}, CachedModules={_allModules.Count}, CachedCodeNodes={_allCodeNodes.Count}, VisibleExternalSystems={ExternalSystems.Count}, VisibleStartupItems={StartupItems.Count}");
     }
+
+    private static IReadOnlyList<string> BuildAnalysisHighlights(SystemModel system)
+    {
+        var highlights = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(system.Notes))
+            highlights.Add(system.Notes.Trim());
+
+        if (system.EntryPointCandidates.FirstOrDefault() is { Length: > 0 } entryPoint)
+            highlights.Add($"Entry point: {entryPoint}");
+
+        if (!string.IsNullOrWhiteSpace(system.StartupMechanism))
+            highlights.Add($"Startup: {system.StartupMechanism}");
+
+        highlights.AddRange(system.Evidence
+            .Where(e => !string.IsNullOrWhiteSpace(e.Description))
+            .Select(e => e.Description.Trim())
+            .Where(description => !highlights.Contains(description, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(3));
+
+        return highlights.Take(4).ToList();
+    }
+
+    private static int GetOverviewPriority(SystemKind kind) => kind switch
+    {
+        SystemKind.DesktopApp => 0,
+        SystemKind.WebApp => 1,
+        SystemKind.BackendService or SystemKind.WorkerService => 2,
+        SystemKind.ScheduledJob or SystemKind.CliTool or SystemKind.DatabaseProcess => 3,
+        SystemKind.Unknown => 4,
+        SystemKind.LibraryOnly => 5,
+        _ => 4
+    };
 
     /// <summary>
     /// Detects common leading token(s) shared across all card names

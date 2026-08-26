@@ -634,8 +634,7 @@ public partial class MainWindow : Window
                 result.WorkspaceFolderPath,
                 result.WorkspaceName,
                 result.SourceProjectPath,
-                result.ProfileName,
-                result.SystemNames);
+                result.ProfileName);
             SetActiveNavTab("Overview");
             UpdateWindowTitle();
             AppLogger.Info($"New workspace created: {result.WorkspaceName}");

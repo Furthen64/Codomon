@@ -27,7 +27,9 @@ public partial class App : Application
     public override void Initialize()
     {
         // (step 1)
+        DebugLaunchTrace.Write("Loading App.axaml.");
         AvaloniaXamlLoader.Load(this);
+        DebugLaunchTrace.Write("App.axaml loaded.");
     }
 
     
@@ -36,6 +38,7 @@ public partial class App : Application
         // (step 2)
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            DebugLaunchTrace.Write("Starting splash-to-main window flow.");
             _ = StartWithSplashAsync(desktop);
         }
 
@@ -56,8 +59,10 @@ public partial class App : Application
 
         try
         {
+            DebugLaunchTrace.Write("Selecting splash window implementation.");
             if (SplashModeSelector.ShouldUseFancySplash())
             {
+                DebugLaunchTrace.Write("Constructing FancySplashWindow from Views/FancySplashWindow.axaml.cs.");
                 fancy = new FancySplashWindow(
                     timings.FancyCodeRefreshMilliseconds,
                     timings.FancyFadeInMilliseconds);
@@ -65,17 +70,22 @@ public partial class App : Application
             }
             else
             {
+                DebugLaunchTrace.Write("Constructing StaticSplashWindow from Views/StaticSplashWindow.axaml.cs.");
                 splash = new StaticSplashWindow();
             }
 
+            DebugLaunchTrace.Write($"Opening {splash.GetType().Name}.");
             splash.Show();
 
             await SimulateStartupAsync(fancy, timings.ProgressStepMilliseconds);
         }
-        catch
+        catch (Exception ex)
         {
+            DebugLaunchTrace.Exception(ex);
             splash?.Close();
+            DebugLaunchTrace.Write("Constructing fallback StaticSplashWindow from Views/StaticSplashWindow.axaml.cs.");
             splash = new StaticSplashWindow();
+            DebugLaunchTrace.Write("Opening fallback StaticSplashWindow.");
             splash.Show();
             await Task.Delay(timings.FallbackSplashMilliseconds);
         }
@@ -86,14 +96,26 @@ public partial class App : Application
             await Task.Delay(remaining);
         }
 
-        var main = new MainWindow();
-        desktop.MainWindow = main;
-        main.Opened += OnMainWindowOpened;
-        main.Show();
-
-        if (splash is not null)
+        try
         {
-            await Dispatcher.UIThread.InvokeAsync(() => splash.Close());
+            DebugLaunchTrace.Write("Transition splash => main: constructing Views/MainWindow.axaml.cs.");
+            var main = new MainWindow();
+            DebugLaunchTrace.Write("MainWindow construction completed.");
+            desktop.MainWindow = main;
+            main.Opened += OnMainWindowOpened;
+            DebugLaunchTrace.Write("Opening MainWindow.");
+            main.Show();
+
+            if (splash is not null)
+            {
+                DebugLaunchTrace.Write($"Closing {splash.GetType().Name} after MainWindow.Show().");
+                await Dispatcher.UIThread.InvokeAsync(() => splash.Close());
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLaunchTrace.Exception(ex);
+            throw;
         }
     }
 

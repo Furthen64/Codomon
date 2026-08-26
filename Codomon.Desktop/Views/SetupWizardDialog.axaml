@@ -20,12 +20,11 @@
             <Ellipse x:Name="Dot1" Width="10" Height="10" Fill="#3A8FBF"/>
             <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="#2A3F5A"/>
             <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="#2A3F5A"/>
-            <Ellipse x:Name="Dot4" Width="10" Height="10" Fill="#2A3F5A"/>
           </StackPanel>
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="New Workspace" FontSize="16" FontWeight="Bold" Foreground="White"/>
-          <TextBlock x:Name="StepTitleText" Text="Step 1 of 4 — Source Project"
+          <TextBlock x:Name="StepTitleText" Text="Step 1 of 3 — Source Project"
                      FontSize="12" Foreground="#88AABB"/>
         </StackPanel>
       </DockPanel>
@@ -107,31 +106,6 @@
           <TextBlock Text="A profile stores layout, filters, and visual settings. You can add more profiles later."
                      Foreground="#667788" FontSize="11" TextWrapping="Wrap"/>
         </StackPanel>
-
-        <!-- Step 4: Initial systems (optional) -->
-        <DockPanel x:Name="Step4Panel" Margin="0,36,0,0" IsVisible="False" LastChildFill="True">
-          <StackPanel DockPanel.Dock="Top" Spacing="10">
-            <TextBlock Text="Optionally add initial System names. You can always add more later."
-                       Foreground="#AABBCC" TextWrapping="Wrap"/>
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBox x:Name="NewSystemNameBox" Grid.Column="0"
-                       Watermark="System name…"
-                       KeyDown="OnSystemNameKeyDown"
-                       TextChanged="OnNewSystemNameChanged"/>
-              <Button Grid.Column="1" Content="+ Add" Click="OnAddSystemClick"
-                      Margin="8,0,0,0" Padding="12,4"/>
-            </Grid>
-          </StackPanel>
-          <TextBlock DockPanel.Dock="Top" Text="Systems to create:" Foreground="#667788"
-                     FontSize="11" Margin="0,12,0,4"/>
-          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1" CornerRadius="3">
-            <ScrollViewer>
-              <ItemsControl x:Name="SystemsList" Margin="6">
-                <!-- Items added in code-behind -->
-              </ItemsControl>
-            </ScrollViewer>
-          </Border>
-        </DockPanel>
 
       </Grid>
     </Border>

@@ -139,6 +139,12 @@ public static class SystemMapUpsertService
                 target.Confidence = suggestion.Confidence;
         }
 
+        if (string.IsNullOrWhiteSpace(target.Notes) &&
+            !string.IsNullOrWhiteSpace(suggestion.Description))
+        {
+            target.Notes = suggestion.Description.Trim();
+        }
+
         // Merge evidence: append entries not already present (by description).
         foreach (var ev in suggestion.Evidence)
         {
@@ -198,6 +204,7 @@ public static class SystemMapUpsertService
             Kind        = suggestion.Kind,
             Confidence  = suggestion.Confidence,
             IdentityKey = key,
+            Notes       = suggestion.Description?.Trim() ?? string.Empty,
             Evidence    = suggestion.Evidence
                 .Where(e => !string.IsNullOrWhiteSpace(e))
                 .Select(e => new EvidenceModel { Source = "LLM", Description = e })

@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -13,10 +12,9 @@ public class SetupWizardViewModel : INotifyPropertyChanged
     private string _workspaceFolderPath = string.Empty;
     private string _workspaceName = string.Empty;
     private string _profileName = "Default";
-    private string _newSystemName = string.Empty;
     private string _validationError = string.Empty;
 
-    public const int TotalSteps = 4;
+    public const int TotalSteps = 3;
 
     public int CurrentStep
     {
@@ -52,16 +50,6 @@ public class SetupWizardViewModel : INotifyPropertyChanged
         set { _profileName = value; OnPropertyChanged(); ClearValidation(); }
     }
 
-    /// <summary>Step 4 — text field for typing a new system name.</summary>
-    public string NewSystemName
-    {
-        get => _newSystemName;
-        set { _newSystemName = value; OnPropertyChanged(); }
-    }
-
-    /// <summary>Step 4 — list of system names to create.</summary>
-    public ObservableCollection<string> SystemNames { get; } = new();
-
     /// <summary>Validation error message to display on the current step.</summary>
     public string ValidationError
     {
@@ -73,10 +61,9 @@ public class SetupWizardViewModel : INotifyPropertyChanged
 
     public string StepTitle => CurrentStep switch
     {
-        1 => "Step 1 of 4 — Source Project",
-        2 => "Step 2 of 4 — Workspace Folder",
-        3 => "Step 3 of 4 — Names",
-        4 => "Step 4 of 4 — Initial Systems (optional)",
+        1 => "Step 1 of 3 — Source Project",
+        2 => "Step 2 of 3 — Workspace Folder",
+        3 => "Step 3 of 3 — Names",
         _ => string.Empty
     };
 
@@ -140,22 +127,10 @@ public class SetupWizardViewModel : INotifyPropertyChanged
                 }
                 break;
 
-            // Step 4 is entirely optional — always valid.
         }
 
         return true;
     }
-
-    public void AddSystem()
-    {
-        var name = NewSystemName.Trim();
-        if (string.IsNullOrEmpty(name)) return;
-        if (!SystemNames.Contains(name))
-            SystemNames.Add(name);
-        NewSystemName = string.Empty;
-    }
-
-    public void RemoveSystem(string name) => SystemNames.Remove(name);
 
     private void ClearValidation() => ValidationError = string.Empty;
 

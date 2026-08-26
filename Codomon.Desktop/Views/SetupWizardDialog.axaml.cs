@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -50,7 +49,6 @@ public partial class SetupWizardDialog : Window
 
     private void OnFinishClick(object? sender, RoutedEventArgs e)
     {
-        // Step 4 has no mandatory fields, but still validate for consistency.
         if (!_vm.ValidateCurrentStep())
         {
             ShowError(_vm.ValidationError);
@@ -70,7 +68,6 @@ public partial class SetupWizardDialog : Window
         SetPanelVisible("Step1Panel", step == 1);
         SetPanelVisible("Step2Panel", step == 2);
         SetPanelVisible("Step3Panel", step == 3);
-        SetPanelVisible("Step4Panel", step == 4);
 
         this.FindControl<Button>("BackButton")!.IsEnabled = step > 1;
         this.FindControl<Button>("NextButton")!.IsVisible = step < SetupWizardViewModel.TotalSteps;
@@ -228,72 +225,6 @@ public partial class SetupWizardDialog : Window
     {
         if (sender is ComboBox cb && cb.SelectedItem is ComboBoxItem item)
             _vm.ProfileName = item.Content?.ToString() ?? "Default";
-    }
-
-    private void OnNewSystemNameChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (sender is TextBox tb)
-            _vm.NewSystemName = tb.Text ?? string.Empty;
-    }
-
-    // ── System list (Step 4) ─────────────────────────────────────────────────
-
-    private void OnSystemNameKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-            AddSystem();
-    }
-
-    private void OnAddSystemClick(object? sender, RoutedEventArgs e) => AddSystem();
-
-    private void AddSystem()
-    {
-        _vm.AddSystem();
-        RefreshSystemsList();
-
-        // Clear the input box.
-        var box = this.FindControl<TextBox>("NewSystemNameBox");
-        if (box != null) box.Text = string.Empty;
-    }
-
-    private void RefreshSystemsList()
-    {
-        var list = this.FindControl<ItemsControl>("SystemsList");
-        if (list == null) return;
-
-        list.Items.Clear();
-
-        foreach (var name in _vm.SystemNames)
-        {
-            var systemName = name;
-            var row = new DockPanel { LastChildFill = false, Margin = new Avalonia.Thickness(0, 2) };
-
-            var removeBtn = new Button
-            {
-                Content = "✕",
-                Padding = new Avalonia.Thickness(6, 2),
-                FontSize = 11,
-                Foreground = Brushes.Gray,
-                [DockPanel.DockProperty] = Dock.Right
-            };
-            removeBtn.Click += (_, _) =>
-            {
-                _vm.RemoveSystem(systemName);
-                RefreshSystemsList();
-            };
-
-            var label = new TextBlock
-            {
-                Text = systemName,
-                Foreground = Brushes.LightGray,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                Margin = new Avalonia.Thickness(4, 0)
-            };
-
-            row.Children.Add(removeBtn);
-            row.Children.Add(label);
-            list.Items.Add(row);
-        }
     }
 
     // ── Validation error banner ──────────────────────────────────────────────

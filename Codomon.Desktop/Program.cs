@@ -1,5 +1,7 @@
 using Avalonia;
 using System;
+using System.Linq;
+using Codomon.Desktop.Services;
 
 namespace Codomon.Desktop;
 
@@ -9,8 +11,19 @@ class Program
     // The Avalonia UI bootstrap and app lifecycle are handled by `App.axaml` and
     // `App.axaml.cs`.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        if (args.Contains(DebugLaunchTrace.CommandLineFlag, StringComparer.Ordinal))
+        {
+            DebugLaunchTrace.Enable();
+            args = args
+                .Where(arg => !string.Equals(arg, DebugLaunchTrace.CommandLineFlag, StringComparison.Ordinal))
+                .ToArray();
+        }
+
+        DebugLaunchTrace.Write("Entering Avalonia desktop lifetime.");
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     
     // Builds and configures the Avalonia application builder.
