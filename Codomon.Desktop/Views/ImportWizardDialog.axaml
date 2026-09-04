@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Codomon.Desktop.Views.ImportWizardDialog"
         Title="Import Log — Import Wizard"
-        Width="640" Height="540"
-        MinWidth="540" MinHeight="460"
+        Width="640" Height="580"
+        MinWidth="540" MinHeight="500"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="#111820">
@@ -20,11 +20,12 @@
             <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="#2A3F5A"/>
             <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="#2A3F5A"/>
             <Ellipse x:Name="Dot4" Width="10" Height="10" Fill="#2A3F5A"/>
+            <Ellipse x:Name="Dot5" Width="10" Height="10" Fill="#2A3F5A"/>
           </StackPanel>
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="Import Log" FontSize="16" FontWeight="Bold" Foreground="White"/>
-          <TextBlock x:Name="StepTitleText" Text="Step 1 of 4 — Select File"
+          <TextBlock x:Name="StepTitleText" Text="Step 1 of 5 — Select File"
                      FontSize="12" Foreground="#88AABB"/>
         </StackPanel>
       </DockPanel>
@@ -123,8 +124,35 @@
           </Border>
         </StackPanel>
 
-        <!-- ── Step 3: Timestamp & Timezone ─────────────────────────────────── -->
+        <!-- ── Step 3: Columns & Headers ─────────────────────────────────────── -->
         <StackPanel x:Name="Step3Panel" Spacing="10" Margin="0,36,0,0" IsVisible="False">
+          <TextBlock Text="Rename columns, reorder them, or exclude columns from import."
+                     Foreground="#AABBCC" TextWrapping="Wrap"/>
+
+          <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,0">
+            <StackPanel Grid.Column="0" Spacing="2">
+              <CheckBox x:Name="HeaderRowCheckBox" Content="First row contains headers (skip on import)"
+                        Foreground="#AABBCC"
+                        IsCheckedChanged="OnHeaderRowChanged"/>
+              <TextBlock x:Name="HeaderDetectionText" Foreground="#667788" FontSize="11"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Reset" Click="OnResetColumnsClick"
+                    Padding="12,4" VerticalAlignment="Top" Margin="8,0,0,0"/>
+          </Grid>
+
+          <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"
+                  CornerRadius="3" Height="190">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+              <StackPanel x:Name="ColumnsStackPanel" Margin="6" Spacing="4"/>
+            </ScrollViewer>
+          </Border>
+          <TextBlock Text="Order (top → bottom) and inclusion are applied during import."
+                     Foreground="#667788" FontSize="11"/>
+        </StackPanel>
+
+        <!-- ── Step 4: Timestamp & Timezone ─────────────────────────────────── -->
+        <StackPanel x:Name="Step4Panel" Spacing="10" Margin="0,36,0,0" IsVisible="False">
           <TextBlock Text="Tell codomon where to find the timestamp and how to interpret it."
                      Foreground="#AABBCC" TextWrapping="Wrap"/>
 
@@ -175,8 +203,8 @@
           </Border>
         </StackPanel>
 
-        <!-- ── Step 4: Confirmation ──────────────────────────────────────────── -->
-        <StackPanel x:Name="Step4Panel" Spacing="12" Margin="0,36,0,0" IsVisible="False">
+        <!-- ── Step 5: Confirmation ──────────────────────────────────────────── -->
+        <StackPanel x:Name="Step5Panel" Spacing="12" Margin="0,36,0,0" IsVisible="False">
           <TextBlock Text="Review your settings and click Import to load the file."
                      Foreground="#AABBCC" TextWrapping="Wrap"/>
           <Border Background="#0F141E" BorderBrush="#2A3F5A" BorderThickness="1"

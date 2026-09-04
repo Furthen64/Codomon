@@ -29,4 +29,41 @@ public class ImportOptions
     /// "Local" means <see cref="TimeZoneInfo.Local"/>; "UTC" means <see cref="TimeZoneInfo.Utc"/>.
     /// </summary>
     public string TimeZoneId { get; set; } = "UTC";
+
+    /// <summary>
+    /// When <c>true</c>, the first line of the file is treated as a header row:
+    /// it supplies default column names and is skipped during import.
+    /// </summary>
+    public bool FirstRowIsHeader { get; set; } = false;
+
+    /// <summary>
+    /// Column layout in display order. An empty list means "all columns in file
+    /// order, all included, with default names". When non-empty, the parser
+    /// reorders/filters split fields according to this list before detecting
+    /// timestamp/level/message.
+    /// </summary>
+    public List<ImportColumnMapping> Columns { get; set; } = new();
+}
+
+/// <summary>
+/// Describes one column in the Columns/Headers wizard step.
+/// <see cref="OriginalIndex"/> is the zero-based position produced by splitting
+/// a line; the position of the entry inside <see cref="ImportOptions.Columns"/>
+/// defines the display/import order. Set <see cref="IsIncluded"/> to
+/// <c>false</c> to skip the column during import.
+/// </summary>
+public sealed class ImportColumnMapping
+{
+    public int OriginalIndex { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public bool IsIncluded { get; set; } = true;
+
+    public ImportColumnMapping() { }
+
+    public ImportColumnMapping(int originalIndex, string name, bool isIncluded = true)
+    {
+        OriginalIndex = originalIndex;
+        Name = name;
+        IsIncluded = isIncluded;
+    }
 }

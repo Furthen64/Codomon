@@ -49,11 +49,16 @@ public static class LogImportService
     /// <summary>
     /// Reads a delimiter-separated log file and parses each line using
     /// <paramref name="options"/> (custom delimiter, timestamp column, format, and timezone).
+    /// When <see cref="ImportOptions.FirstRowIsHeader"/> is set, the first line
+    /// is skipped (it supplied the column names in the wizard).
     /// </summary>
     public static async Task<List<LogEntryModel>> LoadEntriesWithOptionsAsync(
         string filePath, ImportOptions options)
     {
         var lines = await File.ReadAllLinesAsync(filePath);
-        return lines.Select(l => LogParser.ParseDelimited(l, options)).ToList();
+        IEnumerable<string> dataLines = lines;
+        if (options.FirstRowIsHeader && lines.Length > 0)
+            dataLines = lines.Skip(1);
+        return dataLines.Select(l => LogParser.ParseDelimited(l, options)).ToList();
     }
 }

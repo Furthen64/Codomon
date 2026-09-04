@@ -133,6 +133,36 @@ public static class LogParser
             parts = line.Split(new[] { options.Delimiter }, StringSplitOptions.None);
         }
 
+        // Apply the Columns/Headers step layout (reorder + ignore) before
+        // timestamp/level detection. TimestampColumnIndex refers to the
+        // OriginalIndex, so translate it to the effective position.
+        int effectiveTimestampIndex = options.TimestampColumnIndex;
+        if (options.Columns is { Count: > 0 })
+        {
+            var reordered = new List<string>(options.Columns.Count);
+            int effectiveIdx = -1;
+            for (int displayIdx = 0; displayIdx < options.Columns.Count; displayIdx++)
+            {
+                var col = options.Columns[displayIdx];
+                if (!col.IsIncluded) continue;
+                if (col.OriginalIndex >= 0 && col.OriginalIndex < parts.Length)
+                    reordered.Add(parts[col.OriginalIndex]);
+                else
+                    reordered.Add(string.Empty);
+                if (col.OriginalIndex == options.TimestampColumnIndex)
+                    effectiveIdx = reordered.Count - 1;
+            }
+            // Preserve trailing extra fields that have no column definition
+            // (e.g. file has more columns than the wizard saw).
+            int maxMapped = options.Columns.Count > 0
+                ? options.Columns.Max(c => c.OriginalIndex)
+                : -1;
+            for (int i = maxMapped + 1; i < parts.Length; i++)
+                reordered.Add(parts[i]);
+            parts = reordered.ToArray();
+            effectiveTimestampIndex = options.TimestampColumnIndex < 0 ? -1 : effectiveIdx;
+        }
+
         DateTimeOffset? ts     = null;
         string          level  = string.Empty;
         var             msgBuf = new List<string>(parts.Length);
@@ -145,8 +175,8 @@ public static class LogParser
             // Try timestamp —————————————————————————————————————————————————
             if (ts == null)
             {
-                bool isCandidate = options.TimestampColumnIndex < 0   // auto-detect: try every column
-                                || options.TimestampColumnIndex == i;  // or exact column
+                bool isCandidate = effectiveTimestampIndex < 0   // auto-detect: try every column
+                                || effectiveTimestampIndex == i;  // or exact column
                 if (isCandidate)
                 {
                     var parsed = TryParseTimestamp(cell, options.TimestampFormat, options.TimeZoneId,
